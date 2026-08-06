@@ -5,6 +5,7 @@ import { isRTL, type Locale } from '@/lib/i18n'
 import { LandingPage } from '@/components/landing/landing'
 import { AuthScreen } from '@/components/auth/auth-screen'
 import { DashboardShell } from '@/components/shell/dashboard-shell'
+import { PublicProfilePage } from '@/components/public/public-profile'
 
 export default function Home() {
   const session = useApp((s) => s.session)
@@ -16,6 +17,7 @@ export default function Home() {
   const theme = useApp((s) => s.theme)
   const setLocale = useApp((s) => s.setLocale)
   const goDashboard = useApp((s) => s.goDashboard)
+  const goPublicProfile = useApp((s) => s.goPublicProfile)
 
   // bootstrap session
   useEffect(() => {
@@ -37,8 +39,19 @@ export default function Home() {
       }
     })()
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle ?profile=TYPE:ID query param for public profile sharing
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const profileParam = params.get('profile')
+    if (profileParam) {
+      const [type, id] = profileParam.split(':')
+      if (type && id) {
+        goPublicProfile(id, type)
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // sync locale from session once
   useEffect(() => {
@@ -53,7 +66,7 @@ export default function Home() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [locale, theme])
 
-  // if a session exists and we're on landing/auth, go to dashboard
+  // if a session exists and we're on landing/auth, go to dashboard (unless viewing public profile)
   useEffect(() => {
     if (session && (view.name === 'landing' || view.name === 'auth')) {
       goDashboard('overview')
@@ -61,8 +74,7 @@ export default function Home() {
     if (!session && view.name === 'dashboard') {
       useApp.getState().goLanding()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session])
+  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (sessionLoading) {
     return (
@@ -74,6 +86,9 @@ export default function Home() {
       </div>
     )
   }
+
+  // Public profile is viewable without login
+  if (view.name === 'public-profile') return <PublicProfilePage />
 
   if (!session) {
     if (view.name === 'auth') return <AuthScreen />

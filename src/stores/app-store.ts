@@ -7,6 +7,7 @@ export type AppView =
   | { name: 'landing' }
   | { name: 'auth'; mode: 'signin' | 'signup'; role: string }
   | { name: 'dashboard'; section: string }
+  | { name: 'public-profile'; providerId: string; providerType: string }
 
 export type SessionInfo = {
   id: string
@@ -28,6 +29,7 @@ interface AppState {
   goLanding: () => void
   goAuth: (mode: 'signin' | 'signup', role: string) => void
   goDashboard: (section?: string) => void
+  goPublicProfile: (providerId: string, providerType: string) => void
 
   locale: Locale
   setLocale: (l: Locale) => void
@@ -55,6 +57,7 @@ export const useApp = create<AppState>()(
       goLanding: () => set({ view: { name: 'landing' } }),
       goAuth: (mode, role) => set({ view: { name: 'auth', mode, role } }),
       goDashboard: (section = 'overview') => set({ view: { name: 'dashboard', section } }),
+      goPublicProfile: (providerId, providerType) => set({ view: { name: 'public-profile', providerId, providerType } }),
 
       locale: 'en',
       setLocale: (l) => set({ locale: l }),

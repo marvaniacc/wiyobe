@@ -434,3 +434,60 @@ Platform was stable but had a major i18n issue: 402 keys used in dashboard code 
 5. Add real-time notifications via WebSocket
 6. Add admin dispute resolution workflow UI
 7. Add provider profile public page (shareable link)
+
+---
+Task ID: 10
+Agent: main (orchestrator) — scheduled cron review round 3
+Task: QA assessment + fix 399 duplicate i18n keys + add provider public profile page + share functionality.
+
+## Current Project Status Assessment
+Platform was stable but had a critical i18n bug: the auto-generation script from round 2 (task 9) added 399 duplicate keys to each locale dictionary, with worse auto-generated values overriding the original good translations. This caused text like "Ledger Title" and "Export Csv" to display instead of "Accounting ledger" and "Export CSV". Fixed by deduplicating all 4 locale dictionaries.
+
+## Completed Modifications
+
+### Bug Fixes
+1. **399 duplicate i18n keys** — CRITICAL FIX. Wrote a Python script to scan each locale dictionary, find duplicate keys, and remove the second occurrence (keeping the first/original/better translation). All 4 locales now have 532 unique keys each (was 931/852/852/852 with duplicates). Verified: admin ledger now correctly shows "Accounting ledger" and "Export CSV".
+
+### New Features
+
+#### 1. Provider Public Profile Page (shareable, no login required)
+- **API**: `GET /api/providers/public?id=X&type=DOCTOR` — returns sanitized public profile data (no auth required). Includes provider info, services, reviews with replies. Works for all 4 provider types.
+- **Store**: Added `public-profile` view type to Zustand store with `goPublicProfile(providerId, providerType)` action.
+- **Query param handling**: `page.tsx` now reads `?profile=TYPE:ID` from URL on initial load and shows the public profile. Shareable links like `http://app/?profile=DOCTOR:abc123` work without login.
+- **UI**: Full `PublicProfilePage` component with:
+  - Hero card with banner, avatar, verified badge, rating, price, location
+  - Two-column layout: bio + services + reviews (left), booking CTA + quick info sidebar (right)
+  - Reviews section showing patient reviews with provider replies
+  - CTA buttons: "Book now" (→ signup) and "Sign in" (→ signin)
+  - Full loading skeleton, error state, empty state
+  - Language switcher in header
+  - RTL-aware, responsive design
+- **Share functionality**: 
+  - Provider dashboard overview: "Share profile" button in header that copies `?profile=TYPE:ID` URL to clipboard
+  - Patient provider detail dialog: Share icon button that copies the public profile URL
+  - Toast notification on copy: "Profile link copied to clipboard"
+- **i18n**: Added 5 new keys (public.viewProfile, public.shareProfile, public.profileCopied, public.about, public.bookThisProvider) to all 4 locales.
+
+## Verification Results
+- **Lint**: 0 errors, 7 warnings (all cosmetic)
+- **i18n**: All 4 locales now have 532 unique keys (no duplicates)
+- **Agent-browser QA**:
+  - Public profile page: ✓ renders with hero card, bio, services, reviews, booking CTA. Verified via `?profile=DOCTOR:cmsh9z9lm000hrza74yqh9ep0` URL — shows Dr. Mehmet Yilmaz with Cardiology specialty, 5.0 rating, $180 price, verified badge, services list, review with provider reply.
+  - Share button: ✓ found on provider dashboard overview, copies URL to clipboard
+  - Share button: ✓ found in patient provider detail dialog
+  - Admin ledger: ✓ "Accounting ledger" and "Export CSV" show correctly (dedup fix verified)
+  - All existing flows still working
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 7 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for some keys — functional but not ideal
+
+## Priority Recommendations for Next Phase
+1. Proper translation of remaining English-fallback keys to tr/fa/ar
+2. Add email notification sending (SMTP integration)
+3. Add multi-currency support
+4. Add real-time notifications via WebSocket
+5. Add admin dispute resolution workflow UI
+6. Add provider profile photo upload
+7. Add booking calendar export (iCal/Google Calendar)

@@ -251,6 +251,21 @@ function OverviewSection({ role }: { role: string }) {
   const { t, locale } = useT()
   const goDashboard = useApp((s) => s.goDashboard)
   const { data, loading, error, refetch } = useApi<StatsResponse>('/api/stats')
+  const { data: profileData } = useApi<{ user: any }>('/api/profile')
+
+  // Find provider ID for public profile link
+  const providerId = profileData?.user?.doctor?.id || profileData?.user?.hospital?.id || profileData?.user?.hotel?.id || profileData?.user?.translator?.id || ''
+
+  async function shareProfile() {
+    if (!providerId) return
+    const url = `${window.location.origin}/?profile=${role}:${providerId}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success(t('public.profileCopied'))
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
 
   if (loading) {
     return (
@@ -288,6 +303,12 @@ function OverviewSection({ role }: { role: string }) {
       <PageHeader
         title={t('dash.overview')}
         description={data.providerName ? `${t('role.' + role.toLowerCase())} · ${data.providerName}` : t('role.' + role.toLowerCase())}
+        action={providerId ? (
+          <Button variant="outline" size="sm" onClick={shareProfile} className="gap-1.5">
+            <Icon name="share" size={16} />
+            <span className="hidden sm:inline">{t('public.shareProfile')}</span>
+          </Button>
+        ) : undefined}
       />
 
       {/* Stat cards */}

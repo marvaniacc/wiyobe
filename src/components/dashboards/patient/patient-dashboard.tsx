@@ -879,6 +879,17 @@ function ProviderDetailDialog({ provider, open, onOpenChange, onBook }: {
 
   if (!provider) return null
 
+  async function shareProfile() {
+    if (!provider) return
+    const shareUrl = `${window.location.origin}/?profile=${provider.providerType}:${provider.id}`
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast.success(t('public.profileCopied'))
+    } catch {
+      window.open(shareUrl, '_blank')
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
@@ -894,6 +905,9 @@ function ProviderDetailDialog({ provider, open, onOpenChange, onBook }: {
                 {provider.specialty} · {[provider.city, provider.country].filter(Boolean).join(', ')}
               </DialogDescription>
             </div>
+            <Button variant="ghost" size="icon-sm" onClick={shareProfile} title={t('public.shareProfile')}>
+              <Icon name="share" size={16} />
+            </Button>
           </div>
         </DialogHeader>
 
