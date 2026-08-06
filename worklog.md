@@ -701,3 +701,65 @@ Platform was stable. Profile pages lacked avatar/photo upload capability and had
 5. Add real-time notifications via WebSocket
 6. Add iCal export to provider dashboard
 7. Move avatar storage to S3/Cloudinary for production
+
+---
+Task ID: 14
+Agent: main (orchestrator) — scheduled cron review round 7
+Task: Add "Open dispute" + "Add to calendar" buttons to provider appointment rows + complete provider-side dispute workflow.
+
+## Current Project Status Assessment
+Platform was stable. Provider appointments had "Mark as completed", "Cancel", and "Join video" buttons but lacked "Open dispute" and "Add to calendar" capabilities that patients already had. This round completed the feature parity for providers.
+
+## Completed Modifications
+
+### New Features
+
+#### 1. iCal Calendar Export for Provider Appointments
+- Added "Add to calendar" button (event_available icon) to confirmed appointment rows in the provider dashboard
+- Uses the same `downloadICal` utility from `src/lib/ical.ts`
+- Generates .ics file with: event title ("Online consultation with Sara Ahmadi" / "In-person visit with..."), description (patient name, visit type, booking ID), location (video URL or city), start/end times, 1-hour alarm
+- Toast: "Calendar event downloaded" on success
+- Button shows on confirmed bookings only (not completed/cancelled)
+
+#### 2. Provider Dispute Creation
+- Added "Open dispute" button (gavel icon, red text) to appointment rows:
+  - **Confirmed bookings**: Shows alongside Calendar, Mark complete, and Cancel buttons
+  - **Completed bookings**: Shows as the only action button (for post-service disputes)
+- **DisputeDialog** (inline in BookingRow component):
+  - Dispute type select (Refund request, Service quality, Scheduling issue, Payment issue, Other)
+  - Title input (min 3 chars, max 200)
+  - Description textarea (min 10 chars, max 2000, with character counter)
+  - Submit button with validation
+  - Success toast: "Dispute opened successfully"
+  - Form resets after submission
+  - Calls `POST /api/disputes` with bookingId, type, title, description
+- The API automatically determines the "against" party (patient) from the booking context
+
+### Code Structure
+- Added `handleDispute()` and `handleAddToCalendar()` functions to the `BookingRow` component
+- Added dispute form state: `disputeOpen`, `disputeType`, `disputeTitle`, `disputeDesc`
+- Imported `downloadICal` from `@/lib/ical`
+- Dispute dialog rendered inline within the BookingRow for both confirmed and completed booking states
+
+## Verification Results
+- **Lint**: 0 errors, 9 warnings (all cosmetic)
+- **Agent-browser QA**:
+  - Provider appointments: ✓ All 4 action buttons visible — Row 0-2 (confirmed): calendar + complete + cancel + dispute; Row 3 (completed): dispute only
+  - Provider dispute creation: ✓ Clicked gavel button → dispute dialog opened → filled title + description → submitted → POST /api/disputes 201 → dialog closed
+  - Calendar export: ✓ Button visible and functional on confirmed bookings
+  - All existing flows still working (patient disputes, admin resolution, bookings, etc.)
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 9 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for newer keys — functional but not ideal
+- Avatar stored as data URL in DB — works for MVP but should use S3 in production
+
+## Priority Recommendations for Next Phase
+1. Proper translation of remaining English-fallback keys to tr/fa/ar
+2. Add email notification sending (SMTP integration)
+3. Add multi-currency support (EUR, TRY, IRR, SAR)
+4. Add real-time notifications via WebSocket
+5. Move avatar storage to S3/Cloudinary for production
+6. Add provider analytics dashboard (earnings chart, booking trends)
+7. Add patient medical document upload (prescriptions, test results)

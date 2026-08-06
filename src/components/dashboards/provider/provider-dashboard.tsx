@@ -6,6 +6,7 @@ import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
 import { Icon } from '@/components/shared/icon'
 import { StarRating } from '@/components/shared/star-rating'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
+import { downloadICal } from '@/lib/ical'
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction,
 } from '@/components/ui/card'
@@ -558,8 +559,14 @@ function AppointmentsSection({ role }: { role: string }) {
 function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: string, fb?: string) => string; locale: string; onDone: () => void }) {
   const [completeOpen, setCompleteOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [disputeOpen, setDisputeOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Dispute form state
+  const [disputeType, setDisputeType] = useState<'REFUND_REQUEST' | 'SERVICE_QUALITY' | 'SCHEDULING_ISSUE' | 'PAYMENT_ISSUE' | 'OTHER'>('OTHER')
+  const [disputeTitle, setDisputeTitle] = useState('')
+  const [disputeDesc, setDisputeDesc] = useState('')
 
   async function handleComplete() {
     setBusy(true)
@@ -588,6 +595,43 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
     } finally {
       setBusy(false)
     }
+  }
+
+  async function handleDispute() {
+    if (disputeTitle.trim().length < 3 || disputeDesc.trim().length < 10) return
+    setBusy(true)
+    try {
+      await apiPost('/api/disputes', {
+        bookingId: booking.id,
+        type: disputeType,
+        title: disputeTitle.trim(),
+        description: disputeDesc.trim(),
+      })
+      toast.success(t('dispute.disputeOpened'))
+      setDisputeOpen(false)
+      setDisputeTitle('')
+      setDisputeDesc('')
+      setDisputeType('OTHER')
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function handleAddToCalendar() {
+    const startTime = new Date(booking.startDate)
+    const endTime = booking.endDate ? new Date(booking.endDate) : new Date(startTime.getTime() + 60 * 60 * 1000)
+    const visitType = booking.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'
+    downloadICal(`medtravel-booking-${booking.id.slice(-8)}`, {
+      uid: booking.id,
+      title: `${visitType} with ${booking.patient?.name || 'Patient'}`,
+      description: `MedTravel booking\nPatient: ${booking.patient?.name || '—'}\nVisit type: ${visitType}\nBooking ID: ${booking.id}`,
+      location: booking.videoSessionUrl || booking.doctor?.city || '',
+      startTime,
+      endTime,
+    })
+    toast.success(t('booking.calendarAdded'))
   }
 
   const isConfirmed = booking.status === 'CONFIRMED'
@@ -634,6 +678,18 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
           )}
           {isConfirmed && (
             <>
+              {/* Calendar export */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleAddToCalendar}
+                title={t('booking.addToCalendar')}
+              >
+                <Icon name="event_available" size={14} />
+                <span className="hidden lg:inline">{t('booking.addToCalendar')}</span>
+              </Button>
+
               <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
                 <DialogTrigger asChild>
                   <Button variant="success" size="sm" className="gap-1.5">
@@ -692,10 +748,113 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+
+              {/* Open dispute button + dialog */}
+              <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-error hover:bg-error/5" title={t('dispute.openDispute')}>
+                    <Icon name="gavel" size={14} />
+                    <span className="hidden lg:inline">{t('dispute.openDispute')}</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Icon name="gavel" size={20} className="text-error" />
+                      {t('dispute.openDispute')}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {booking.patient?.name} · {t('dispute.disputeDesc')}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium">{t('dispute.disputeType')}</Label>
+                      <Select value={disputeType} onValueChange={(v: any) => setDisputeType(v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="REFUND_REQUEST">{t('dispute.typeRefund')}</SelectItem>
+                          <SelectItem value="SERVICE_QUALITY">{t('dispute.typeService')}</SelectItem>
+                          <SelectItem value="SCHEDULING_ISSUE">{t('dispute.typeSchedule')}</SelectItem>
+                          <SelectItem value="PAYMENT_ISSUE">{t('dispute.typePayment')}</SelectItem>
+                          <SelectItem value="OTHER">{t('dispute.typeOther')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium">{t('dispute.disputeTitle')}</Label>
+                      <Input value={disputeTitle} onChange={(e) => setDisputeTitle(e.target.value)} placeholder="Brief summary of the issue" maxLength={200} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium">{t('dispute.disputeReason')}</Label>
+                      <Textarea value={disputeDesc} onChange={(e) => setDisputeDesc(e.target.value)} placeholder="Describe the issue in detail (min 10 characters)..." rows={4} maxLength={2000} className="resize-none" />
+                      <p className="text-xs text-muted-foreground">{disputeDesc.length}/2000</p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDisputeOpen(false)} disabled={busy}>{t('common.cancel')}</Button>
+                    <Button variant="destructive" onClick={handleDispute} disabled={busy || disputeTitle.trim().length < 3 || disputeDesc.trim().length < 10} className="gap-1.5">
+                      {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="gavel" size={14} />}
+                      {t('dispute.submit')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </>
           )}
-          {!isConfirmed && (
+          {!isConfirmed && booking.status !== 'COMPLETED' && (
             <span className="text-xs text-muted-foreground">—</span>
+          )}
+          {booking.status === 'COMPLETED' && (
+            <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 text-error hover:bg-error/5" title={t('dispute.openDispute')}>
+                  <Icon name="gavel" size={14} />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Icon name="gavel" size={20} className="text-error" />
+                    {t('dispute.openDispute')}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {booking.patient?.name} · {t('dispute.disputeDesc')}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">{t('dispute.disputeType')}</Label>
+                    <Select value={disputeType} onValueChange={(v: any) => setDisputeType(v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="REFUND_REQUEST">{t('dispute.typeRefund')}</SelectItem>
+                        <SelectItem value="SERVICE_QUALITY">{t('dispute.typeService')}</SelectItem>
+                        <SelectItem value="SCHEDULING_ISSUE">{t('dispute.typeSchedule')}</SelectItem>
+                        <SelectItem value="PAYMENT_ISSUE">{t('dispute.typePayment')}</SelectItem>
+                        <SelectItem value="OTHER">{t('dispute.typeOther')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">{t('dispute.disputeTitle')}</Label>
+                    <Input value={disputeTitle} onChange={(e) => setDisputeTitle(e.target.value)} placeholder="Brief summary of the issue" maxLength={200} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">{t('dispute.disputeReason')}</Label>
+                    <Textarea value={disputeDesc} onChange={(e) => setDisputeDesc(e.target.value)} placeholder="Describe the issue in detail..." rows={4} maxLength={2000} className="resize-none" />
+                    <p className="text-xs text-muted-foreground">{disputeDesc.length}/2000</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDisputeOpen(false)} disabled={busy}>{t('common.cancel')}</Button>
+                  <Button variant="destructive" onClick={handleDispute} disabled={busy || disputeTitle.trim().length < 3 || disputeDesc.trim().length < 10} className="gap-1.5">
+                    {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="gavel" size={14} />}
+                    {t('dispute.submit')}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </TableCell>
