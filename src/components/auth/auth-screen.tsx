@@ -26,6 +26,7 @@ const ROLES = [
   { role: 'HOSPITAL', icon: 'local_hospital', labelKey: 'role.hospital' },
   { role: 'HOTEL', icon: 'hotel', labelKey: 'role.hotel' },
   { role: 'TRANSLATOR', icon: 'translate', labelKey: 'role.translator' },
+  { role: 'AFFILIATE', icon: 'campaign', labelKey: 'role.affiliate' },
 ]
 
 type Step = 'credentials' | 'otp'

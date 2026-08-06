@@ -1754,6 +1754,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'ledger': return <LedgerSection />
     case 'reports': return <ReportsSection />
     case 'disputes': return <DisputesSection />
+    case 'affiliates': return <AffiliatesSection />
     default: return <OverviewSection />
   }
 }
@@ -2149,6 +2150,230 @@ function DisputesSection() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Affiliates section — manage affiliate marketers + commission tier settings
+// ============================================================================
+
+const AFFILIATE_TIER_CLS: Record<string, string> = {
+  BRONZE: 'bg-amber-700/10 text-amber-700',
+  SILVER: 'bg-gray-500/10 text-gray-500',
+  GOLD: 'bg-warning/10 text-warning',
+  PLATINUM: 'bg-primary/10 text-primary',
+}
+
+function AffiliatesSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ affiliates: any[]; settings: any[] }>('/api/admin/affiliates')
+  const [busy, setBusy] = React.useState<string | null>(null)
+  const [tierRates, setTierRates] = React.useState<Record<string, string>>({})
+
+  React.useEffect(() => {
+    if (data?.settings) {
+      const map: Record<string, string> = {}
+      data.settings.forEach((s: any) => { map[s.tier] = s.commissionRate })
+      setTierRates(map)
+    }
+  }, [data?.settings])
+
+  async function handleAction(affiliateId: string, action: string, extra?: any) {
+    setBusy(affiliateId + action)
+    try {
+      await apiPost('/api/admin/affiliates', { affiliateId, action, ...extra })
+      toast.success(action === 'approve' ? t('admin.approve') : action === 'suspend' ? t('admin.suspend') : 'Updated')
+      refetch()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
+  }
+
+  async function saveSettings() {
+    setBusy('settings')
+    try {
+      const settings = Object.entries(tierRates).map(([tier, rate]) => ({ tier, commissionRate: rate }))
+      await apiPut('/api/admin/affiliates', { settings })
+      toast.success(t('admin.commissionSaved'))
+      refetch()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
+  }
+
+  if (loading) return <div className="flex flex-col gap-6"><PageHeader title={t('admin.affiliateManagement')} icon="campaign" /><LoadingCard lines={4} /></div>
+  if (error) return <ErrorState message={error} onRetry={refetch} />
+
+  const affiliates = data?.affiliates || []
+  const pending = affiliates.filter((a: any) => !a.verified)
+  const active = affiliates.filter((a: any) => a.verified)
+  const settings = data?.settings || []
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('admin.affiliateManagement')} description={t('admin.affiliateManagementDesc')} icon="campaign" />
+
+      {/* Commission tier settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="percent" size={18} className="text-primary" />
+            {t('admin.affiliateSettings')}
+          </CardTitle>
+          <CardDescription>{t('admin.affiliateSettingsDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'].map((tier) => {
+              const s = settings.find((x: any) => x.tier === tier)
+              return (
+                <div key={tier} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className={cn('flex size-8 items-center justify-center rounded-[8px]', AFFILIATE_TIER_CLS[tier])}>
+                      <Icon name="workspace_premium" size={16} fill />
+                    </div>
+                    <Label className="text-sm font-medium capitalize">{tier.toLowerCase()}</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={tierRates[tier] || s?.commissionRate || ''}
+                      onChange={(e) => setTierRates((prev) => ({ ...prev, [tier]: e.target.value }))}
+                      className="h-10"
+                      placeholder="10"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Commission of platform fee</p>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={saveSettings} disabled={busy === 'settings'} className="gap-1.5">
+              {busy === 'settings' ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+              {t('common.save')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard icon="campaign" label={t('admin.totalAffiliates')} value={String(affiliates.length)} tone="primary" />
+        <StatCard icon="verified" label={t('admin.activeAffiliates')} value={String(active.length)} tone="success" />
+        <StatCard icon="hourglass_top" label={t('admin.pendingAffiliates')} value={String(pending.length)} tone="warning" />
+      </div>
+
+      {/* Pending affiliates */}
+      {pending.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">{t('admin.affiliateModeration')} ({pending.length})</h3>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {pending.map((a: any) => (
+              <Card key={a.id} className="gap-0">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warning/10 text-warning">
+                      <Icon name="hourglass_top" size={20} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{a.user.name || a.user.email}</p>
+                      <p className="text-xs text-muted-foreground">{a.user.email}</p>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="font-mono">{a.referralCode}</span>
+                        {a.website && <span>· {a.website}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" variant="success" onClick={() => handleAction(a.id, 'approve')} disabled={!!busy} className="gap-1.5">
+                      <Icon name="check_circle" size={14} fill />
+                      {t('admin.approveAffiliate')}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleAction(a.id, 'suspend')} disabled={!!busy} className="gap-1.5 text-error">
+                      <Icon name="block" size={14} />
+                      {t('admin.suspendAffiliate')}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All affiliates table */}
+      <Card className="gap-0">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t('admin.affiliateManagement')}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {affiliates.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">{t('admin.noAffiliates')}</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="ps-4 text-xs uppercase tracking-wide text-muted-foreground">Name</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Code</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Tier</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Clicks</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Signups</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Earnings</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Status</TableHead>
+                  <TableHead className="pe-4 text-end text-xs uppercase tracking-wide text-muted-foreground">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {affiliates.map((a: any) => (
+                  <TableRow key={a.id} className="border-divider">
+                    <TableCell className="ps-4">
+                      <p className="text-sm font-medium text-foreground">{a.user.name || a.user.email}</p>
+                      <p className="text-xs text-muted-foreground">{a.user.email}</p>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-foreground">{a.referralCode}</TableCell>
+                    <TableCell>
+                      <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium capitalize', AFFILIATE_TIER_CLS[a.tier] || AFFILIATE_TIER_CLS.BRONZE)}>
+                        {a.tier.toLowerCase()}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-foreground tabular-nums">{a.totalClicks}</TableCell>
+                    <TableCell className="text-sm text-foreground tabular-nums">{a.totalSignups}</TableCell>
+                    <TableCell className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(a.totalEarnings, 'USD', locale)}</TableCell>
+                    <TableCell>
+                      {a.verified ? (
+                        <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">{t('common.active')}</span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">{t('common.pending')}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="pe-4">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Select value={a.tier} onValueChange={(v) => handleAction(a.id, 'setTier', { tier: v })} disabled={!!busy}>
+                          <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="BRONZE">Bronze</SelectItem>
+                            <SelectItem value="SILVER">Silver</SelectItem>
+                            <SelectItem value="GOLD">Gold</SelectItem>
+                            <SelectItem value="PLATINUM">Platinum</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {a.verified ? (
+                          <Button size="sm" variant="ghost" onClick={() => handleAction(a.id, 'suspend')} disabled={!!busy} className="text-error hover:bg-error/5" title={t('admin.suspendAffiliate')}>
+                            <Icon name="block" size={14} />
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" onClick={() => handleAction(a.id, 'approve')} disabled={!!busy} className="text-success hover:bg-success/5" title={t('admin.approveAffiliate')}>
+                            <Icon name="check_circle" size={14} fill />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

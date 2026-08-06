@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { hashPassword, setSessionCookie } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,6 +108,15 @@ export async function POST(req: Request) {
             userId: user.id, languages: data.languages || data.preferredLanguage, specialization: 'general',
             bio: '', city: data.city || '', country: data.country || '', hourlyRate: '0', dailyRate: '0',
             yearsExperience: 0, verified: false,
+          },
+        })
+      } else if (data.role === 'AFFILIATE') {
+        const referralCode = (data.name || body.email).replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() + crypto.randomBytes(4).toString('hex').toUpperCase()
+        await db.affiliate.create({
+          data: {
+            userId: user.id,
+            referralCode,
+            commissionRate: '10',
           },
         })
       }

@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { hashPassword, setSessionCookie } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export async function GET() {
 const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
-  role: z.enum(['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']),
+  role: z.enum(['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR', 'AFFILIATE']),
   name: z.string().min(2),
   preferredLanguage: z.enum(['en', 'tr', 'fa', 'ar']).default('en'),
   phone: z.string().optional(),
@@ -24,6 +25,8 @@ const signupSchema = z.object({
   city: z.string().optional(),
   specialty: z.string().optional(),
   languages: z.string().optional(),
+  website: z.string().optional(),
+  socialMedia: z.string().optional(),
 })
 
 export async function POST(req: Request) {
@@ -81,6 +84,17 @@ export async function POST(req: Request) {
           userId: user.id, languages: body.languages || body.preferredLanguage, specialization: 'general',
           bio: '', city: body.city || '', country: body.country || '', hourlyRate: '0', dailyRate: '0',
           yearsExperience: 0, verified: false,
+        },
+      })
+    } else if (body.role === 'AFFILIATE') {
+      const referralCode = (body.name || body.email).replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() + crypto.randomBytes(4).toString('hex').toUpperCase()
+      await db.affiliate.create({
+        data: {
+          userId: user.id,
+          referralCode,
+          commissionRate: '10',
+          website: body.website,
+          socialMedia: body.socialMedia,
         },
       })
     }

@@ -954,3 +954,83 @@ Platform was stable with all core flows working (0 lint errors, no console error
 5. Move document/avatar storage to S3/Cloudinary for production
 6. Add document sharing with providers
 7. Add booking iCal export to admin/overview
+
+---
+Task ID: 18
+Agent: main (orchestrator) — affiliate marketer role implementation
+Task: Design and implement a new AFFILIATE role with dashboard, referral tracking, and admin moderation + commission percent settings.
+
+## Current Project Status Assessment
+Platform was stable with 7 roles (PATIENT, DOCTOR, HOSPITAL, HOTEL, TRANSLATOR, ADMIN). No affiliate/referral marketing system existed. This task added a complete affiliate marketing system from scratch: schema, API, dashboard, admin management, and landing page integration.
+
+## Completed Modifications
+
+### 1. Database Schema (prisma/schema.prisma)
+- Added `AFFILIATE` to the `Role` enum
+- Added 4 new models:
+  - **Affiliate**: userId (unique), referralCode (unique), tier (BRONZE/SILVER/GOLD/PLATINUM), commissionRate, website, socialMedia, description, verified, totalClicks, totalSignups, totalBookings, totalEarnings, availableBalance, pendingBalance, paidOut
+  - **AffiliateClick**: affiliateId, visitorIp, userAgent, referredUserId, bookingId, status (CLICKED/SIGNED_UP/BOOKED/COMPLETED), commissionAmount, clickedAt, convertedAt
+  - **AffiliatePayout**: affiliateId, amount, currency, status, method, reference, periodStart, periodEnd, completedAt
+  - **AffiliateSetting**: tier (unique), commissionRate — admin-configurable per-tier commission percentages
+- Added `affiliate` and `affiliateReferrals` relations to User model
+- Added 2 new enums: `AffiliateTier` (BRONZE/SILVER/GOLD/PLATINUM), `AffiliateClickStatus` (CLICKED/SIGNED_UP/BOOKED/COMPLETED)
+
+### 2. API Routes
+- **`/api/affiliate/profile`** (GET/PUT): Get/update affiliate profile. Auto-creates affiliate record with generated referral code if missing.
+- **`/api/affiliate/stats`** (GET): Overview stats — totalClicks, signups, bookings, earnings, balance, conversion rate, booking rate, tier, referral code. Includes conversion funnel and recent activity.
+- **`/api/affiliate/clicks`** (GET): Full referral/click history with status filter and referred user info.
+- **`/api/affiliate/payouts`** (GET): Payout history + balance summary.
+- **`/api/affiliate/track`** (POST, public): Tracks referral clicks when someone visits via `?ref=CODE`. No auth required. Creates AffiliateClick record + increments totalClicks.
+- **`/api/admin/affiliates`** (GET/POST/PUT): Admin management — list all affiliates + tier settings; approve/suspend/activate affiliates; set tier per affiliate; update tier commission rate settings.
+
+### 3. Auth Integration
+- Updated signup schema to accept `AFFILIATE` role + `website` and `socialMedia` fields
+- Updated OTP send/verify routes to handle `AFFILIATE` role with automatic referral code generation
+- Affiliate accounts start as PENDING (need admin approval) — same as other providers
+- Google OAuth flow also handles AFFILIATE role
+
+### 4. Affiliate Dashboard (`src/components/dashboards/affiliate/affiliate-dashboard.tsx`)
+Full dashboard with 5 sections:
+- **Overview**: Referral link card (copyable link + code), 4 stat cards (clicks, signups, bookings, conversion rate), earnings summary (available/pending/paid out + total), tier card with badge, conversion funnel (4-step visual), recent activity feed
+- **Referrals**: Full click/referral history table with status badges, referred user names, timestamps, commission amounts. Desktop table + mobile cards. Empty state with CTA.
+- **Analytics**: 4 stat cards, conversion funnel bar chart (recharts with color-coded bars)
+- **Payouts**: 4 balance cards, payout history table with status badges
+- **Profile**: Avatar upload, form with name/phone/country/city/language/website/socialMedia/description, referral code + commission rate display, tier badge
+
+### 5. Admin Affiliate Management (`src/components/dashboards/admin/admin-dashboard.tsx`)
+New "Affiliates" section (campaign icon) in admin sidebar:
+- **Commission tier settings card**: 4 tier inputs (Bronze/Silver/Gold/Platinum) with percentage inputs and save button. Settings stored in AffiliateSetting model.
+- **3 summary stat cards**: Total affiliates, Active affiliates, Pending affiliates
+- **Pending affiliates moderation**: Card grid with approve/suspend buttons for each pending affiliate
+- **All affiliates table**: Name/email, referral code, tier badge, clicks, signups, earnings, status, actions (tier select dropdown + approve/suspend button)
+
+### 6. Navigation & Landing
+- Added AFFILIATE nav config to DashboardShell (5 items: Overview, Referrals, Analytics, Payouts, Profile)
+- Added AFFILIATE role to ROLE_LABEL_KEY
+- Added "Affiliate" role to auth screen role tabs (campaign icon)
+- Added "Affiliate" role to landing page role chooser (teal color, campaign icon, "Earn commissions by referring patients to MedTravel")
+- Wired `AffiliateDashboard` into the DashboardShell content renderer
+
+### 7. i18n
+- Added 72 affiliate-related keys to all 4 locales (en/tr/fa/ar) including: role label, dashboard sections, referral link, stats, tiers, payouts, profile, admin management, commission settings
+
+### Bug Fix
+- Fixed bare `useState` in AffiliatesSection → `React.useState` (admin dashboard uses `import * as React` pattern)
+
+## Verification Results
+- **Lint**: 0 errors, 9 warnings (all cosmetic)
+- **Agent-browser QA**:
+  - Affiliate signup: ✓ Created `affiliate@medtravel.com` via signup API, status PENDING, referral code `AFFI0848CD91` auto-generated
+  - Admin approval: ✓ Approved affiliate via admin API
+  - Affiliate dashboard: ✓ Renders with "Affiliate Dashboard" heading, "Verified" badge, referral link card with copyable link (`http://127.0.0.1:3000/?ref=AFFI0848CD91`), referral code display, 4 stat cards (clicks/signups/bookings/conversion rate), earnings summary (available/pending/paid out), tier card (Bronze), conversion funnel
+  - Admin affiliate management: ✓ Renders with "Affiliate management" heading, commission tier settings (Bronze/Silver/Gold/Platinum percentage inputs), 3 summary stat cards, affiliate table with name, code, tier, clicks, signups, earnings, status, tier selector + approve/suspend actions
+  - All existing flows still working
+
+## Demo Account
+- `affiliate@medtravel.com` / `affiliate123` (role: AFFILIATE, tier: BRONZE, verified: true)
+
+## Unresolved Issues / Risks
+- Affiliate commission calculation on booking completion not yet wired into the booking lifecycle (the API and models exist, but the actual commission credit when a referred user's booking completes needs integration into `/api/bookings/complete`)
+- Referral click tracking on the landing page (`?ref=CODE` query param) not yet wired into `page.tsx` to call the track API
+- Affiliate payout batch processing not yet implemented (similar to provider payouts)
+- Non-English locales use English fallback for the 72 new keys

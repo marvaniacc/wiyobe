@@ -13,7 +13,7 @@ const schema = z.object({
   purpose: z.enum(['signup', 'signin', 'reset']),
   // For signup OTP, we stash the full signup payload to use after verification
   signupData: z.object({
-    role: z.enum(['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']),
+    role: z.enum(['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR', 'AFFILIATE']),
     name: z.string().min(2),
     password: z.string().min(6),
     preferredLanguage: z.enum(['en', 'tr', 'fa', 'ar']).default('en'),

@@ -15,6 +15,7 @@ import { useRouter as _r } from 'next/navigation'
 import { PatientDashboard } from '@/components/dashboards/patient/patient-dashboard'
 import { ProviderDashboard } from '@/components/dashboards/provider/provider-dashboard'
 import { AdminDashboard } from '@/components/dashboards/admin/admin-dashboard'
+import { AffiliateDashboard } from '@/components/dashboards/affiliate/affiliate-dashboard'
 import { NotificationBell } from '@/components/shell/notification-bell'
 
 type NavItem = { key: string; labelKey: string; icon: string }
@@ -85,11 +86,19 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'payouts', labelKey: 'dash.payouts', icon: 'account_balance' },
     { key: 'ledger', labelKey: 'dash.ledger', icon: 'receipt_long' },
     { key: 'reports', labelKey: 'dash.reports', icon: 'analytics' },
+    { key: 'affiliates', labelKey: 'admin.affiliates', icon: 'campaign' },
+  ],
+  AFFILIATE: [
+    { key: 'overview', labelKey: 'dash.affiliateOverview', icon: 'space_dashboard' },
+    { key: 'referrals', labelKey: 'dash.referrals', icon: 'ads_click' },
+    { key: 'analytics', labelKey: 'dash.affiliateAnalytics', icon: 'analytics' },
+    { key: 'payouts', labelKey: 'dash.affiliatePayouts', icon: 'account_balance' },
+    { key: 'profile', labelKey: 'dash.affiliateProfile', icon: 'account_circle' },
   ],
 }
 
 const ROLE_LABEL_KEY: Record<string, string> = {
-  PATIENT: 'role.patient', DOCTOR: 'role.doctor', HOSPITAL: 'role.hospital', HOTEL: 'role.hotel', TRANSLATOR: 'role.translator', ADMIN: 'role.admin',
+  PATIENT: 'role.patient', DOCTOR: 'role.doctor', HOSPITAL: 'role.hospital', HOTEL: 'role.hotel', TRANSLATOR: 'role.translator', ADMIN: 'role.admin', AFFILIATE: 'role.affiliate',
 }
 
 export function DashboardShell() {
@@ -267,6 +276,7 @@ export function DashboardShell() {
             <ProviderDashboard section={section} role={session.role} />
           )}
           {session.role === 'ADMIN' && <AdminDashboard section={section} />}
+          {session.role === 'AFFILIATE' && <AffiliateDashboard section={section} />}
         </main>
 
         {/* Footer */}

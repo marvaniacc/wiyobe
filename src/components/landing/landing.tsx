@@ -19,6 +19,7 @@ const ROLES = [
   { role: 'HOSPITAL', icon: 'local_hospital', color: 'bg-amber-50 text-warning', labelKey: 'role.hospital', descKey: 'landing.hospitalDesc' },
   { role: 'HOTEL', icon: 'hotel', color: 'bg-purple-50 text-[#9334E6]', labelKey: 'role.hotel', descKey: 'landing.hotelDesc' },
   { role: 'TRANSLATOR', icon: 'translate', color: 'bg-red-50 text-error', labelKey: 'role.translator', descKey: 'landing.translatorDesc' },
+  { role: 'AFFILIATE', icon: 'campaign', color: 'bg-teal-50 text-[#007B83]', labelKey: 'role.affiliate', descKey: 'landing.affiliateDesc' },
 ]
 
 const FEATURES = [

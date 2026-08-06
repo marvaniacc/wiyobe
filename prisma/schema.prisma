@@ -15,6 +15,7 @@ enum Role {
   HOTEL
   TRANSLATOR
   ADMIN
+  AFFILIATE
 }
 
 enum UserStatus {
@@ -102,6 +103,8 @@ model User {
   disputesRaised    Dispute[]    @relation("disputesRaised")
   disputesAgainst   Dispute[]    @relation("disputesAgainst")
   disputesResolved  Dispute[]    @relation("disputesResolved")
+  affiliate         Affiliate?
+  affiliateReferrals AffiliateClick[] @relation("affiliateReferrals")
 }
 
 model OtpCode {
@@ -461,4 +464,84 @@ model Dispute {
   resolvedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+}
+
+// ============================================================================
+// Affiliate Marketing System
+// ============================================================================
+
+enum AffiliateTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum AffiliateClickStatus {
+  CLICKED
+  SIGNED_UP
+  BOOKED
+  COMPLETED
+}
+
+model Affiliate {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referralCode    String   @unique
+  tier            AffiliateTier @default(BRONZE)
+  commissionRate  String   @default("10") // percentage of platform commission
+  website         String?
+  socialMedia     String?
+  description     String?
+  verified        Boolean  @default(false)
+  totalClicks     Int      @default(0)
+  totalSignups    Int      @default(0)
+  totalBookings   Int      @default(0)
+  totalEarnings   String   @default("0")
+  availableBalance String  @default("0")
+  pendingBalance  String   @default("0")
+  paidOut         String   @default("0")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  clicks          AffiliateClick[]
+  payouts         AffiliatePayout[]
+}
+
+model AffiliateClick {
+  id            String   @id @default(cuid())
+  affiliateId   String
+  affiliate     Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  visitorIp     String?
+  userAgent     String?
+  referredUserId String?  // user who signed up from this click
+  referredUser  User?     @relation("affiliateReferrals", fields: [referredUserId], references: [id])
+  bookingId     String?   // booking that resulted from this referral
+  status        AffiliateClickStatus @default(CLICKED)
+  commissionAmount String? // commission earned when booking completes
+  clickedAt     DateTime @default(now())
+  convertedAt   DateTime?
+}
+
+model AffiliatePayout {
+  id           String   @id @default(cuid())
+  affiliateId  String
+  affiliate    Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  amount       String   @default("0")
+  currency     String   @default("USD")
+  status       String   @default("PENDING") // PENDING | COMPLETED
+  method       String   @default("bank_transfer")
+  reference    String?
+  periodStart  DateTime
+  periodEnd    DateTime
+  createdAt    DateTime @default(now())
+  completedAt  DateTime?
+}
+
+model AffiliateSetting {
+  id           String         @id @default(cuid())
+  tier         AffiliateTier  @unique
+  commissionRate String       @default("10") // default commission % per tier
+  updatedAt    DateTime       @updatedAt
 }
