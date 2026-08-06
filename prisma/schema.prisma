@@ -1,0 +1,367 @@
+// Global Medical Tourism Marketplace — full data model
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  HOSPITAL
+  HOTEL
+  TRANSLATOR
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum ProviderType {
+  DOCTOR
+  HOSPITAL
+  HOTEL
+  TRANSLATOR
+}
+
+enum VisitType {
+  IN_PERSON
+  ONLINE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum LedgerType {
+  PATIENT_CHARGE
+  COMMISSION
+  PROVIDER_CREDIT
+  PROVIDER_DEBIT
+  REFUND_PATIENT
+  REFUND_COMMISSION_REVERSAL
+  REFUND_PROVIDER_DEBIT
+  PAYOUT
+}
+
+enum PayoutStatus {
+  PENDING
+  COMPLETED
+}
+
+model User {
+  id                String       @id @default(cuid())
+  email             String       @unique
+  passwordHash      String
+  role              Role
+  status            UserStatus   @default(ACTIVE)
+  name              String?
+  phone             String?
+  avatarUrl         String?
+  preferredLanguage String       @default("en")
+  country           String?
+  city              String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  patient           Patient?
+  doctor            Doctor?
+  hospital          Hospital?
+  hotel             Hotel?
+  translator        Translator?
+  bookings          Booking[]    @relation("patientBookings")
+  ledgerEntries     LedgerEntry[]
+  reviewsAuthored   Review[]     @relation("reviewAuthor")
+  reviewsReceived   Review[]     @relation("reviewSubject")
+  payouts           Payout[]
+}
+
+model Patient {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth   String?
+  gender        String?
+  bloodGroup    String?
+  medicalHistory String?
+  emergencyContact String?
+  passportNumber String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Doctor {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty        String
+  subSpecialties   String    // comma-separated
+  bio              String
+  city             String
+  country          String
+  yearsExperience  Int       @default(0)
+  consultationFee  String    @default("0") // Decimal as string (SQLite)
+  onlineFee        String    @default("0")
+  languages        String    // comma-separated language codes
+  education        String
+  certifications   String
+  verified         Boolean   @default(false)
+  rating           Float     @default(0)
+  reviewCount      Int       @default(0)
+  services         Service[]
+  slots            Slot[]
+  bookings         Booking[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Hospital {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  description     String
+  address         String
+  city            String
+  country         String
+  departments     String    // comma-separated
+  accreditations  String    // comma-separated
+  beds            Int       @default(0)
+  baseFee         String    @default("0")
+  languages       String
+  verified        Boolean   @default(false)
+  rating          Float     @default(0)
+  reviewCount     Int       @default(0)
+  services        Service[]
+  slots           Slot[]
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Hotel {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  description   String
+  address       String
+  city          String
+  country       String
+  starRating    Int       @default(3)
+  amenities     String    // comma-separated
+  roomTypes     String    // comma-separated
+  pricePerNight String    @default("0")
+  languages     String
+  verified      Boolean   @default(false)
+  rating        Float     @default(0)
+  reviewCount   Int       @default(0)
+  services      Service[]
+  bookings      Booking[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Translator {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languages       String    // comma-separated (source->target pairs)
+  specialization  String    // medical, legal, general
+  bio             String
+  city            String
+  country         String
+  hourlyRate      String    @default("0")
+  dailyRate       String    @default("0")
+  yearsExperience Int       @default(0)
+  verified        Boolean   @default(false)
+  rating          Float     @default(0)
+  reviewCount     Int       @default(0)
+  services        Service[]
+  slots           Slot[]
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Service {
+  id              String       @id @default(cuid())
+  providerType    ProviderType
+  doctorId        String?
+  hospitalId      String?
+  hotelId         String?
+  translatorId    String?
+  doctor          Doctor?      @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital        Hospital?    @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  hotel           Hotel?       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  translator      Translator?  @relation(fields: [translatorId], references: [id], onDelete: Cascade)
+  name            String
+  description     String
+  price           String       @default("0")
+  currency        String       @default("USD")
+  durationMinutes Int?
+  isActive        Boolean      @default(true)
+  bookings        Booking[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Slot {
+  id           String     @id @default(cuid())
+  doctorId     String?
+  hospitalId   String?
+  translatorId String?
+  doctor       Doctor?    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital     Hospital?  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  translator   Translator? @relation(fields: [translatorId], references: [id], onDelete: Cascade)
+  startTime    DateTime
+  endTime      DateTime
+  visitType    VisitType  @default(IN_PERSON)
+  isBooked     Boolean    @default(false)
+  booking      Booking?
+  createdAt    DateTime   @default(now())
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  patientId          String
+  patient            User          @relation("patientBookings", fields: [patientId], references: [id])
+  providerType       ProviderType
+  doctorId           String?
+  hospitalId         String?
+  hotelId            String?
+  translatorId       String?
+  doctor             Doctor?       @relation(fields: [doctorId], references: [id])
+  hospital           Hospital?     @relation(fields: [hospitalId], references: [id])
+  hotel              Hotel?        @relation(fields: [hotelId], references: [id])
+  translator         Translator?   @relation(fields: [translatorId], references: [id])
+  serviceId          String?
+  service            Service?      @relation(fields: [serviceId], references: [id])
+  slotId             String?       @unique
+  slot               Slot?         @relation(fields: [slotId], references: [id])
+  visitType          VisitType
+  status             BookingStatus @default(PENDING)
+  startDate          DateTime
+  endDate            DateTime?
+  amount             String        @default("0")
+  currency           String        @default("USD")
+  commissionRate     String        @default("0")
+  commissionAmount   String        @default("0")
+  providerNetAmount  String        @default("0")
+  videoSessionUrl    String?
+  notes              String?
+  cancellationReason String?
+  cancelledById      String?
+  cancelledAt        DateTime?
+  refundAmount       String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  payment            Payment?
+  ledgerEntries      LedgerEntry[]
+  review             Review?
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  bookingId     String        @unique
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  stripeChargeId String?
+  amount        String        @default("0")
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  refundAmount  String        @default("0")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  ledgerEntries LedgerEntry[]
+}
+
+model LedgerEntry {
+  id          String     @id @default(cuid())
+  type        LedgerType
+  bookingId   String?
+  booking     Booking?   @relation(fields: [bookingId], references: [id])
+  paymentId   String?
+  payment     Payment?   @relation(fields: [paymentId], references: [id])
+  payoutId    String?
+  payout      Payout?    @relation(fields: [payoutId], references: [id])
+  userId      String?    // provider user id (for provider balances)
+  user        User?      @relation(fields: [userId], references: [id])
+  amount      String     @default("0") // signed: + credit, - debit
+  description String
+  meta        String?
+  createdAt   DateTime   @default(now())
+}
+
+model Payout {
+  id             String       @id @default(cuid())
+  providerUserId String
+  providerUser   User         @relation(fields: [providerUserId], references: [id])
+  providerType   ProviderType
+  amount         String       @default("0")
+  currency       String       @default("USD")
+  status         PayoutStatus @default(PENDING)
+  method         String       @default("bank_transfer")
+  reference      String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  note           String?
+  ledgerEntries  LedgerEntry[]
+  createdAt      DateTime     @default(now())
+  completedAt    DateTime?
+}
+
+model Review {
+  id            String   @id @default(cuid())
+  authorId      String
+  author        User     @relation("reviewAuthor", fields: [authorId], references: [id])
+  subjectUserId String
+  subjectUser   User     @relation("reviewSubject", fields: [subjectUserId], references: [id])
+  bookingId     String   @unique
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  rating        Int
+  comment       String
+  language      String   @default("en")
+  createdAt     DateTime @default(now())
+}
+
+model CommissionRate {
+  id           String       @id @default(cuid())
+  providerType ProviderType @unique
+  rate         String       @default("15") // percentage
+  updatedAt    DateTime     @updatedAt
+}
+
+model CancellationPolicy {
+  id                      String       @id @default(cuid())
+  providerType            ProviderType @unique
+  freeCancellationHours   Int          @default(24)
+  cancellationFeePercent  String       @default("20")
+  updatedAt               DateTime     @updatedAt
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}

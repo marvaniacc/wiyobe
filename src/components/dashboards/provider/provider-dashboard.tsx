@@ -1,0 +1,1766 @@
+'use client'
+import { useEffect, useMemo, useState } from 'react'
+import { useApp } from '@/stores/app-store'
+import { useT } from '@/hooks/use-t'
+import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
+import { Icon } from '@/components/shared/icon'
+import { StarRating } from '@/components/shared/star-rating'
+import {
+  Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction,
+} from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import {
+  Table, TableHeader, TableBody, TableHead, TableRow, TableCell,
+} from '@/components/ui/table'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import { formatCurrency, formatDate, formatDateTime, relativeTime } from '@/lib/money'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+
+/* =========================================================================
+ * Types
+ * ======================================================================= */
+
+type Balance = { available: string; pending: string; lifetime: string; paidOut: string }
+
+type Patient = { id?: string; name: string | null; email?: string | null; avatarUrl?: string | null }
+
+type Service = {
+  id: string
+  name: string
+  description: string
+  price: string
+  currency: string
+  durationMinutes: number | null
+  isActive: boolean
+  providerType: string
+}
+
+type Slot = {
+  id: string
+  startTime: string
+  endTime: string
+  visitType: 'IN_PERSON' | 'ONLINE'
+  isBooked: boolean
+}
+
+type Booking = {
+  id: string
+  patient: Patient
+  providerType: string
+  visitType: 'IN_PERSON' | 'ONLINE'
+  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'REFUNDED'
+  startDate: string
+  endDate: string | null
+  amount: string
+  currency: string
+  commissionRate: string
+  commissionAmount: string
+  providerNetAmount: string
+  videoSessionUrl: string | null
+  notes: string | null
+  cancellationReason: string | null
+  refundAmount: string | null
+  service?: { id: string; name: string } | null
+  slot?: { id: string; startTime: string; endTime: string } | null
+  payment?: { id: string; status: string; amount: string; refundAmount?: string } | null
+  review?: { id: string; rating: number; comment: string } | null
+  createdAt: string
+}
+
+type Payout = {
+  id: string
+  providerType: string
+  amount: string
+  currency: string
+  status: 'PENDING' | 'COMPLETED'
+  method: string
+  reference: string | null
+  periodStart: string
+  periodEnd: string
+  completedAt: string | null
+  createdAt: string
+}
+
+type Review = {
+  id: string
+  rating: number
+  comment: string
+  createdAt: string
+  author: { name: string | null; avatarUrl: string | null }
+}
+
+type StatsResponse = {
+  totalBookings: number
+  upcoming: number
+  completed: number
+  balance: Balance
+  rating: number
+  reviewCount: number
+  providerName: string
+  recentBookings: Booking[]
+}
+
+type ProfileUser = {
+  id: string
+  name: string | null
+  email: string
+  phone: string | null
+  country: string | null
+  city: string | null
+  preferredLanguage: string
+  avatarUrl: string | null
+  doctor?: any
+  hospital?: any
+  hotel?: any
+  translator?: any
+}
+
+/* =========================================================================
+ * Helpers
+ * ======================================================================= */
+
+function initials(name?: string | null) {
+  if (!name) return '?'
+  return name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const { t } = useT()
+  const map: Record<string, { label: string; cls: string; icon: string }> = {
+    PENDING: { label: t('common.pending'), cls: 'bg-warning/15 text-warning-foreground border-warning/30', icon: 'pending' },
+    CONFIRMED: { label: t('common.confirmed'), cls: 'bg-info/15 text-info border-info/30', icon: 'check_circle' },
+    COMPLETED: { label: t('common.completed'), cls: 'bg-success/15 text-success border-success/30', icon: 'check_circle' },
+    CANCELLED: { label: t('common.cancelled'), cls: 'bg-error/10 text-error border-error/30', icon: 'cancel' },
+    NO_SHOW: { label: t('common.cancelled'), cls: 'bg-error/10 text-error border-error/30', icon: 'cancel' },
+    REFUNDED: { label: t('common.refund'), cls: 'bg-muted text-muted-foreground border-divider', icon: 'undo' },
+  }
+  const conf = map[status] || map.PENDING
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium', conf.cls)}>
+      <Icon name={conf.icon} size={12} fill />
+      {conf.label}
+    </span>
+  )
+}
+
+function VisitTypePill({ visitType }: { visitType: string }) {
+  const { t } = useT()
+  const isOnline = visitType === 'ONLINE'
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
+      isOnline ? 'bg-primary/10 text-primary' : 'bg-surface-secondary text-muted-foreground',
+    )}>
+      <Icon name={isOnline ? 'videocam' : 'location_on'} size={12} fill />
+      {isOnline ? t('common.onlineVisit') : t('common.inPersonVisit')}
+    </span>
+  )
+}
+
+function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
+        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {action}
+    </div>
+  )
+}
+
+function EmptyState({ icon, title, description, action }: { icon: string; title: string; description?: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-divider bg-surface px-6 py-12 text-center">
+      <div className="flex size-14 items-center justify-center rounded-full bg-surface-secondary text-muted-foreground">
+        <Icon name={icon} size={28} fill />
+      </div>
+      <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
+      {description && <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>}
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  )
+}
+
+function ErrorState({ message, onRetry }: { message?: string; onRetry?: () => void }) {
+  const { t } = useT()
+  return (
+    <div className="flex flex-col items-center justify-center rounded-[16px] border border-error/30 bg-error/5 px-6 py-10 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-error/10 text-error">
+        <Icon name="error" size={24} fill />
+      </div>
+      <p className="mt-3 text-sm text-foreground">{message || t('common.error')}</p>
+      {onRetry && (
+        <Button variant="outline" size="sm" onClick={onRetry} className="mt-4 gap-1.5">
+          <Icon name="refresh" size={16} />
+          {t('common.retry')}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function StatCardSkeleton() {
+  return (
+    <Card className="gap-0">
+      <CardContent className="p-5">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="mt-3 h-8 w-20" />
+        <Skeleton className="mt-3 h-3 w-16" />
+      </CardContent>
+    </Card>
+  )
+}
+
+function RowSkeleton({ cols = 5 }: { cols?: number }) {
+  return (
+    <TableRow>
+      {Array.from({ length: cols }).map((_, i) => (
+        <TableCell key={i}><Skeleton className="h-5 w-full max-w-[120px]" /></TableCell>
+      ))}
+    </TableRow>
+  )
+}
+
+/* =========================================================================
+ * Section: Overview
+ * ======================================================================= */
+
+function OverviewSection({ role }: { role: string }) {
+  const { t, locale } = useT()
+  const goDashboard = useApp((s) => s.goDashboard)
+  const { data, loading, error, refetch } = useApi<StatsResponse>('/api/stats')
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('dash.overview')} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+        <Card><CardContent className="p-6"><Skeleton className="h-32 w-full" /></CardContent></Card>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('dash.overview')} />
+        <ErrorState message={error || undefined} onRetry={refetch} />
+      </div>
+    )
+  }
+
+  const balance = data.balance || { available: '0', pending: '0', lifetime: '0', paidOut: '0' }
+  const roleIcon = role === 'DOCTOR' ? 'medical_services' : role === 'HOSPITAL' ? 'local_hospital' : role === 'HOTEL' ? 'hotel' : 'translate'
+
+  const stats = [
+    { label: t('stat.totalBookings'), value: String(data.totalBookings ?? 0), icon: 'event', tint: 'bg-primary/10 text-primary' },
+    { label: t('stat.upcoming'), value: String(data.upcoming ?? 0), icon: 'schedule', tint: 'bg-info/10 text-info' },
+    { label: t('stat.completedVisits'), value: String(data.completed ?? 0), icon: 'check_circle', tint: 'bg-success/10 text-success' },
+    { label: t('stat.rating'), value: data.rating ? data.rating.toFixed(1) : '—', icon: 'star', tint: 'bg-warning/10 text-warning' },
+  ]
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={t('dash.overview')}
+        description={data.providerName ? `${t('role.' + role.toLowerCase())} · ${data.providerName}` : t('role.' + role.toLowerCase())}
+      />
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((s) => (
+          <Card key={s.label} className="gap-0">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{s.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-foreground">{s.value}</p>
+                </div>
+                <div className={cn('flex size-10 items-center justify-center rounded-full', s.tint)}>
+                  <Icon name={s.icon} size={20} fill />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Earnings + Recent bookings */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Earnings */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="account_balance" size={18} className="text-success" fill />
+              {t('provider.earningsTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('provider.balance')}</p>
+              <p className="mt-1 text-3xl font-semibold text-success">{formatCurrency(balance.available, 'USD', locale)}</p>
+            </div>
+            <Separator className="my-4" />
+            <div className="grid grid-cols-1 gap-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('provider.pendingBalance')}</span>
+                <span className="font-medium text-foreground">{formatCurrency(balance.pending, 'USD', locale)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('provider.lifetimeEarnings')}</span>
+                <span className="font-medium text-foreground">{formatCurrency(balance.lifetime, 'USD', locale)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('provider.paidOut')}</span>
+                <span className="font-medium text-foreground">{formatCurrency(balance.paidOut, 'USD', locale)}</span>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2 rounded-[14px] bg-surface-secondary px-3 py-2 text-xs text-muted-foreground">
+              <Icon name="schedule" size={14} fill />
+              {t('provider.weeklySettlement')}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent bookings */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="event" size={18} className="text-primary" fill />
+              {t('provider.recentBookings')}
+            </CardTitle>
+            <CardAction>
+              <Button variant="ghost" size="sm" onClick={() => goDashboard(role === 'HOTEL' ? 'bookings' : 'appointments')} className="gap-1.5 text-primary">
+                {t('common.viewAll')}
+                <Icon name="chevron_right" size={16} className="rtl:rotate-180" />
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {data.recentBookings && data.recentBookings.length > 0 ? (
+              <ul className="flex flex-col divide-y divide-divider">
+                {data.recentBookings.slice(0, 6).map((b) => (
+                  <li key={b.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                    <Avatar className="size-10">
+                      {b.patient?.avatarUrl ? <AvatarImage src={b.patient.avatarUrl} alt="" /> : null}
+                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">{initials(b.patient?.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{b.patient?.name || '—'}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {b.service?.name || t('booking.inPerson')} · {formatDate(b.startDate, locale)}
+                      </p>
+                    </div>
+                    <div className="hidden text-end sm:block">
+                      <p className="text-sm font-medium text-foreground">{formatCurrency(b.amount, 'USD', locale)}</p>
+                      <p className="text-xs text-muted-foreground">{relativeTime(b.createdAt, locale)}</p>
+                    </div>
+                    <StatusBadge status={b.status} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-surface-secondary text-muted-foreground">
+                  <Icon name={roleIcon} size={24} fill />
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">{t('provider.noBookings')}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick actions */}
+      <Card>
+        <CardHeader className="pb-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="bolt" size={18} className="text-warning" fill />
+            {t('provider.quickActions')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <QuickAction icon="add_circle" label={t('provider.addService')} desc={t('dash.services')} onClick={() => goDashboard('services')} />
+            {role !== 'HOTEL' && (
+              <QuickAction icon="calendar_month" label={t('provider.addAvailability')} desc={t('dash.availability')} onClick={() => goDashboard('availability')} />
+            )}
+            <QuickAction icon="reviews" label={t('provider.viewReviews')} desc={t('dash.reviews')} onClick={() => goDashboard('reviews')} />
+            <QuickAction icon="account_balance" label={t('dash.payouts')} desc={t('provider.earningsTitle')} onClick={() => goDashboard('payouts')} />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function QuickAction({ icon, label, desc, onClick }: { icon: string; label: string; desc: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex items-center gap-3 rounded-[14px] border border-divider bg-surface p-4 text-start transition-all hover:border-primary/40 hover:bg-surface-secondary"
+    >
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+        <Icon name={icon} size={20} fill />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{label}</p>
+        <p className="truncate text-xs text-muted-foreground">{desc}</p>
+      </div>
+      <Icon name="chevron_right" size={18} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 rtl:rotate-180" />
+    </button>
+  )
+}
+
+/* =========================================================================
+ * Section: Appointments / Bookings
+ * ======================================================================= */
+
+function AppointmentsSection({ role }: { role: string }) {
+  const { t, locale } = useT()
+  const [filter, setFilter] = useState<string>('all')
+  const { data, loading, error, refetch } = useApi<{ bookings: Booking[] }>('/api/bookings')
+
+  const bookings = useMemo(() => {
+    if (!data?.bookings) return []
+    if (filter === 'all') return data.bookings
+    return data.bookings.filter((b) => b.status === filter.toUpperCase())
+  }, [data, filter])
+
+  const titleKey = role === 'HOTEL' ? 'dash.bookings' : 'dash.appointments'
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t(titleKey)} description={`${t('common.status')}: ${bookings.length}`} />
+
+      <Tabs value={filter} onValueChange={setFilter}>
+        <TabsList className="h-10">
+          <TabsTrigger value="all" className="gap-1.5 px-3"><Icon name="list" size={14} />{t('common.all')}</TabsTrigger>
+          <TabsTrigger value="confirmed" className="gap-1.5 px-3"><Icon name="check_circle" size={14} />{t('common.confirmed')}</TabsTrigger>
+          <TabsTrigger value="completed" className="gap-1.5 px-3"><Icon name="task_alt" size={14} />{t('common.completed')}</TabsTrigger>
+          <TabsTrigger value="cancelled" className="gap-1.5 px-3"><Icon name="cancel" size={14} />{t('common.cancelled')}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={filter} className="mt-4">
+          <Card className="gap-0">
+            <CardContent className="p-0">
+              {loading ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="ps-4">{t('common.patient')}</TableHead>
+                      <TableHead>{t('common.visitType')}</TableHead>
+                      <TableHead>{t('common.date')}</TableHead>
+                      <TableHead>{t('common.amount')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead className="pe-4 text-end">{t('common.actions')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={i} cols={6} />)}
+                  </TableBody>
+                </Table>
+              ) : error ? (
+                <div className="p-4"><ErrorState message={error} onRetry={refetch} /></div>
+              ) : bookings.length === 0 ? (
+                <div className="p-4">
+                  <EmptyState icon="event_available" title={t('provider.noBookings')} />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="ps-4">{t('common.patient')}</TableHead>
+                      <TableHead className="hidden md:table-cell">{t('common.visitType')}</TableHead>
+                      <TableHead>{t('common.date')}</TableHead>
+                      <TableHead>{t('common.amount')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead className="pe-4 text-end">{t('common.actions')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bookings.map((b) => (
+                      <BookingRow key={b.id} booking={b} t={t} locale={locale} onDone={refetch} />
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: string, fb?: string) => string; locale: string; onDone: () => void }) {
+  const [completeOpen, setCompleteOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function handleComplete() {
+    setBusy(true)
+    try {
+      await apiPost('/api/bookings/complete', { bookingId: booking.id })
+      toast.success(t('booking.confirmCompletion'))
+      setCompleteOpen(false)
+      onDone()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleCancel() {
+    setBusy(true)
+    try {
+      await apiPost('/api/bookings/cancel', { bookingId: booking.id, reason: reason || undefined })
+      toast.success(t('booking.cancelBooking'))
+      setCancelOpen(false)
+      setReason('')
+      onDone()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const isConfirmed = booking.status === 'CONFIRMED'
+  const isOnline = booking.visitType === 'ONLINE'
+
+  return (
+    <TableRow>
+      <TableCell className="ps-4">
+        <div className="flex items-center gap-3">
+          <Avatar className="size-9">
+            {booking.patient?.avatarUrl ? <AvatarImage src={booking.patient.avatarUrl} alt="" /> : null}
+            <AvatarFallback className="bg-primary/10 text-[11px] font-semibold text-primary">{initials(booking.patient?.name)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{booking.patient?.name || '—'}</p>
+            <p className="truncate text-xs text-muted-foreground">{booking.patient?.email || ''}</p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <VisitTypePill visitType={booking.visitType} />
+      </TableCell>
+      <TableCell>
+        <p className="text-sm text-foreground">{formatDate(booking.startDate, locale)}</p>
+        <p className="text-xs text-muted-foreground">{formatDateTime(booking.startDate, locale).split(',').pop()?.trim()}</p>
+      </TableCell>
+      <TableCell>
+        <p className="text-sm font-medium text-foreground">{formatCurrency(booking.amount, 'USD', locale)}</p>
+        <p className="text-xs text-muted-foreground">{t('common.youNet')}: {formatCurrency(booking.providerNetAmount, 'USD', locale)}</p>
+      </TableCell>
+      <TableCell><StatusBadge status={booking.status} /></TableCell>
+      <TableCell className="pe-4">
+        <div className="flex items-center justify-end gap-1.5">
+          {isConfirmed && isOnline && booking.videoSessionUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => window.open(booking.videoSessionUrl!, '_blank', 'noopener')}
+            >
+              <Icon name="videocam" size={14} fill />
+              <span className="hidden sm:inline">{t('common.joinVideo')}</span>
+            </Button>
+          )}
+          {isConfirmed && (
+            <>
+              <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="success" size="sm" className="gap-1.5">
+                    <Icon name="task_alt" size={14} fill />
+                    <span className="hidden sm:inline">{t('booking.markComplete')}</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t('booking.confirmCompletion')}</DialogTitle>
+                    <DialogDescription>
+                      {booking.patient?.name} · {booking.service?.name || t('booking.inPerson')} · {formatCurrency(booking.amount, 'USD', locale)}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="rounded-[14px] bg-surface-secondary p-4 text-sm text-muted-foreground">
+                    {t('booking.providerReceives')}: <span className="font-semibold text-success">{formatCurrency(booking.providerNetAmount, 'USD', locale)}</span>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCompleteOpen(false)} disabled={busy}>{t('common.close')}</Button>
+                    <Button variant="success" onClick={handleComplete} disabled={busy} className="gap-1.5">
+                      {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="check_circle" size={14} fill />}
+                      {t('common.confirm')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-error hover:bg-error/5 hover:text-error">
+                    <Icon name="cancel" size={14} fill />
+                    <span className="hidden sm:inline">{t('common.cancel')}</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t('booking.cancelBooking')}</DialogTitle>
+                    <DialogDescription>{booking.patient?.name} · {formatDate(booking.startDate, locale)}</DialogDescription>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="cancel-reason">{t('booking.cancelReason')}</Label>
+                    <Textarea
+                      id="cancel-reason"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder={t('common.cancelReasonPlaceholder')}
+                      rows={3}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={busy}>{t('common.close')}</Button>
+                    <Button variant="destructive" onClick={handleCancel} disabled={busy} className="gap-1.5">
+                      {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="cancel" size={14} fill />}
+                      {t('booking.cancelBooking')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+          {!isConfirmed && (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+/* =========================================================================
+ * Section: Services
+ * ======================================================================= */
+
+function ServicesSection({ role }: { role: string }) {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ services: Service[] }>('/api/services')
+  const [addOpen, setAddOpen] = useState(false)
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={t('dash.services')}
+        description={t('provider.serviceDescription')}
+        action={
+          <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+            <Icon name="add" size={18} fill />
+            {t('provider.addService')}
+          </Button>
+        }
+      />
+
+      <AddServiceDialog open={addOpen} onOpenChange={setAddOpen} onCreated={() => { setAddOpen(false); refetch() }} />
+
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}><CardContent className="p-5"><Skeleton className="h-32 w-full" /></CardContent></Card>
+          ))}
+        </div>
+      ) : error ? (
+        <ErrorState message={error} onRetry={refetch} />
+      ) : !data?.services || data.services.length === 0 ? (
+        <EmptyState
+          icon="medical_services"
+          title={t('provider.noServices')}
+          action={<Button onClick={() => setAddOpen(true)} className="gap-1.5"><Icon name="add" size={16} fill />{t('provider.addService')}</Button>}
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {data.services.map((s) => (
+            <ServiceCard key={s.id} service={s} t={t} locale={locale} onChanged={refetch} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ServiceCard({ service, t, locale, onChanged }: { service: Service; t: (k: string, fb?: string) => string; locale: string; onChanged: () => void }) {
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function toggleActive(next: boolean) {
+    setBusy(true)
+    try {
+      await apiPatch('/api/services', { id: service.id, isActive: next })
+      onChanged()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDelete() {
+    setBusy(true)
+    try {
+      await apiDelete(`/api/services?id=${service.id}`)
+      toast.success(t('provider.serviceDeleted'))
+      setDeleteOpen(false)
+      onChanged()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className="gap-0">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate text-base font-semibold text-foreground">{service.name}</h3>
+              {service.isActive ? (
+                <Badge className="bg-success/15 text-success border-success/30">{t('common.active')}</Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-muted text-muted-foreground">{t('provider.inactive')}</Badge>
+              )}
+            </div>
+            {service.description && (
+              <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{service.description}</p>
+            )}
+          </div>
+          <Switch checked={service.isActive} onCheckedChange={toggleActive} disabled={busy} />
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">{t('common.price')}</p>
+            <p className="font-semibold text-foreground">{formatCurrency(service.price, service.currency || 'USD', locale)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t('provider.durationMinutes')}</p>
+            <p className="font-semibold text-foreground">
+              {service.durationMinutes ? `${service.durationMinutes} ${t('common.minutes')}` : '—'}
+            </p>
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Icon name="edit" size={14} fill />
+            {t('common.edit')}
+          </Button>
+          <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-error hover:bg-error/5 hover:text-error">
+                <Icon name="delete" size={14} fill />
+                {t('common.delete')}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('common.delete')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('provider.confirmDeleteService')}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={busy}>{t('common.close')}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={busy}
+                  className="bg-error text-error-foreground hover:bg-error/90 gap-1.5"
+                >
+                  {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="delete" size={14} fill />}
+                  {t('common.delete')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </CardContent>
+
+      <ServiceFormDialog
+        mode="edit"
+        service={service}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={() => { setEditOpen(false); onChanged() }}
+      />
+    </Card>
+  )
+}
+
+function AddServiceDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
+  return (
+    <ServiceFormDialog
+      mode="add"
+      open={open}
+      onOpenChange={onOpenChange}
+      onSaved={onCreated}
+    />
+  )
+}
+
+function ServiceFormDialog({
+  mode, service, open, onOpenChange, onSaved,
+}: {
+  mode: 'add' | 'edit'
+  service?: Service
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSaved: () => void
+}) {
+  const { t } = useT()
+  const [name, setName] = useState(service?.name || '')
+  const [description, setDescription] = useState(service?.description || '')
+  const [price, setPrice] = useState(service?.price || '')
+  const [duration, setDuration] = useState(service?.durationMinutes ? String(service.durationMinutes) : '')
+  const [busy, setBusy] = useState(false)
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setName(service?.name || '')
+      setDescription(service?.description || '')
+      setPrice(service?.price || '')
+      setDuration(service?.durationMinutes ? String(service.durationMinutes) : '')
+    }
+  }, [open])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim() || !price.trim()) {
+      toast.error(t('common.error'))
+      return
+    }
+    setBusy(true)
+    try {
+      const body: any = {
+        name: name.trim(),
+        description: description.trim(),
+        price: price.trim(),
+        currency: 'USD',
+      }
+      if (duration.trim()) body.durationMinutes = parseInt(duration.trim(), 10)
+
+      if (mode === 'add') {
+        await apiPost('/api/services', body)
+        toast.success(t('provider.serviceCreated'))
+      } else if (service) {
+        await apiPatch('/api/services', { id: service.id, ...body })
+        toast.success(t('provider.serviceUpdated'))
+      }
+      onSaved()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === 'add' ? t('provider.addService') : t('common.edit')}</DialogTitle>
+          <DialogDescription>{t('provider.serviceDescription')}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="svc-name">{t('provider.serviceName')}</Label>
+            <Input id="svc-name" value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="svc-desc">{t('provider.serviceDescription')}</Label>
+            <Textarea id="svc-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="svc-price">{t('provider.servicePrice')}</Label>
+              <Input id="svc-price" type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="svc-dur">{t('provider.serviceDuration')}</Label>
+              <Input id="svc-dur" type="number" min="1" step="1" value={duration} onChange={(e) => setDuration(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>{t('common.close')}</Button>
+            <Button type="submit" disabled={busy} className="gap-1.5">
+              {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="save" size={14} fill />}
+              {t('common.save')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* =========================================================================
+ * Section: Availability (NOT for hotels)
+ * ======================================================================= */
+
+function AvailabilitySection({ role }: { role: string }) {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ slots: Slot[] }>('/api/slots')
+  const [addOpen, setAddOpen] = useState(false)
+
+  // Hotels shouldn't have a slot calendar — show a friendly notice instead
+  if (role === 'HOTEL') {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('dash.availability')} />
+        <EmptyState icon="hotel" title={t('provider.hotelsNoSlots')} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={t('dash.availability')}
+        description={t('provider.addSlot')}
+        action={
+          <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+            <Icon name="add" size={18} fill />
+            {t('provider.addSlot')}
+          </Button>
+        }
+      />
+
+      <AddSlotDialog open={addOpen} onOpenChange={setAddOpen} onCreated={() => { setAddOpen(false); refetch() }} />
+
+      {loading ? (
+        <Card><CardContent className="p-0">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead className="ps-4">{t('common.date')}</TableHead>
+              <TableHead>{t('common.time')}</TableHead>
+              <TableHead>{t('common.visitType')}</TableHead>
+              <TableHead>{t('common.status')}</TableHead>
+              <TableHead className="pe-4 text-end">{t('common.actions')}</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>{Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={i} cols={5} />)}</TableBody>
+          </Table>
+        </CardContent></Card>
+      ) : error ? (
+        <ErrorState message={error} onRetry={refetch} />
+      ) : !data?.slots || data.slots.length === 0 ? (
+        <EmptyState
+          icon="calendar_month"
+          title={t('provider.noSlots')}
+          action={<Button onClick={() => setAddOpen(true)} className="gap-1.5"><Icon name="add" size={16} fill />{t('provider.addSlot')}</Button>}
+        />
+      ) : (
+        <Card className="gap-0">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="ps-4">{t('common.date')}</TableHead>
+                  <TableHead>{t('common.time')}</TableHead>
+                  <TableHead>{t('common.visitType')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead className="pe-4 text-end">{t('common.actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.slots.map((slot) => (
+                  <SlotRow key={slot.id} slot={slot} t={t} locale={locale} onDeleted={refetch} />
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function SlotRow({ slot, t, locale, onDeleted }: { slot: Slot; t: (k: string, fb?: string) => string; locale: string; onDeleted: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function handleDelete() {
+    setBusy(true)
+    try {
+      await apiDelete(`/api/slots?id=${slot.id}`)
+      toast.success(t('provider.slotDeleted'))
+      setOpen(false)
+      onDeleted()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const start = new Date(slot.startTime)
+  const end = new Date(slot.endTime)
+  const timeStr = `${start.toLocaleTimeString(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', { hour: '2-digit', minute: '2-digit' })} — ${end.toLocaleTimeString(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`
+
+  return (
+    <TableRow>
+      <TableCell className="ps-4">
+        <p className="text-sm font-medium text-foreground">{formatDate(slot.startTime, locale)}</p>
+      </TableCell>
+      <TableCell>
+        <p className="text-sm text-foreground">{timeStr}</p>
+      </TableCell>
+      <TableCell><VisitTypePill visitType={slot.visitType} /></TableCell>
+      <TableCell>
+        {slot.isBooked ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success">
+            <Icon name="event_available" size={12} fill />
+            {t('provider.booked')}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+            <Icon name="event_available" size={12} fill />
+            {t('provider.available')}
+          </span>
+        )}
+      </TableCell>
+      <TableCell className="pe-4 text-end">
+        {slot.isBooked ? (
+          <span className="text-xs text-muted-foreground">—</span>
+        ) : (
+          <AlertDialog open={open} onOpenChange={setOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-error hover:bg-error/5 hover:text-error">
+                <Icon name="delete" size={14} fill />
+                {t('common.delete')}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('provider.deleteSlot')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('provider.confirmDeleteSlot')}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={busy}>{t('common.close')}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={busy} className="bg-error text-error-foreground hover:bg-error/90 gap-1.5">
+                  {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="delete" size={14} fill />}
+                  {t('common.delete')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </TableCell>
+    </TableRow>
+  )
+}
+
+function AddSlotDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
+  const { t } = useT()
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [visitType, setVisitType] = useState<'IN_PERSON' | 'ONLINE'>('IN_PERSON')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      // Default start = now+1h rounded to 30, end = +30min
+      const now = new Date()
+      now.setMinutes(now.getMinutes() + 60 - (now.getMinutes() % 30), 0, 0)
+      const later = new Date(now.getTime() + 30 * 60000)
+      const toLocal = (d: Date) => {
+        const off = d.getTimezoneOffset()
+        return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16)
+      }
+      setStart(toLocal(now))
+      setEnd(toLocal(later))
+      setVisitType('IN_PERSON')
+    }
+  }, [open])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!start || !end) {
+      toast.error(t('common.error'))
+      return
+    }
+    const s = new Date(start)
+    const en = new Date(end)
+    if (en <= s) {
+      toast.error(t('common.error'))
+      return
+    }
+    setBusy(true)
+    try {
+      await apiPost('/api/slots', { startTime: s.toISOString(), endTime: en.toISOString(), visitType })
+      toast.success(t('provider.slotCreated'))
+      onCreated()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('provider.addSlot')}</DialogTitle>
+          <DialogDescription>{t('dash.availability')}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="slot-start">{t('provider.slotStart')}</Label>
+              <Input id="slot-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="slot-end">{t('provider.slotEnd')}</Label>
+              <Input id="slot-end" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} required />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>{t('provider.visitType')}</Label>
+            <Select value={visitType} onValueChange={(v) => setVisitType(v as 'IN_PERSON' | 'ONLINE')}>
+              <SelectTrigger className="h-12 w-full rounded-[14px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IN_PERSON">{t('common.inPersonVisit')}</SelectItem>
+                <SelectItem value="ONLINE">{t('common.onlineVisit')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>{t('common.close')}</Button>
+            <Button type="submit" disabled={busy} className="gap-1.5">
+              {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="add" size={14} fill />}
+              {t('common.save')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* =========================================================================
+ * Section: Reviews
+ * ======================================================================= */
+
+function ReviewsSection() {
+  const { t, locale } = useT()
+  const session = useApp((s) => s.session)
+  const subjectUserId = session?.id
+  const { data, loading, error, refetch } = useApi<{ reviews: Review[]; avg: number; count: number }>(
+    subjectUserId ? `/api/reviews?subjectUserId=${subjectUserId}` : null
+  )
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('dash.reviews')} />
+
+      {loading ? (
+        <Card><CardContent className="p-6"><Skeleton className="h-32 w-full" /></CardContent></Card>
+      ) : error ? (
+        <ErrorState message={error} onRetry={refetch} />
+      ) : !data || data.count === 0 ? (
+        <EmptyState
+          icon="reviews"
+          title={t('provider.noReviews')}
+          description={t('provider.noReviewsDesc')}
+        />
+      ) : (
+        <>
+          {/* Hero */}
+          <Card className="gap-0">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-8">
+                <div className="text-center">
+                  <p className="text-5xl font-semibold text-foreground">{data.avg.toFixed(1)}</p>
+                  <div className="mt-1 flex justify-center">
+                    <StarRating rating={data.avg} size={20} />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{data.count} {t('common.reviews').toLowerCase()}</p>
+                </div>
+                <Separator orientation="vertical" className="hidden h-20 sm:block" />
+                <div className="flex-1 text-center sm:text-start">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {data.avg >= 4.5 ? t('common.verified') : data.avg >= 3.5 ? t('common.active') : t('dash.reviews')}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {data.count} {t('common.reviews').toLowerCase()}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* List */}
+          <div className="flex flex-col gap-3">
+            {data.reviews.map((r) => (
+              <Card key={r.id} className="gap-0">
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="size-10">
+                      {r.author?.avatarUrl ? <AvatarImage src={r.author.avatarUrl} alt="" /> : null}
+                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">{initials(r.author?.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium text-foreground">{r.author?.name || '—'}</p>
+                        <StarRating rating={r.rating} size={14} />
+                        <span className="text-xs text-muted-foreground">· {relativeTime(r.createdAt, locale)}</span>
+                      </div>
+                      {r.comment && (
+                        <p className="mt-2 text-sm text-foreground">{r.comment}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* =========================================================================
+ * Section: Payouts
+ * ======================================================================= */
+
+function PayoutsSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ balance: Balance; payouts: Payout[] }>('/api/payouts')
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('dash.payouts')} />
+        <Card><CardContent className="p-6"><Skeleton className="h-40 w-full" /></CardContent></Card>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('dash.payouts')} />
+        <ErrorState message={error || undefined} onRetry={refetch} />
+      </div>
+    )
+  }
+
+  const balance = data.balance || { available: '0', pending: '0', lifetime: '0', paidOut: '0' }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('dash.payouts')} description={t('provider.payoutsNote')} />
+
+      {/* Balance summary */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="gap-0 border-success/30">
+          <CardContent className="p-5">
+            <p className="text-sm font-medium text-muted-foreground">{t('provider.balance')}</p>
+            <p className="mt-2 text-2xl font-semibold text-success">{formatCurrency(balance.available, 'USD', locale)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('provider.weeklySettlementShort')}</p>
+          </CardContent>
+        </Card>
+        <Card className="gap-0">
+          <CardContent className="p-5">
+            <p className="text-sm font-medium text-muted-foreground">{t('provider.pendingBalance')}</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(balance.pending, 'USD', locale)}</p>
+          </CardContent>
+        </Card>
+        <Card className="gap-0">
+          <CardContent className="p-5">
+            <p className="text-sm font-medium text-muted-foreground">{t('provider.lifetimeEarnings')}</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(balance.lifetime, 'USD', locale)}</p>
+          </CardContent>
+        </Card>
+        <Card className="gap-0">
+          <CardContent className="p-5">
+            <p className="text-sm font-medium text-muted-foreground">{t('provider.paidOut')}</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(balance.paidOut, 'USD', locale)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Payout history */}
+      <Card className="gap-0">
+        <CardHeader className="pb-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="receipt_long" size={18} className="text-primary" fill />
+            {t('provider.payoutHistory')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {!data.payouts || data.payouts.length === 0 ? (
+            <EmptyState icon="payments" title={t('provider.noPayouts')} />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('common.date')}</TableHead>
+                  <TableHead>{t('common.period')}</TableHead>
+                  <TableHead>{t('common.amount')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('common.method')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('common.reference')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.payouts.map((p) => {
+                  const done = p.status === 'COMPLETED'
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <p className="text-sm text-foreground">{formatDate(p.createdAt, locale)}</p>
+                        <p className="text-xs text-muted-foreground">{relativeTime(p.createdAt, locale)}</p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm text-foreground">{formatDate(p.periodStart, locale)}</p>
+                        <p className="text-xs text-muted-foreground">— {formatDate(p.periodEnd, locale)}</p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm font-semibold text-foreground">{formatCurrency(p.amount, p.currency || 'USD', locale)}</p>
+                      </TableCell>
+                      <TableCell>
+                        {done ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success">
+                            <Icon name="check_circle" size={12} fill />
+                            {t('common.completed')}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-medium text-warning-foreground">
+                            <Icon name="pending" size={12} fill />
+                            {t('common.pending')}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <span className="text-sm text-muted-foreground">{p.method || '—'}</span>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <span className="text-xs text-muted-foreground">{p.reference || '—'}</span>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+/* =========================================================================
+ * Section: Profile
+ * ======================================================================= */
+
+function ProfileSection({ role }: { role: string }) {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ user: ProfileUser }>('/api/profile')
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('dash.profile')} />
+        <Card><CardContent className="p-6"><Skeleton className="h-96 w-full" /></CardContent></Card>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('dash.profile')} />
+        <ErrorState message={error || undefined} onRetry={refetch} />
+      </div>
+    )
+  }
+
+  return <ProfileForm user={data.user} role={role} t={t} locale={locale} onSaved={refetch} />
+}
+
+function ProfileForm({ user, role, t, locale, onSaved }: {
+  user: ProfileUser
+  role: string
+  t: (k: string, fb?: string) => string
+  locale: string
+  onSaved: () => void
+}) {
+  // Common fields
+  const [name, setName] = useState(user.name || '')
+  const [phone, setPhone] = useState(user.phone || '')
+  const [country, setCountry] = useState(user.country || '')
+  const [city, setCity] = useState(user.city || '')
+  const [preferredLanguage, setPreferredLanguage] = useState(user.preferredLanguage || 'en')
+
+  // Doctor
+  const d = user.doctor
+  const [specialty, setSpecialty] = useState(d?.specialty || '')
+  const [subSpecialties, setSubSpecialties] = useState(d?.subSpecialties || '')
+  const [bio, setBio] = useState(d?.bio || '')
+  const [yearsExperience, setYearsExperience] = useState(d?.yearsExperience != null ? String(d.yearsExperience) : '')
+  const [consultationFee, setConsultationFee] = useState(d?.consultationFee || '')
+  const [onlineFee, setOnlineFee] = useState(d?.onlineFee || '')
+  const [languages, setLanguages] = useState(d?.languages || '')
+  const [education, setEducation] = useState(d?.education || '')
+  const [certifications, setCertifications] = useState(d?.certifications || '')
+
+  // Hospital
+  const h = user.hospital
+  const [hospitalName, setHospitalName] = useState(h?.name || '')
+  const [hospitalDesc, setHospitalDesc] = useState(h?.description || '')
+  const [hospitalAddr, setHospitalAddr] = useState(h?.address || '')
+  const [departments, setDepartments] = useState(h?.departments || '')
+  const [accreditations, setAccreditations] = useState(h?.accreditations || '')
+  const [beds, setBeds] = useState(h?.beds != null ? String(h.beds) : '')
+  const [baseFee, setBaseFee] = useState(h?.baseFee || '')
+  const [hospitalLangs, setHospitalLangs] = useState(h?.languages || '')
+
+  // Hotel
+  const ho = user.hotel
+  const [hotelName, setHotelName] = useState(ho?.name || '')
+  const [hotelDesc, setHotelDesc] = useState(ho?.description || '')
+  const [hotelAddr, setHotelAddr] = useState(ho?.address || '')
+  const [starRating, setStarRating] = useState(ho?.starRating != null ? String(ho.starRating) : '3')
+  const [amenities, setAmenities] = useState(ho?.amenities || '')
+  const [roomTypes, setRoomTypes] = useState(ho?.roomTypes || '')
+  const [pricePerNight, setPricePerNight] = useState(ho?.pricePerNight || '')
+  const [hotelLangs, setHotelLangs] = useState(ho?.languages || '')
+
+  // Translator
+  const tr = user.translator
+  const [translatorLangs, setTranslatorLangs] = useState(tr?.languages || '')
+  const [specialization, setSpecialization] = useState(tr?.specialization || 'medical')
+  const [translatorBio, setTranslatorBio] = useState(tr?.bio || '')
+  const [hourlyRate, setHourlyRate] = useState(tr?.hourlyRate || '')
+  const [dailyRate, setDailyRate] = useState(tr?.dailyRate || '')
+  const [translatorYears, setTranslatorYears] = useState(tr?.yearsExperience != null ? String(tr.yearsExperience) : '')
+
+  const [busy, setBusy] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const body: any = {
+        name, phone, country, city,
+        preferredLanguage: preferredLanguage as 'en' | 'tr' | 'fa' | 'ar',
+      }
+      if (role === 'DOCTOR') {
+        Object.assign(body, {
+          specialty, subSpecialties, bio,
+          yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : 0,
+          consultationFee, onlineFee, languages, education, certifications,
+        })
+      } else if (role === 'HOSPITAL') {
+        Object.assign(body, {
+          hospitalName, description: hospitalDesc, address: hospitalAddr,
+          departments, accreditations,
+          beds: beds ? parseInt(beds, 10) : 0,
+          baseFee, languages: hospitalLangs,
+        })
+      } else if (role === 'HOTEL') {
+        Object.assign(body, {
+          hotelName, description: hotelDesc, address: hotelAddr,
+          starRating: starRating ? parseInt(starRating, 10) : 3,
+          amenities, roomTypes, pricePerNight, languages: hotelLangs,
+        })
+      } else if (role === 'TRANSLATOR') {
+        Object.assign(body, {
+          languages: translatorLangs, specialization,
+          bio: translatorBio,
+          hourlyRate, dailyRate,
+          yearsExperience: translatorYears ? parseInt(translatorYears, 10) : 0,
+        })
+      }
+      await apiPut('/api/profile', body)
+      toast.success(t('provider.profileUpdated'))
+      onSaved()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const roleIcon = role === 'DOCTOR' ? 'medical_services' : role === 'HOSPITAL' ? 'local_hospital' : role === 'HOTEL' ? 'hotel' : 'translate'
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('dash.profile')} description={t('provider.profileSection')} />
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        {/* Common */}
+        <Card className="gap-0">
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="account_circle" size={18} className="text-primary" fill />
+              {t('provider.commonFields')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label={t('common.name')}>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+              <Field label={t('common.phone')}>
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+90..." />
+              </Field>
+              <Field label={t('common.country')}>
+                <Input value={country} onChange={(e) => setCountry(e.target.value)} />
+              </Field>
+              <Field label={t('common.city')}>
+                <Input value={city} onChange={(e) => setCity(e.target.value)} />
+              </Field>
+              <Field label={t('provider.preferredLanguage')}>
+                <Select value={preferredLanguage} onValueChange={setPreferredLanguage}>
+                  <SelectTrigger className="h-12 w-full rounded-[14px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="tr">Türkçe</SelectItem>
+                    <SelectItem value="fa">فارسی</SelectItem>
+                    <SelectItem value="ar">العربية</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Role-specific */}
+        <Card className="gap-0">
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name={roleIcon} size={18} className="text-primary" fill />
+              {t('role.' + role.toLowerCase())}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {role === 'DOCTOR' && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label={t('common.specialty')}>
+                  <Input value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Cardiology" />
+                </Field>
+                <Field label={t('provider.subSpecialties')} hint={t('common.commaSeparated')}>
+                  <Input value={subSpecialties} onChange={(e) => setSubSpecialties(e.target.value)} placeholder="Interventional, Echo" />
+                </Field>
+                <Field label={t('provider.yearsExperience')}>
+                  <Input type="number" min="0" value={yearsExperience} onChange={(e) => setYearsExperience(e.target.value)} />
+                </Field>
+                <Field label={t('provider.consultationFee')}>
+                  <Input type="number" min="0" step="0.01" value={consultationFee} onChange={(e) => setConsultationFee(e.target.value)} />
+                </Field>
+                <Field label={t('provider.onlineFee')}>
+                  <Input type="number" min="0" step="0.01" value={onlineFee} onChange={(e) => setOnlineFee(e.target.value)} />
+                </Field>
+                <Field label={t('common.languages')} hint={t('common.commaSeparated')}>
+                  <Input value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="en, tr, fa" />
+                </Field>
+                <Field label={t('provider.education')}>
+                  <Input value={education} onChange={(e) => setEducation(e.target.value)} />
+                </Field>
+                <Field label={t('provider.certifications')} hint={t('common.commaSeparated')}>
+                  <Input value={certifications} onChange={(e) => setCertifications(e.target.value)} />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label={t('provider.bio')}>
+                    <Textarea rows={4} value={bio} onChange={(e) => setBio(e.target.value)} />
+                  </Field>
+                </div>
+              </div>
+            )}
+
+            {role === 'HOSPITAL' && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label={t('provider.hospitalName')}>
+                  <Input value={hospitalName} onChange={(e) => setHospitalName(e.target.value)} />
+                </Field>
+                <Field label={t('provider.beds')}>
+                  <Input type="number" min="0" value={beds} onChange={(e) => setBeds(e.target.value)} />
+                </Field>
+                <Field label={t('provider.baseFee')}>
+                  <Input type="number" min="0" step="0.01" value={baseFee} onChange={(e) => setBaseFee(e.target.value)} />
+                </Field>
+                <Field label={t('common.languages')} hint={t('common.commaSeparated')}>
+                  <Input value={hospitalLangs} onChange={(e) => setHospitalLangs(e.target.value)} placeholder="en, tr" />
+                </Field>
+                <Field label={t('provider.departments')} hint={t('common.commaSeparated')}>
+                  <Input value={departments} onChange={(e) => setDepartments(e.target.value)} />
+                </Field>
+                <Field label={t('provider.accreditations')} hint={t('common.commaSeparated')}>
+                  <Input value={accreditations} onChange={(e) => setAccreditations(e.target.value)} />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label={t('provider.address')}>
+                    <Input value={hospitalAddr} onChange={(e) => setHospitalAddr(e.target.value)} />
+                  </Field>
+                </div>
+                <div className="sm:col-span-2">
+                  <Field label={t('provider.description')}>
+                    <Textarea rows={4} value={hospitalDesc} onChange={(e) => setHospitalDesc(e.target.value)} />
+                  </Field>
+                </div>
+              </div>
+            )}
+
+            {role === 'HOTEL' && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label={t('provider.hotelName')}>
+                  <Input value={hotelName} onChange={(e) => setHotelName(e.target.value)} />
+                </Field>
+                <Field label={t('provider.starRating')}>
+                  <Select value={starRating} onValueChange={setStarRating}>
+                    <SelectTrigger className="h-12 w-full rounded-[14px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{'★'.repeat(n)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label={t('provider.pricePerNight')}>
+                  <Input type="number" min="0" step="0.01" value={pricePerNight} onChange={(e) => setPricePerNight(e.target.value)} />
+                </Field>
+                <Field label={t('common.languages')} hint={t('common.commaSeparated')}>
+                  <Input value={hotelLangs} onChange={(e) => setHotelLangs(e.target.value)} placeholder="en, tr" />
+                </Field>
+                <Field label={t('provider.amenities')} hint={t('common.commaSeparated')}>
+                  <Input value={amenities} onChange={(e) => setAmenities(e.target.value)} />
+                </Field>
+                <Field label={t('provider.roomTypes')} hint={t('common.commaSeparated')}>
+                  <Input value={roomTypes} onChange={(e) => setRoomTypes(e.target.value)} />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label={t('provider.address')}>
+                    <Input value={hotelAddr} onChange={(e) => setHotelAddr(e.target.value)} />
+                  </Field>
+                </div>
+                <div className="sm:col-span-2">
+                  <Field label={t('provider.description')}>
+                    <Textarea rows={4} value={hotelDesc} onChange={(e) => setHotelDesc(e.target.value)} />
+                  </Field>
+                </div>
+              </div>
+            )}
+
+            {role === 'TRANSLATOR' && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label={t('common.languages')} hint={t('common.commaSeparated')}>
+                  <Input value={translatorLangs} onChange={(e) => setTranslatorLangs(e.target.value)} placeholder="en, tr, fa" />
+                </Field>
+                <Field label={t('provider.specialization')}>
+                  <Select value={specialization} onValueChange={setSpecialization}>
+                    <SelectTrigger className="h-12 w-full rounded-[14px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="medical">{t('provider.spec.medical')}</SelectItem>
+                      <SelectItem value="legal">{t('provider.spec.legal')}</SelectItem>
+                      <SelectItem value="general">{t('provider.spec.general')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label={t('provider.yearsExperience')}>
+                  <Input type="number" min="0" value={translatorYears} onChange={(e) => setTranslatorYears(e.target.value)} />
+                </Field>
+                <Field label={t('provider.hourlyRate')}>
+                  <Input type="number" min="0" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+                </Field>
+                <Field label={t('provider.dailyRate')}>
+                  <Input type="number" min="0" step="0.01" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label={t('provider.bio')}>
+                    <Textarea rows={4} value={translatorBio} onChange={(e) => setTranslatorBio(e.target.value)} />
+                  </Field>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sticky save bar */}
+        <div className="flex justify-end">
+          <Button type="submit" size="lg" disabled={busy} className="gap-2">
+            {busy ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} fill />}
+            {t('common.saveChanges')}
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label className="flex items-center justify-between">
+        <span>{label}</span>
+        {hint && <span className="text-[11px] font-normal text-muted-foreground">({hint})</span>}
+      </Label>
+      {children}
+    </div>
+  )
+}
+
+/* =========================================================================
+ * Main dispatcher
+ * ======================================================================= */
+
+export function ProviderDashboard({ section, role }: { section: string; role: string }) {
+  switch (section) {
+    case 'overview':
+      return <OverviewSection role={role} />
+    case 'appointments':
+    case 'bookings':
+      return <AppointmentsSection role={role} />
+    case 'services':
+      return <ServicesSection role={role} />
+    case 'availability':
+      return <AvailabilitySection role={role} />
+    case 'reviews':
+      return <ReviewsSection />
+    case 'payouts':
+      return <PayoutsSection />
+    case 'profile':
+      return <ProfileSection role={role} />
+    default:
+      return <OverviewSection role={role} />
+  }
+}

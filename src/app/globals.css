@@ -1,0 +1,212 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-error: var(--error);
+  --color-error-foreground: var(--error-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-divider: var(--divider);
+  --color-destructive: var(--error);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+}
+
+:root {
+  /* Google-inspired design system — flat colors only */
+  --radius: 16px;
+  --background: #F8F9FA;
+  --foreground: #202124;
+  --surface: #FFFFFF;
+  --surface-secondary: #F1F3F4;
+  --card: #FFFFFF;
+  --card-foreground: #202124;
+  --popover: #FFFFFF;
+  --popover-foreground: #202124;
+  --primary: #1A73E8;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F3F4;
+  --secondary-foreground: #202124;
+  --muted: #F1F3F4;
+  --muted-foreground: #5F6368;
+  --accent: #E8F0FE;
+  --accent-foreground: #174EA6;
+  --success: #188038;
+  --success-foreground: #FFFFFF;
+  --warning: #F9AB00;
+  --warning-foreground: #202124;
+  --error: #D93025;
+  --error-foreground: #FFFFFF;
+  --info: #4285F4;
+  --info-foreground: #FFFFFF;
+  --border: #DADCE0;
+  --divider: #E8EAED;
+  --input: #DADCE0;
+  --ring: #1A73E8;
+  --chart-1: #1A73E8;
+  --chart-2: #188038;
+  --chart-3: #F9AB00;
+  --chart-4: #D93025;
+  --chart-5: #9334E6;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #202124;
+  --sidebar-primary: #1A73E8;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E8F0FE;
+  --sidebar-accent-foreground: #174EA6;
+  --sidebar-border: #E8EAED;
+  --sidebar-ring: #1A73E8;
+}
+
+.dark {
+  --background: #202124;
+  --foreground: #E8EAED;
+  --surface: #28292C;
+  --surface-secondary: #2D2E31;
+  --card: #28292C;
+  --card-foreground: #E8EAED;
+  --popover: #28292C;
+  --popover-foreground: #E8EAED;
+  --primary: #8AB4F8;
+  --primary-foreground: #202124;
+  --secondary: #2D2E31;
+  --secondary-foreground: #E8EAED;
+  --muted: #2D2E31;
+  --muted-foreground: #9AA0A6;
+  --accent: #2D2E31;
+  --accent-foreground: #8AB4F8;
+  --success: #81C995;
+  --success-foreground: #202124;
+  --warning: #FDD663;
+  --warning-foreground: #202124;
+  --error: #F28B82;
+  --error-foreground: #202124;
+  --info: #8AB4F8;
+  --info-foreground: #202124;
+  --border: #3C4043;
+  --divider: #3C4043;
+  --input: #3C4043;
+  --ring: #8AB4F8;
+  --sidebar: #28292C;
+  --sidebar-foreground: #E8EAED;
+  --sidebar-primary: #8AB4F8;
+  --sidebar-primary-foreground: #202124;
+  --sidebar-accent: #2D2E31;
+  --sidebar-accent-foreground: #8AB4F8;
+  --sidebar-border: #3C4043;
+  --sidebar-ring: #8AB4F8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* RTL support */
+  [dir="rtl"] {
+    text-align: right;
+  }
+}
+
+/* Custom scrollbar — enterprise quality */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #C4C7C5 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: #C4C7C5;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #9AA0A6;
+    background-clip: content-box;
+  }
+}
+
+/* Material Symbols icon sizing helper */
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+.ms-fill {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+/* Subtle fade/scale animations — respect reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-fade-in {
+    animation: fade-in 180ms ease-out both;
+  }
+  .animate-scale-in {
+    animation: scale-in 140ms ease-out both;
+  }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}

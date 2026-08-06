@@ -1,0 +1,602 @@
+   600→                </div>
+   601→              </>
+   602→            )}
+   603→          </div>
+   604→
+   605→          {/* Bio */}
+   606→          {provider.bio && (
+   607→            <div>
+   608→              <h4 className="mb-1 text-sm font-semibold text-foreground">{t('browse.bio')}</h4>
+   609→              <p className="text-sm leading-relaxed text-muted-foreground">{provider.bio}</p>
+   610→            </div>
+   611→          )}
+   612→
+   613→          {/* Languages */}
+   614→          {parseList(provider.languages).length > 0 && (
+   615→            <div>
+   616→              <h4 className="mb-1.5 text-sm font-semibold text-foreground">{t('common.languages')}</h4>
+   617→              <LanguageBadges languages={provider.languages} max={20} />
+   618→            </div>
+   619→          )}
+   620→
+   621→          {/* Sub-specialties */}
+   622→          {provider.subSpecialties && (
+   623→            <div>
+   624→              <h4 className="mb-1 text-sm font-semibold text-foreground">{t('common.specialty')}</h4>
+   625→              <p className="text-sm text-muted-foreground">{provider.subSpecialties}</p>
+   626→            </div>
+   627→          )}
+   628→
+   629→          {/* Education */}
+   630→          {provider.education && (
+   631→            <div>
+   632→              <h4 className="mb-1 text-sm font-semibold text-foreground">{t('browse.education')}</h4>
+   633→              <p className="text-sm text-muted-foreground">{provider.education}</p>
+   634→            </div>
+   635→          )}
+   636→
+   637→          {/* Services (if loaded) */}
+   638→          {data?.provider?.services && data.provider.services.length > 0 && (
+   639→            <div>
+   640→              <h4 className="mb-2 text-sm font-semibold text-foreground">{t('browse.services')}</h4>
+   641→              <div className="space-y-2">
+   642→                {data.provider.services.map((s: any) => (
+   643→                  <div key={s.id} className="flex items-start justify-between gap-2 rounded-xl border border-divider p-3">
+   644→                    <div className="min-w-0">
+   645→                      <div className="text-sm font-medium text-foreground">{s.name}</div>
+   646→                      {s.description && <div className="mt-0.5 text-xs text-muted-foreground">{s.description}</div>}
+   647→                    </div>
+   648→                    <div className="text-sm font-semibold text-foreground tabular-nums">
+   649→                      {formatCurrency(s.price, s.currency || 'USD', locale)}
+   650→                    </div>
+   651→                  </div>
+   652→                ))}
+   653→              </div>
+   654→            </div>
+   655→          )}
+   656→
+   657→          {/* Reviews */}
+   658→          <div>
+   659→            <h4 className="mb-2 text-sm font-semibold text-foreground">{t('common.reviews')}</h4>
+   660→            {loading ? (
+   661→              <div className="space-y-2">
+   662→                {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+   663→              </div>
+   664→            ) : data?.reviews && data.reviews.length > 0 ? (
+   665→              <div className="space-y-2">
+   666→                {data.reviews.slice(0, 5).map((r: any) => (
+   667→                  <div key={r.id} className="rounded-xl border border-divider p-3">
+   668→                    <div className="flex items-center justify-between gap-2">
+   669→                      <div className="flex items-center gap-2">
+   670→                        <div className="flex size-7 items-center justify-center rounded-full bg-surface-secondary text-xs font-medium text-muted-foreground">
+   671→                          {initials(r.author?.name)}
+   672→                        </div>
+   673→                        <span className="text-sm font-medium text-foreground">{r.author?.name || '—'}</span>
+   674→                      </div>
+   675→                      <StarRating rating={r.rating} size={12} />
+   676→                    </div>
+   677→                    {r.comment && <p className="mt-2 text-sm text-muted-foreground">{r.comment}</p>}
+   678→                    <div className="mt-1.5 text-xs text-muted-foreground">{formatDate(r.createdAt, locale)}</div>
+   679→                  </div>
+   680→                ))}
+   681→              </div>
+   682→            ) : (
+   683→              <p className="text-sm text-muted-foreground">{t('reviews.noReviews')}</p>
+   684→            )}
+   685→          </div>
+   686→        </div>
+   687→
+   688→        <DialogFooter>
+   689→          <Button onClick={() => { onOpenChange(false); onBook() }} size="lg" className="w-full sm:w-auto">
+   690→            <Icon name="event_available" size={18} />
+   691→            {t('common.bookNow')}
+   692→          </Button>
+   693→        </DialogFooter>
+   694→      </DialogContent>
+   695→    </Dialog>
+   696→  )
+   697→}
+   698→
+   699→// ---- Booking dialog ----
+   700→
+   701→function BookingDialog({ provider, open, onOpenChange, onBooked }: {
+   702→  provider: Provider | null
+   703→  open: boolean
+   704→  onOpenChange: (o: boolean) => void
+   705→  onBooked: () => void
+   706→}) {
+   707→  const { t, locale } = useT()
+   708→
+   709→  const [step, setStep] = useState<'details' | 'payment'>('details')
+   710→  const [visitType, setVisitType] = useState<VisitType>('IN_PERSON')
+   711→  const [slotId, setSlotId] = useState<string | null>(null)
+   712→  const [checkInDate, setCheckInDate] = useState<string>('')
+   713→  const [nights, setNights] = useState<number>(1)
+   714→  const [notes, setNotes] = useState('')
+   715→  const [submitting, setSubmitting] = useState(false)
+   716→
+   717→  const isHotel = provider?.providerType === 'HOTEL'
+   718→  const showVisitTypeToggle = provider?.providerType === 'DOCTOR' || provider?.providerType === 'HOSPITAL' || provider?.providerType === 'TRANSLATOR'
+   719→  const canOnline = provider?.providerType === 'DOCTOR' && provider.onlinePrice && parseFloat(provider.onlinePrice) > 0
+   720→
+   721→  // Slots fetch (non-hotel only)
+   722→  const slotsUrl = useMemo(() => {
+   723→    if (!provider || isHotel || !open) return null
+   724→    const p = provider.providerType.toLowerCase()
+   725→    const key = p === 'doctor' ? 'doctorId' : p === 'hospital' ? 'hospitalId' : 'translatorId'
+   726→    return `/api/providers/slots?${key}=${provider.id}`
+   727→  }, [provider, isHotel, open])
+   728→
+   729→  const { data: slotsData, loading: slotsLoading } = useApi<{ slots: Slot[] }>(slotsUrl, { deps: [provider?.id, open] })
+   730→
+   731→  // State is reset by parent via `key` prop when dialog opens.
+   732→
+   733→  const selectedSlot = slotsData?.slots.find((s) => s.id === slotId) || null
+   734→
+   735→  // Compute pricing
+   736→  const unitPrice = useMemo(() => {
+   737→    if (!provider) return '0'
+   738→    if (visitType === 'ONLINE' && canOnline && provider.onlinePrice) return provider.onlinePrice
+   739→    return provider.price
+   740→  }, [provider, visitType, canOnline])
+   741→
+   742→  const totalAmount = useMemo(() => {
+   743→    if (!provider) return '0'
+   744→    if (isHotel) return mulDec(unitPrice, String(Math.max(1, nights)))
+   745→    return unitPrice
+   746→  }, [provider, isHotel, unitPrice, nights])
+   747→
+   748→  // Group slots by date
+   749→  const slotsByDate = useMemo(() => {
+   750→    if (!slotsData?.slots) return [] as { date: string; label: string; slots: Slot[] }[]
+   751→    const groups = new Map<string, Slot[]>()
+   752→    for (const s of slotsData.slots) {
+   753→      const d = new Date(s.startTime)
+   754→      const key = d.toISOString().slice(0, 10)
+   755→      if (!groups.has(key)) groups.set(key, [])
+   756→      groups.get(key)!.push(s)
+   757→    }
+   758→    return Array.from(groups.entries()).map(([key, slots]) => ({
+   759→      date: key,
+   760→      label: formatDate(key, locale, { weekday: 'short', month: 'short', day: 'numeric' }),
+   761→      slots: slots.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+   762→    }))
+   763→  }, [slotsData, locale])
+   764→
+   765→  const canContinue = isHotel ? !!checkInDate && nights > 0 : !!slotId
+   766→
+   767→  function handleConfirm() {
+   768→    if (!provider) return
+   769→    setSubmitting(true)
+   770→
+   771→    const body: any = {
+   772→      providerType: provider.providerType,
+   773→      providerId: provider.id,
+   774→      visitType: isHotel ? 'IN_PERSON' : visitType,
+   775→      notes: notes || undefined,
+   776→    }
+   777→
+   778→    if (isHotel) {
+   779→      const start = new Date(checkInDate)
+   780→      const end = new Date(start)
+   781→      end.setDate(end.getDate() + nights)
+   782→      body.startDate = start.toISOString()
+   783→      body.endDate = end.toISOString()
+   784→    } else if (selectedSlot) {
+   785→      body.slotId = selectedSlot.id
+   786→      body.startDate = selectedSlot.startTime
+   787→      body.endDate = selectedSlot.endTime
+   788→    }
+   789→
+   790→    apiPost('/api/bookings', body)
+   791→      .then(() => {
+   792→        toast.success(t('booking.success'))
+   793→        onOpenChange(false)
+   794→        onBooked()
+   795→      })
+   796→      .catch((e: any) => {
+   797→        toast.error(e.message || t('booking.paymentFailed'))
+   798→      })
+   799→      .finally(() => setSubmitting(false))
+   800→  }
+   801→
+   802→  if (!provider) return null
+   803→
+   804→  return (
+   805→    <Dialog open={open} onOpenChange={onOpenChange}>
+   806→      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+   807→        <DialogHeader>
+   808→          <DialogTitle className="flex items-center gap-2">
+   809→            <Icon name={PROVIDER_TYPE_ICON[provider.providerType]} size={20} fill className="text-primary" />
+   810→            {t('common.bookNow')} · {provider.name}
+   811→          </DialogTitle>
+   812→          <DialogDescription>
+   813→            {provider.specialty} · {[provider.city, provider.country].filter(Boolean).join(', ')}
+   814→          </DialogDescription>
+   815→        </DialogHeader>
+   816→
+   817→        {step === 'details' && (
+   818→          <div className="space-y-4">
+   819→            {/* Visit type toggle */}
+   820→            {showVisitTypeToggle && (
+   821→              <div className="space-y-2">
+   822→                <Label className="text-sm font-medium">{t('booking.visitType')}</Label>
+   823→                <div className="grid grid-cols-2 gap-2">
+   824→                  <button
+   825→                    type="button"
+   826→                    onClick={() => setVisitType('IN_PERSON')}
+   827→                    className={cn(
+   828→                      'flex items-center gap-2 rounded-xl border p-3 text-start text-sm transition-colors',
+   829→                      visitType === 'IN_PERSON' ? 'border-primary bg-primary/5 text-foreground' : 'border-divider text-muted-foreground hover:border-primary/30'
+   830→                    )}
+   831→                  >
+   832→                    <Icon name="person" size={18} fill={visitType === 'IN_PERSON'} className={visitType === 'IN_PERSON' ? 'text-primary' : ''} />
+   833→                    <div>
+   834→                      <div className="font-medium">{t('booking.inPerson')}</div>
+   835→                      <div className="text-xs">{formatCurrency(provider.price, 'USD', locale)}</div>
+   836→                    </div>
+   837→                  </button>
+   838→                  <button
+   839→                    type="button"
+   840→                    onClick={() => canOnline ? setVisitType('ONLINE') : toast.info(t('booking.noSlots'))}
+   841→                    disabled={!canOnline}
+   842→                    className={cn(
+   843→                      'flex items-center gap-2 rounded-xl border p-3 text-start text-sm transition-colors disabled:opacity-50',
+   844→                      visitType === 'ONLINE' ? 'border-primary bg-primary/5 text-foreground' : 'border-divider text-muted-foreground hover:border-primary/30'
+   845→                    )}
+   846→                  >
+   847→                    <Icon name="videocam" size={18} fill={visitType === 'ONLINE'} className={visitType === 'ONLINE' ? 'text-primary' : ''} />
+   848→                    <div>
+   849→                      <div className="font-medium">{t('booking.online')}</div>
+   850→                      <div className="text-xs">{canOnline ? formatCurrency(provider.onlinePrice!, 'USD', locale) : '—'}</div>
+   851→                    </div>
+   852→                  </button>
+   853→                </div>
+   854→              </div>
+   855→            )}
+   856→
+   857→            {/* Hotel: date + nights */}
+   858→            {isHotel && (
+   859→              <div className="grid grid-cols-2 gap-3">
+   860→                <div className="space-y-2">
+   861→                  <Label className="text-sm font-medium">{t('booking.selectDate')}</Label>
+   862→                  <Input
+   863→                    type="date"
+   864→                    value={checkInDate}
+   865→                    min={new Date().toISOString().slice(0, 10)}
+   866→                    onChange={(e) => setCheckInDate(e.target.value)}
+   867→                  />
+   868→                </div>
+   869→                <div className="space-y-2">
+   870→                  <Label className="text-sm font-medium">{t('common.nights')}</Label>
+   871→                  <Input
+   872→                    type="number"
+   873→                    min={1}
+   874→                    max={30}
+   875→                    value={nights}
+   876→                    onChange={(e) => setNights(Math.max(1, Math.min(30, parseInt(e.target.value) || 1)))}
+   877→                  />
+   878→                </div>
+   879→              </div>
+   880→            )}
+   881→
+   882→            {/* Slots list (non-hotel) */}
+   883→            {!isHotel && (
+   884→              <div className="space-y-2">
+   885→                <Label className="text-sm font-medium">{t('booking.selectSlot')}</Label>
+   886→                {slotsLoading ? (
+   887→                  <div className="space-y-2">
+   888→                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+   889→                  </div>
+   890→                ) : slotsByDate.length === 0 ? (
+   891→                  <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-divider p-6 text-center">
+   892→                    <Icon name="event_busy" size={28} className="text-muted-foreground" />
+   893→                    <p className="text-sm text-muted-foreground">{t('booking.noSlots')}</p>
+   894→                  </div>
+   895→                ) : (
+   896→                  <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border border-divider p-3">
+   897→                    {slotsByDate.map((group) => (
+   898→                      <div key={group.date}>
+   899→                        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</div>
+   900→                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+   901→                          {group.slots.map((s) => {
+   902→                            const selected = s.id === slotId
+   903→                            return (
+   904→                              <button
+   905→                                key={s.id}
+   906→                                type="button"
+   907→                                onClick={() => setSlotId(s.id)}
+   908→                                className={cn(
+   909→                                  'flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-sm transition-colors',
+   910→                                  selected ? 'border-primary bg-primary text-primary-foreground' : 'border-divider bg-surface hover:border-primary/40'
+   911→                                )}
+   912→                              >
+   913→                                <Icon name={s.visitType === 'ONLINE' ? 'videocam' : 'schedule'} size={14} />
+   914→                                {new Date(s.startTime).toLocaleTimeString(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+   915→                              </button>
+   916→                            )
+   917→                          })}
+   918→                        </div>
+   919→                      </div>
+   920→                    ))}
+   921→                  </div>
+   922→                )}
+   923→              </div>
+   924→            )}
+   925→
+   926→            {/* Notes */}
+   927→            <div className="space-y-2">
+   928→              <Label className="text-sm font-medium">{t('common.notes')} <span className="text-xs text-muted-foreground">({t('common.optional')})</span></Label>
+   929→              <Textarea
+   930→                value={notes}
+   931→                onChange={(e) => setNotes(e.target.value)}
+   932→                rows={2}
+   933→                placeholder="…"
+   934→              />
+   935→            </div>
+   936→
+   937→            <DialogFooter>
+   938→              <Button
+   939→                size="lg"
+   940→                className="w-full"
+   941→                disabled={!canContinue}
+   942→                onClick={() => setStep('payment')}
+   943→              >
+   944→                {t('booking.continueToPayment')}
+   945→                <Icon name="arrow_forward" size={16} />
+   946→              </Button>
+   947→            </DialogFooter>
+   948→          </div>
+   949→        )}
+   950→
+   951→        {step === 'payment' && (
+   952→          <div className="space-y-4">
+   953→            <div className="space-y-3 rounded-2xl border border-divider bg-surface-secondary p-4">
+   954→              <div className="flex items-center justify-between">
+   955→                <span className="text-sm text-muted-foreground">
+   956→                  {isHotel ? t('common.perNight') : provider.priceLabel}
+   957→                </span>
+   958→                <span className="text-sm font-medium text-foreground tabular-nums">
+   959→                  {formatCurrency(unitPrice, 'USD', locale)}
+   960→                </span>
+   961→              </div>
+   962→              {isHotel && (
+   963→                <div className="flex items-center justify-between">
+   964→                  <span className="text-sm text-muted-foreground">{t('common.nights')}</span>
+   965→                  <span className="text-sm font-medium text-foreground tabular-nums">× {nights}</span>
+   966→                </div>
+   967→              )}
+   968→              <Separator />
+   969→              <div className="flex items-center justify-between">
+   970→                <span className="text-sm font-medium text-foreground">{t('common.total')}</span>
+   971→                <span className="text-lg font-semibold text-foreground tabular-nums">
+   972→                  {formatCurrency(totalAmount, 'USD', locale)}
+   973→                </span>
+   974→              </div>
+   975→            </div>
+   976→
+   977→            <div className="flex items-start gap-2 rounded-xl bg-info/5 p-3 text-xs text-muted-foreground">
+   978→              <Icon name="lock" size={14} className="mt-0.5 text-info" />
+   979→              <span>{t('booking.platformCommission')} — {t('booking.serviceFee')}.</span>
+   980→            </div>
+   981→
+   982→            {/* Booking recap */}
+   983→            <div className="space-y-1.5 rounded-xl border border-divider p-3 text-sm">
+   984→              <div className="flex items-center gap-2 text-muted-foreground">
+   985→                <Icon name={visitType === 'ONLINE' ? 'videocam' : 'person'} size={14} />
+   986→                {visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}
+   987→              </div>
+   988→              {selectedSlot && (
+   989→                <div className="flex items-center gap-2 text-muted-foreground">
+   990→                  <Icon name="event" size={14} />
+   991→                  {formatDateTime(selectedSlot.startTime, locale)}
+   992→                </div>
+   993→              )}
+   994→              {isHotel && checkInDate && (
+   995→                <div className="flex items-center gap-2 text-muted-foreground">
+   996→                  <Icon name="event" size={14} />
+   997→                  {formatDate(checkInDate, locale)} → {formatDate(new Date(new Date(checkInDate).getTime() + nights * 86400000), locale)}
+   998→                </div>
+   999→              )}
+  1000→            </div>
+  1001→
+  1002→            <DialogFooter className="flex-row gap-2 sm:flex-row">
+  1003→              <Button variant="outline" size="lg" onClick={() => setStep('details')} disabled={submitting}>
+  1004→                <Icon name="arrow_back" size={16} />
+  1005→                {t('booking.backToDetails')}
+  1006→              </Button>
+  1007→              <Button size="lg" className="flex-1" onClick={handleConfirm} disabled={submitting}>
+  1008→                {submitting ? (
+  1009→                  <><Icon name="progress_activity" size={16} className="animate-spin" />{t('common.loading')}</>
+  1010→                ) : (
+  1011→                  <><Icon name="payments" size={16} />{t('booking.payNow')}</>
+  1012→                )}
+  1013→              </Button>
+  1014→            </DialogFooter>
+  1015→          </div>
+  1016→        )}
+  1017→      </DialogContent>
+  1018→    </Dialog>
+  1019→  )
+  1020→}
+  1021→
+  1022→// ============================================================================
+  1023→// Browse section
+  1024→// ============================================================================
+  1025→
+  1026→function BrowseSection() {
+  1027→  const { t } = useT()
+  1028→  const [type, setType] = useState<'all' | ProviderType>('all')
+  1029→  const [q, setQ] = useState('')
+  1030→  const [city, setCity] = useState('')
+  1031→  const [maxPrice, setMaxPrice] = useState('')
+  1032→  const [sort, setSort] = useState('rating')
+  1033→  const [debouncedQ, setDebouncedQ] = useState('')
+  1034→
+  1035→  const [detailProvider, setDetailProvider] = useState<Provider | null>(null)
+  1036→  const [detailOpen, setDetailOpen] = useState(false)
+  1037→  const [bookProvider, setBookProvider] = useState<Provider | null>(null)
+  1038→  const [bookOpen, setBookOpen] = useState(false)
+  1039→  const [bookTick, setBookTick] = useState(0)
+  1040→  const [bookKey, setBookKey] = useState(0)
+  1041→
+  1042→  function openBooking(p: Provider | null) {
+  1043→    if (!p) return
+  1044→    setBookProvider(p)
+  1045→    setBookKey((k) => k + 1)
+  1046→    setBookOpen(true)
+  1047→  }
+  1048→
+  1049→  // Debounce search
+  1050→  useEffect(() => {
+  1051→    const id = setTimeout(() => setDebouncedQ(q), 350)
+  1052→    return () => clearTimeout(id)
+  1053→  }, [q])
+  1054→
+  1055→  const url = useMemo(() => {
+  1056→    const params = new URLSearchParams()
+  1057→    params.set('type', type)
+  1058→    if (debouncedQ) params.set('q', debouncedQ)
+  1059→    if (city) params.set('city', city)
+  1060→    if (maxPrice) params.set('maxPrice', maxPrice)
+  1061→    params.set('sort', sort)
+  1062→    return `/api/providers?${params.toString()}`
+  1063→  }, [type, debouncedQ, city, maxPrice, sort])
+  1064→
+  1065→  const { data, loading, error, refetch } = useApi<{ results: Provider[]; count: number }>(url, { deps: [url, bookTick] })
+  1066→
+  1067→  const typeTabs: { key: 'all' | ProviderType; label: string; icon: string }[] = [
+  1068→    { key: 'all', label: t('browse.allTypes'), icon: 'apps' },
+  1069→    { key: 'DOCTOR', label: t('role.doctor'), icon: 'medical_services' },
+  1070→    { key: 'HOSPITAL', label: t('role.hospital'), icon: 'local_hospital' },
+  1071→    { key: 'HOTEL', label: t('role.hotel'), icon: 'hotel' },
+  1072→    { key: 'TRANSLATOR', label: t('role.translator'), icon: 'translate' },
+  1073→  ]
+  1074→
+  1075→  return (
+  1076→    <div className="space-y-5">
+  1077→      <SectionHeader title={t('browse.title')} subtitle={data ? t('browse.results').replace('{count}', String(data.count)) : undefined} />
+  1078→
+  1079→      {/* Filter bar */}
+  1080→      <Card className="py-0">
+  1081→        <CardContent className="space-y-3 p-4">
+  1082→          {/* Type tabs */}
+  1083→          <div className="flex flex-wrap gap-1.5">
+  1084→            {typeTabs.map((tab) => (
+  1085→              <button
+  1086→                key={tab.key}
+  1087→                onClick={() => setType(tab.key)}
+  1088→                className={cn(
+  1089→                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+  1090→                  type === tab.key
+  1091→                    ? 'border-primary bg-primary text-primary-foreground'
+  1092→                    : 'border-divider bg-surface text-muted-foreground hover:border-primary/30 hover:text-foreground'
+  1093→                )}
+  1094→              >
+  1095→                <Icon name={tab.icon} size={14} fill={type === tab.key} />
+  1096→                {tab.label}
+  1097→              </button>
+  1098→            ))}
+  1099→          </div>
+  1100→
+  1101→          {/* Search + sort + city + maxPrice */}
+  1102→          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  1103→            <div className="relative lg:col-span-2">
+  1104→              <Icon name="search" size={18} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+  1105→              <Input
+  1106→                value={q}
+  1107→                onChange={(e) => setQ(e.target.value)}
+  1108→                placeholder={t('browse.searchPlaceholder')}
+  1109→                className="ps-10"
+  1110→              />
+  1111→            </div>
+  1112→            <Input
+  1113→              value={city}
+  1114→              onChange={(e) => setCity(e.target.value)}
+  1115→              placeholder={t('browse.cityPlaceholder')}
+  1116→            />
+  1117→            <div className="relative">
+  1118→              <Icon name="sell" size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+  1119→              <Input
+  1120→                value={maxPrice}
+  1121→                onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+  1122→                placeholder={t('browse.maxPrice')}
+  1123→                className="ps-10"
+  1124→                inputMode="decimal"
+  1125→              />
+  1126→            </div>
+  1127→          </div>
+  1128→
+  1129→          <div className="flex items-center justify-between gap-2">
+  1130→            <Select value={sort} onValueChange={setSort}>
+  1131→              <SelectTrigger className="h-9 w-[180px]">
+  1132→                <SelectValue />
+  1133→              </SelectTrigger>
+  1134→              <SelectContent>
+  1135→                <SelectItem value="rating">{t('browse.sortRating')}</SelectItem>
+  1136→                <SelectItem value="priceLow">{t('browse.sortPriceLow')}</SelectItem>
+  1137→                <SelectItem value="priceHigh">{t('browse.sortPriceHigh')}</SelectItem>
+  1138→                <SelectItem value="reviews">{t('browse.sortReviews')}</SelectItem>
+  1139→              </SelectContent>
+  1140→            </Select>
+  1141→            {(q || city || maxPrice || type !== 'all') && (
+  1142→              <Button
+  1143→                variant="ghost"
+  1144→                size="sm"
+  1145→                onClick={() => { setQ(''); setCity(''); setMaxPrice(''); setType('all') }}
+  1146→              >
+  1147→                <Icon name="filter_alt_off" size={14} />
+  1148→                {t('common.clearAll')}
+  1149→              </Button>
+  1150→            )}
+  1151→          </div>
+  1152→        </CardContent>
+  1153→      </Card>
+  1154→
+  1155→      {/* Results */}
+  1156→      {error ? (
+  1157→        <ErrorState message={error} onRetry={refetch} />
+  1158→      ) : loading ? (
+  1159→        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+  1160→          {Array.from({ length: 8 }).map((_, i) => (
+  1161→            <Card key={i} className="py-0">
+  1162→              <CardContent className="space-y-3 p-4">
+  1163→                <div className="flex items-center gap-3">
+  1164→                  <Skeleton className="size-12 rounded-full" />
+  1165→                  <div className="flex-1 space-y-2">
+  1166→                    <Skeleton className="h-4 w-3/4" />
+  1167→                    <Skeleton className="h-3 w-1/2" />
+  1168→                  </div>
+  1169→                </div>
+  1170→                <Skeleton className="h-4 w-full" />
+  1171→                <Skeleton className="h-8 w-full" />
+  1172→              </CardContent>
+  1173→            </Card>
+  1174→          ))}
+  1175→        </div>
+  1176→      ) : !data || data.results.length === 0 ? (
+  1177→        <EmptyState
+  1178→          icon="travel_explore"
+  1179→          title={t('common.noResults')}
+  1180→          description={t('browse.noResults')}
+  1181→        />
+  1182→      ) : (
+  1183→        <div className="grid animate-fade-in grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+  1184→          {data.results.map((p) => (
+  1185→            <ProviderCard
+  1186→              key={p.id}
+  1187→              provider={p}
+  1188→              onView={() => { setDetailProvider(p); setDetailOpen(true) }}
+  1189→              onBook={() => openBooking(p)}
+  1190→            />
+  1191→          ))}
+  1192→        </div>
+  1193→      )}
+  1194→
+  1195→      <ProviderDetailDialog
+  1196→        provider={detailProvider}
+  1197→        open={detailOpen}
+  1198→        onOpenChange={setDetailOpen}
+  1199→        onBook={() => openBooking(detailProvider)}
+
+[showing lines 600-1199 of 2120; use offset=1200 with limit to continue reading]
