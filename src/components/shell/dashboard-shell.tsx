@@ -15,6 +15,7 @@ import { useRouter as _r } from 'next/navigation'
 import { PatientDashboard } from '@/components/dashboards/patient/patient-dashboard'
 import { ProviderDashboard } from '@/components/dashboards/provider/provider-dashboard'
 import { AdminDashboard } from '@/components/dashboards/admin/admin-dashboard'
+import { NotificationBell } from '@/components/shell/notification-bell'
 
 type NavItem = { key: string; labelKey: string; icon: string }
 
@@ -23,6 +24,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
     { key: 'browse', labelKey: 'dash.browse', icon: 'travel_explore' },
     { key: 'compare', labelKey: 'dash.compare', icon: 'compare' },
+    { key: 'favorites', labelKey: 'dash.favorites', icon: 'favorite' },
     { key: 'bookings', labelKey: 'dash.bookings', icon: 'event' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
@@ -187,6 +189,9 @@ export function DashboardShell() {
                 {compareIds.length}
               </Button>
             )}
+
+            {/* Notifications */}
+            <NotificationBell />
 
             {/* Language */}
             <DropdownMenu>

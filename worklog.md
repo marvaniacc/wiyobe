@@ -282,3 +282,86 @@ Stage Summary:
 - Auth system now supports: password signin, OTP signin, Google OAuth (real + demo), OTP signup with email verification, password reset via OTP.
 - Demo credentials still work: admin@/admin123, patient@/patient123, etc.
 - To enable real Google OAuth: set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` env vars — the system automatically switches from demo to real mode.
+
+---
+Task ID: 8
+Agent: main (orchestrator) — scheduled cron review
+Task: QA assessment + fix bugs + add new features (notification center, favorites, booking detail dialog, styling polish).
+
+## Current Project Status Assessment
+Platform is stable and functional. All core flows (patient booking, provider management, admin accounting, auth with OTP+Google) work end-to-end. Dev server stable on port 3000. Lint: 0 errors. No runtime errors in dev log.
+
+## Completed Modifications
+
+### Bug Fixes
+1. **React duplicate key warnings** — Fixed all `key={i}` patterns in patient/provider/admin dashboards by using unique prefixed keys (`key={`item-${i}`}`). This eliminates the "Encountered two children with the same key 0" console errors.
+2. **Admin stat card grid asymmetry** — The 5th stat card (Total Users) was in a separate `lg:grid-cols-3` grid, causing an unbalanced layout. Fixed by merging all 5 cards into a single `xl:grid-cols-5` grid with responsive breakpoints.
+3. **Admin StatCard styling** — Improved: added `overflow-hidden`, `hover:-translate-y-0.5 hover:shadow-md` micro-interaction, `tabular-nums` for value alignment, `group-hover:scale-105` on icon. Fixed warning tone from solid `bg-warning` to soft `bg-warning/10 text-warning` for consistency.
+
+### New Features
+
+#### 1. Notification Center (full system)
+- **Database**: Added `Notification` model (id, userId, type, title, body, read, link, meta, createdAt). Added `notifications` relation to User.
+- **API**: 
+  - `GET /api/notifications` — list user's notifications + unreadCount
+  - `POST /api/notifications` — mark all as read
+  - `POST /api/notifications/read` — mark single as read
+  - `POST /api/notifications/seed` — auto-seed demo notifications for new users
+- **Notification triggers**: Integrated into booking lifecycle:
+  - Booking created → notifies both patient ("Booking confirmed!") and provider ("New booking received")
+  - Booking cancelled → notifies the other party with refund amount
+  - Booking completed → notifies patient ("Visit completed, please review") and provider ("$X available for payout")
+- **UI**: `NotificationBell` component in dashboard topbar — bell icon with red unread count badge, dropdown panel with color-coded notification icons (booking_created=green, booking_cancelled=red, booking_completed=blue, review_received=purple, system=gray), relative timestamps, mark-all-read button, click-to-navigate. Auto-seeds demo notifications on first load.
+- **i18n**: Added notification keys to all 4 locales (en/tr/fa/ar).
+
+#### 2. Provider Favorites/Wishlist
+- **Database**: Added `Favorite` model (id, patientId, providerId, providerType, providerUserId, createdAt) with `@@unique([patientId, providerId])`. Added `favorites` relation to User.
+- **API**: `GET /api/favorites` (list with provider details), `POST /api/favorites` (toggle favorite on/off).
+- **UI**: 
+  - Heart icon button on every provider card in browse section (alongside Book now + Compare). Filled red when favorited, outline when not.
+  - New "Favorites" nav item in patient sidebar (heart icon).
+  - Favorites section: grid of saved provider cards with remove button, empty state with CTA.
+- **i18n**: Added favorites keys to all 4 locales.
+
+#### 3. Booking Detail Dialog with Timeline
+- **UI**: `BookingDetailDialog` component — click any booking row in the bookings table to open a detailed dialog showing:
+  - Status badge + date
+  - Vertical timeline with color-coded icons (created → payment confirmed → completed/cancelled → refund)
+  - Payment breakdown (amount, commission %, provider receives)
+  - Video join button for confirmed online visits
+  - Notes display
+  - Close button
+- Booking table rows now have `cursor-pointer` + `hover:bg-surface-secondary` to indicate clickability.
+- **i18n**: Added booking detail/timeline keys to all 4 locales.
+
+### Styling Improvements
+- Admin StatCard: hover lift effect, icon scale on hover, tabular numbers, consistent soft backgrounds
+- Admin overview: 5-card grid now uses `xl:grid-cols-5` for proper desktop layout
+- Patient browse: provider cards now have favorite heart button (3 action buttons per card)
+- Patient bookings: table rows clickable with hover background, opens detail dialog
+
+## Verification Results
+- **Lint**: 0 errors, 6 warnings (all cosmetic unused eslint-disable directives)
+- **Dev server**: stable, no runtime errors
+- **Agent-browser QA**:
+  - Notification bell: ✓ shows red badge with count, dropdown panel with 3 seeded notifications, mark-all-read works
+  - Favorites: ✓ heart button on provider cards toggles favorite, favorites section shows saved providers with remove option
+  - Booking detail dialog: ✓ opens on row click, shows timeline with icons, payment breakdown, video join button
+  - Admin stat cards: ✓ 5 cards now in single evenly-spaced row
+  - All existing flows still working (booking, payment, ledger, auth)
+
+## Unresolved Issues / Risks
+- Stripe still mocked (no real keys) — expected for MVP
+- Online video uses Jitsi meet links — expected for MVP
+- 6 cosmetic lint warnings (unused eslint-disable directives) — non-blocking
+- The `otp-input.tsx` shows a stale compile error in browser console from a previous session but doesn't affect current functionality
+
+## Priority Recommendations for Next Phase
+1. Add email notification sending (SMTP integration) — currently notifications are in-app only
+2. Add provider availability calendar with recurring slot generation
+3. Add admin dispute resolution workflow UI
+4. Add CSV/PDF financial report exports (CSV scaffolding exists)
+5. Add multi-currency support
+6. Add real-time notifications via WebSocket (currently requires page refresh)
+7. Add provider response to reviews
+8. Add booking rescheduling feature

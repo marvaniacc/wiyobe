@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Icon } from '@/components/shared/icon'
 import { StarRating } from '@/components/shared/star-rating'
 import { useT } from '@/hooks/use-t'
@@ -313,7 +313,7 @@ function LanguageBadges({ languages, max = 3 }: { languages: string; max?: numbe
     <div className="flex flex-wrap gap-1">
       {list.map((l, i) => (
         <span
-          key={i}
+          key={`item-${i}`}
           className="inline-flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
         >
           <Icon name="language" size={11} />
@@ -482,7 +482,7 @@ function OverviewSkeleton() {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="gap-0">
+          <Card key={`item-${i}`} className="gap-0">
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
@@ -500,7 +500,7 @@ function OverviewSkeleton() {
           <CardHeader><Skeleton className="h-5 w-40" /></CardHeader>
           <CardContent className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3">
+              <div key={`item-${i}`} className="flex items-center gap-3">
                 <Skeleton className="size-10 rounded-full" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-1/3" />
@@ -516,7 +516,7 @@ function OverviewSkeleton() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-24 rounded-2xl" />
+                <Skeleton key={`item-${i}`} className="h-24 rounded-2xl" />
               ))}
             </div>
           </CardContent>
@@ -720,7 +720,7 @@ function BrowseSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 8 }).map((_, i) => (
-        <Card key={i} className="gap-0">
+        <Card key={`item-${i}`} className="gap-0">
           <CardContent className="space-y-3 p-4">
             <div className="flex items-start gap-3">
               <Skeleton className="size-12 rounded-full" />
@@ -752,6 +752,18 @@ function ProviderCard({ provider, onBook, onView }: {
   const toggleCompare = useApp((s) => s.toggleCompare)
   const inCompare = compareIds.includes(provider.id)
   const compareFull = compareIds.length >= 4 && !inCompare
+  const [isFav, setIsFav] = useState(false)
+
+  // Check favorite status
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/favorites').then(r => r.json()).then(d => {
+      if (!cancelled && d.favorites) {
+        setIsFav(d.favorites.some((f: any) => f.providerId === provider.id))
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [provider.id])
 
   function handleCompareClick(e: React.MouseEvent) {
     e.stopPropagation()
@@ -761,6 +773,15 @@ function ProviderCard({ provider, onBook, onView }: {
     }
     toggleCompare(provider.id)
     toast.success(inCompare ? t('browse.removedFromCompare') : t('browse.addedToCompare'))
+  }
+
+  async function handleFavoriteClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      const res = await apiPost('/api/favorites', { providerId: provider.id, providerType: provider.providerType, providerUserId: provider.userId })
+      setIsFav(res.favorited)
+      toast.success(res.favorited ? t('favorites.added') : t('favorites.removed'))
+    } catch (err: any) { toast.error(err.message) }
   }
 
   const price = formatCurrency(provider.price, 'USD', locale)
@@ -829,6 +850,16 @@ function ProviderCard({ provider, onBook, onView }: {
             aria-label={t('common.compare')}
           >
             <Icon name="compare" size={16} fill={inCompare} />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            onClick={handleFavoriteClick}
+            title={t('dash.favorites')}
+            aria-label={t('dash.favorites')}
+            className={isFav ? 'text-error border-error/30 hover:bg-error/5' : ''}
+          >
+            <Icon name={isFav ? 'favorite' : 'favorite_border'} size={16} fill={isFav} />
           </Button>
         </div>
       </CardContent>
@@ -1148,7 +1179,7 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
                 <Label className="text-sm font-medium">{t('booking.selectSlot')}</Label>
                 {slotsLoading ? (
                   <div className="space-y-2">
-                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
+                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={`item-${i}`} className="h-12 w-full rounded-xl" />)}
                   </div>
                 ) : grouped.length === 0 ? (
                   <div className="flex items-center gap-2 rounded-xl bg-surface-secondary p-3 text-sm text-muted-foreground">
@@ -1410,7 +1441,7 @@ function CompareSection() {
       {loading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: compareIds.length }).map((_, i) => (
-            <Skeleton key={i} className="h-96 rounded-2xl" />
+            <Skeleton key={`item-${i}`} className="h-96 rounded-2xl" />
           ))}
         </div>
       ) : error ? (
@@ -1497,6 +1528,8 @@ function BookingsSection() {
   const [cancelKey, setCancelKey] = useState(0)
   const [reviewTarget, setReviewTarget] = useState<Booking | null>(null)
   const [reviewKey, setReviewKey] = useState(0)
+  const [detailTarget, setDetailTarget] = useState<Booking | null>(null)
+  const [detailKey, setDetailKey] = useState(0)
   const [tick, setTick] = useState(0)
 
   const statusParam = tab === 'upcoming' ? 'CONFIRMED' : tab === 'completed' ? 'COMPLETED' : tab === 'cancelled' ? 'CANCELLED' : ''
@@ -1516,6 +1549,11 @@ function BookingsSection() {
   function openReview(b: Booking) {
     setReviewTarget(b)
     setReviewKey((k) => k + 1)
+  }
+
+  function openDetail(b: Booking) {
+    setDetailTarget(b)
+    setDetailKey((k) => k + 1)
   }
 
   const tabs: { key: typeof tab; label: string; icon: string }[] = [
@@ -1546,7 +1584,7 @@ function BookingsSection() {
             <Card className="gap-0">
               <CardContent className="p-0">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="border-b border-divider p-4 last:border-0">
+                  <div key={`item-${i}`} className="border-b border-divider p-4 last:border-0">
                     <div className="flex items-center gap-3">
                       <Skeleton className="size-10 rounded-full" />
                       <div className="flex-1 space-y-2">
@@ -1583,7 +1621,7 @@ function BookingsSection() {
                     </TableHeader>
                     <TableBody>
                       {data.bookings.map((b) => (
-                        <TableRow key={b.id} className="border-divider">
+                        <TableRow key={b.id} className="cursor-pointer border-divider transition-colors hover:bg-surface-secondary" onClick={() => openDetail(b)}>
                           <TableCell className="ps-4">
                             <div className="flex items-center gap-3">
                               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -1676,6 +1714,12 @@ function BookingsSection() {
         open={!!reviewTarget}
         onOpenChange={(o) => !o && setReviewTarget(null)}
         onDone={refresh}
+      />
+      <BookingDetailDialog
+        key={detailKey}
+        booking={detailTarget}
+        open={!!detailTarget}
+        onOpenChange={(o) => !o && setDetailTarget(null)}
       />
     </div>
   )
@@ -1968,7 +2012,7 @@ function ReviewsSection() {
         <ErrorState message={error} onRetry={refetch} />
       ) : loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={`item-${i}`} className="h-40 rounded-2xl" />)}
         </div>
       ) : reviewed.length === 0 ? (
         <EmptyState
@@ -2228,17 +2272,218 @@ function ProfileSkeleton() {
         <Card className="lg:col-span-2">
           <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={`item-${i}`} className="h-16" />)}
           </CardContent>
         </Card>
       </div>
       <Card>
         <CardHeader><Skeleton className="h-5 w-40" /></CardHeader>
         <CardContent className="grid grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
+          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={`item-${i}`} className="h-16" />)}
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/* =========================================================================
+ * Section: Favorites — saved providers
+ * ======================================================================= */
+
+function FavoritesSection() {
+  const { t, locale } = useT()
+  const goDashboard = useApp((s) => s.goDashboard)
+  const { data, loading, error, refetch } = useApi<{ favorites: any[] }>('/api/favorites')
+
+  async function removeFav(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      await apiPost('/api/favorites', { providerId: id, providerType: 'DOCTOR', providerUserId: '' })
+      refetch()
+      toast.success(t('favorites.removed'))
+    } catch (e: any) { toast.error(e.message) }
+  }
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={`fav-skel-${i}`} className="h-48 rounded-[16px]" />)}
+      </div>
+    )
+  }
+
+  if (error) return <ErrorState message={error} onRetry={refetch} />
+
+  const favorites = data?.favorites || []
+
+  if (favorites.length === 0) {
+    return (
+      <EmptyState
+        icon="favorite_border"
+        title={t('favorites.empty')}
+        description={t('favorites.emptyDesc')}
+        action={<Button onClick={() => goDashboard('browse')}><Icon name="travel_explore" size={16} />{t('favorites.browseProviders')}</Button>}
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionHeader title={t('favorites.title')} subtitle={`${favorites.length} ${favorites.length === 1 ? 'provider' : 'providers'}`} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {favorites.map((f) => (
+          <Card key={f.providerId} className="group flex cursor-pointer flex-col gap-0 transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => goDashboard('browse')}>
+            <CardContent className="flex flex-1 flex-col gap-3 p-4">
+              <div className="flex items-start gap-3">
+                <ProviderAvatar name={f.name} avatarUrl={f.avatarUrl} size={48} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="truncate font-semibold text-foreground">{f.name || '—'}</h3>
+                    {f.verified && <Icon name="verified" size={16} fill className="shrink-0 text-primary" />}
+                  </div>
+                  <div className="truncate text-sm text-muted-foreground">{f.specialty}</div>
+                  <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                    <Icon name="location_on" size={12} />
+                    <span className="truncate">{[f.city, f.country].filter(Boolean).join(', ')}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => removeFav(f.providerId, e)}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-error transition-colors hover:bg-error/10"
+                  title={t('favorites.removed')}
+                >
+                  <Icon name="favorite" size={18} fill />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <StarRating rating={f.rating || 0} size={14} showValue count={f.reviewCount} />
+                <div className="text-end">
+                  <div className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(f.price, 'USD', locale)}</div>
+                  <div className="text-[11px] text-muted-foreground">{f.priceLabel}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* =========================================================================
+ * Section: Booking Detail Dialog — full timeline
+ * ======================================================================= */
+
+function BookingDetailDialog({ booking, open, onOpenChange }: {
+  booking: any
+  open: boolean
+  onOpenChange: (o: boolean) => void
+}) {
+  const { t, locale } = useT()
+  if (!booking) return null
+
+  const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
+  const providerType = booking.providerType
+
+  // Build timeline
+  const timeline: { label: string; date: string; icon: string; color: string; done: boolean }[] = [
+    { label: t('booking.created'), date: formatDateTime(booking.createdAt, locale), icon: 'event_available', color: 'bg-primary/10 text-primary', done: true },
+    { label: t('booking.confirmed'), date: booking.payment?.status === 'SUCCEEDED' ? formatDateTime(booking.createdAt, locale) : '—', icon: 'verified', color: 'bg-success/10 text-success', done: booking.payment?.status === 'SUCCEEDED' },
+  ]
+  if (booking.status === 'COMPLETED') {
+    timeline.push({ label: t('booking.completedAt'), date: booking.endDate ? formatDateTime(booking.endDate, locale) : '—', icon: 'task_alt', color: 'bg-success/10 text-success', done: true })
+  }
+  if (booking.status === 'CANCELLED' || booking.status === 'REFUNDED') {
+    timeline.push({ label: t('booking.cancelledAt'), date: booking.cancelledAt ? formatDateTime(booking.cancelledAt, locale) : '—', icon: 'event_busy', color: 'bg-error/10 text-error', done: true })
+    if (booking.refundAmount && parseFloat(booking.refundAmount) > 0) {
+      timeline.push({ label: t('booking.refundProcessed'), date: formatCurrency(booking.refundAmount, 'USD', locale), icon: 'undo', color: 'bg-warning/10 text-warning', done: true })
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="receipt_long" size={20} className="text-primary" />
+            {t('booking.detailTitle')}
+          </DialogTitle>
+          <DialogDescription>
+            {providerName} · {booking.visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Status badge */}
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className={cn('rounded-full border', statusBadgeClass(booking.status))}>
+              {t(statusLabelKey(booking.status))}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{formatDateTime(booking.startDate, locale)}</span>
+          </div>
+
+          {/* Timeline */}
+          <div>
+            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('booking.timeline')}</p>
+            <div className="space-y-3">
+              {timeline.map((item, i) => (
+                <div key={`tl-${i}`} className="flex items-start gap-3">
+                  <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', item.color)}>
+                    <Icon name={item.icon} size={16} fill />
+                  </div>
+                  <div className="flex-1 pt-1">
+                    <p className="text-sm font-medium text-foreground">{item.label}</p>
+                    <p className="text-xs text-muted-foreground">{item.date}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Payment info */}
+          <div className="rounded-[14px] border border-divider bg-surface-secondary/50 p-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('booking.paymentInfo')}</p>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('common.amount')}</span>
+                <span className="font-medium text-foreground">{formatCurrency(booking.amount, 'USD', locale)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('booking.platformCommission')} ({booking.commissionRate}%)</span>
+                <span className="font-medium text-foreground">-{formatCurrency(booking.commissionAmount, 'USD', locale)}</span>
+              </div>
+              <Separator className="my-2" />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('booking.providerReceives')}</span>
+                <span className="font-medium text-success">{formatCurrency(booking.providerNetAmount, 'USD', locale)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Video link for online visits */}
+          {booking.visitType === 'ONLINE' && booking.videoSessionUrl && booking.status === 'CONFIRMED' && (
+            <Button asChild variant="success" className="w-full gap-2">
+              <a href={booking.videoSessionUrl} target="_blank" rel="noopener noreferrer">
+                <Icon name="videocam" size={18} />
+                {t('booking.videoJoin')}
+              </a>
+            </Button>
+          )}
+
+          {/* Notes */}
+          {booking.notes && (
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('common.notes')}</p>
+              <p className="rounded-[14px] border border-divider bg-surface p-3 text-sm text-foreground">{booking.notes}</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">{t('booking.close')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -2251,6 +2496,7 @@ export function PatientDashboard({ section }: { section: string }) {
     case 'overview': return <OverviewSection />
     case 'browse': return <BrowseSection />
     case 'compare': return <CompareSection />
+    case 'favorites': return <FavoritesSection />
     case 'bookings': return <BookingsSection />
     case 'reviews': return <ReviewsSection />
     case 'profile': return <ProfileSection />

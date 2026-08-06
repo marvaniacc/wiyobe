@@ -291,7 +291,7 @@ function LoadingCard({ lines = 3 }: { lines?: number }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {Array.from({ length: lines }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
+          <Skeleton key={`item-${i}`} className="h-12 w-full" />
         ))}
       </CardContent>
     </Card>
@@ -302,18 +302,18 @@ function StatCard({ icon, label, value, tone = 'primary', subtitle }: { icon: st
   const toneCls = {
     primary: 'bg-primary/10 text-primary',
     success: 'bg-success/10 text-success',
-    warning: 'bg-warning text-warning-foreground',
+    warning: 'bg-warning/10 text-warning',
     info: 'bg-info/10 text-info',
   }[tone]
   return (
-    <Card className="gap-0 py-5">
-      <CardContent className="flex items-start gap-4">
-        <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-[14px]', toneCls)}>
+    <Card className="group gap-0 overflow-hidden py-0 transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <CardContent className="flex items-start gap-4 p-5">
+        <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105', toneCls)}>
           <Icon name={icon} size={24} fill />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="mt-1 truncate text-2xl font-semibold text-foreground">{value}</p>
+          <p className="mt-1 truncate text-2xl font-semibold tabular-nums text-foreground">{value}</p>
           {subtitle && <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>}
         </div>
       </CardContent>
@@ -336,7 +336,7 @@ function OverviewSection() {
         <PageHeader title={t('admin.overviewTitle')} icon="space_dashboard" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+            <Card key={`item-${i}`} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
           ))}
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -384,14 +384,11 @@ function OverviewSection() {
       )}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard icon="payments" label={t('admin.platformRevenue')} value={formatCurrency(data.platformRevenue, 'USD', locale)} tone="success" />
         <StatCard icon="event" label={t('admin.totalBookings')} value={String(data.totalBookings)} tone="primary" />
         <StatCard icon="check_circle" label={t('admin.completedVisits')} value={String(data.completedBookings)} tone="info" />
         <StatCard icon="verified" label={t('admin.activeProviders')} value={String(data.activeProviders)} tone="primary" />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard icon="group" label={t('admin.totalUsers')} value={String(data.totalUsers)} tone="info" />
       </div>
 
@@ -1077,7 +1074,7 @@ function CancellationsSection() {
           <CardContent className="px-0">
             {bkLoading ? (
               <div className="flex flex-col gap-2 px-6 pb-6">
-                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={`item-${i}`} className="h-14 w-full" />)}
               </div>
             ) : bkError ? (
               <div className="px-6 pb-6"><ErrorState message={bkError} onRetry={bkRefetch} /></div>
@@ -1605,7 +1602,7 @@ function ReportsSection() {
       <div>
         <PageHeader title={t('admin.reportsTitle')} icon="analytics" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Card key={i} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>)}
+          {Array.from({ length: 4 }).map((_, i) => <Card key={`item-${i}`} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>)}
         </div>
         <LoadingCard lines={4} />
       </div>

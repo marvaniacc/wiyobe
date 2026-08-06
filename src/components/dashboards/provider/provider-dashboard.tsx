@@ -235,7 +235,7 @@ function RowSkeleton({ cols = 5 }: { cols?: number }) {
   return (
     <TableRow>
       {Array.from({ length: cols }).map((_, i) => (
-        <TableCell key={i}><Skeleton className="h-5 w-full max-w-[120px]" /></TableCell>
+        <TableCell key={`item-${i}`}><Skeleton className="h-5 w-full max-w-[120px]" /></TableCell>
       ))}
     </TableRow>
   )
@@ -255,7 +255,7 @@ function OverviewSection({ role }: { role: string }) {
       <div className="flex flex-col gap-6">
         <PageHeader title={t('dash.overview')} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={`item-${i}`} />)}
         </div>
         <Card><CardContent className="p-6"><Skeleton className="h-32 w-full" /></CardContent></Card>
       </div>
@@ -479,7 +479,7 @@ function AppointmentsSection({ role }: { role: string }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={i} cols={6} />)}
+                    {Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={`item-${i}`} cols={6} />)}
                   </TableBody>
                 </Table>
               ) : error ? (
@@ -690,7 +690,7 @@ function ServicesSection({ role }: { role: string }) {
       {loading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-5"><Skeleton className="h-32 w-full" /></CardContent></Card>
+            <Card key={`item-${i}`}><CardContent className="p-5"><Skeleton className="h-32 w-full" /></CardContent></Card>
           ))}
         </div>
       ) : error ? (
@@ -972,7 +972,7 @@ function AvailabilitySection({ role }: { role: string }) {
               <TableHead>{t('common.status')}</TableHead>
               <TableHead className="pe-4 text-end">{t('common.actions')}</TableHead>
             </TableRow></TableHeader>
-            <TableBody>{Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={i} cols={5} />)}</TableBody>
+            <TableBody>{Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={`item-${i}`} cols={5} />)}</TableBody>
           </Table>
         </CardContent></Card>
       ) : error ? (

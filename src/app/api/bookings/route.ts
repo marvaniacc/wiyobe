@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { getCommissionRate, resolveProviderUser, recordPaymentLedger } from '@/lib/ledger'
+import { notify } from '@/lib/notify'
 import { toDec, mulDec, subDec } from '@/lib/money'
 import { z } from 'zod'
 import type { ProviderType } from '@prisma/client'
@@ -177,6 +178,26 @@ export async function POST(req: Request) {
       commissionRate,
       providerUserId,
       description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}`,
+    })
+
+    // Notifications — notify both patient and provider
+    const patientUser = await db.user.findUnique({ where: { id: session.id }, select: { name: true } })
+    const patientName = patientUser?.name || 'Patient'
+    await notify({
+      userId: session.id,
+      type: 'booking_created',
+      title: 'Booking confirmed!',
+      body: `Your ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with ${providerName} has been confirmed.`,
+      link: 'bookings',
+      meta: { bookingId: booking.id, amount: toDec(amount) },
+    })
+    await notify({
+      userId: providerUserId,
+      type: 'booking_created',
+      title: 'New booking received',
+      body: `${patientName} booked a ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with you.`,
+      link: 'appointments',
+      meta: { bookingId: booking.id, amount: toDec(amount) },
     })
 
     return json({ booking, payment }, 201)

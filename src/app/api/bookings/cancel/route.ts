@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { getCancellationPolicy, resolveProviderUser, recordRefundLedger } from '@/lib/ledger'
+import { notify } from '@/lib/notify'
 import { subDec, toDec } from '@/lib/money'
 import { z } from 'zod'
 
@@ -79,6 +80,20 @@ export async function POST(req: Request) {
         providerUserId,
         originalAmount: booking.amount,
         description: `Refund on cancellation (fee retained: ${feeRetained})`,
+      })
+    }
+
+    // Notifications — notify both parties about cancellation
+    const otherUserId = isPatient ? providerUserId : booking.patientId
+    const cancelledBy = isPatient ? 'Patient' : isProvider ? 'Provider' : 'Admin'
+    if (otherUserId) {
+      await notify({
+        userId: otherUserId,
+        type: 'booking_cancelled',
+        title: 'Booking cancelled',
+        body: `A booking has been cancelled by ${cancelledBy}. Refund: $${refundAmount}.`,
+        link: isPatient ? 'appointments' : 'bookings',
+        meta: { bookingId: booking.id, refundAmount },
       })
     }
 
