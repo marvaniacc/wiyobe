@@ -1547,6 +1547,8 @@ function BookingsSection() {
   const [detailKey, setDetailKey] = useState(0)
   const [rescheduleTarget, setRescheduleTarget] = useState<Booking | null>(null)
   const [rescheduleKey, setRescheduleKey] = useState(0)
+  const [disputeTarget, setDisputeTarget] = useState<Booking | null>(null)
+  const [disputeKey, setDisputeKey] = useState(0)
   const [tick, setTick] = useState(0)
 
   const statusParam = tab === 'upcoming' ? 'CONFIRMED' : tab === 'completed' ? 'COMPLETED' : tab === 'cancelled' ? 'CANCELLED' : ''
@@ -1576,6 +1578,11 @@ function BookingsSection() {
   function openReschedule(b: Booking) {
     setRescheduleTarget(b)
     setRescheduleKey((k) => k + 1)
+  }
+
+  function openDispute(b: Booking) {
+    setDisputeTarget(b)
+    setDisputeKey((k) => k + 1)
   }
 
   const tabs: { key: typeof tab; label: string; icon: string }[] = [
@@ -1744,12 +1751,20 @@ function BookingsSection() {
         booking={detailTarget}
         open={!!detailTarget}
         onOpenChange={(o) => !o && setDetailTarget(null)}
+        onOpenDispute={openDispute}
       />
       <RescheduleDialog
         key={rescheduleKey}
         booking={rescheduleTarget}
         open={!!rescheduleTarget}
         onOpenChange={(o) => !o && setRescheduleTarget(null)}
+        onDone={refresh}
+      />
+      <DisputeDialog
+        key={disputeKey}
+        booking={disputeTarget}
+        open={!!disputeTarget}
+        onOpenChange={(o) => !o && setDisputeTarget(null)}
         onDone={refresh}
       />
     </div>
@@ -2553,10 +2568,11 @@ function handleAddToCalendar(booking: any) {
   toast.success('Calendar event downloaded')
 }
 
-function BookingDetailDialog({ booking, open, onOpenChange }: {
+function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
   booking: any
   open: boolean
   onOpenChange: (o: boolean) => void
+  onOpenDispute?: (booking: any) => void
 }) {
   const { t, locale } = useT()
   if (!booking) return null
@@ -2669,10 +2685,238 @@ function BookingDetailDialog({ booking, open, onOpenChange }: {
               {t('booking.addToCalendar')}
             </Button>
           )}
+          {(booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && (
+            <Button
+              variant="outline"
+              onClick={() => { onOpenChange(false); onOpenDispute?.(booking) }}
+              className="w-full gap-2 text-error hover:bg-error/5 sm:w-auto"
+            >
+              <Icon name="gavel" size={16} />
+              {t('dispute.openDispute')}
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">{t('booking.close')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/* =========================================================================
+ * Dispute Dialog — open a dispute for a booking
+ * ======================================================================= */
+
+function DisputeDialog({ booking, open, onOpenChange, onDone }: {
+  booking: Booking | null
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onDone: () => void
+}) {
+  const { t } = useT()
+  const [type, setType] = useState<'REFUND_REQUEST' | 'SERVICE_QUALITY' | 'SCHEDULING_ISSUE' | 'PAYMENT_ISSUE' | 'OTHER'>('SERVICE_QUALITY')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setType('SERVICE_QUALITY')
+      setTitle('')
+      setDescription('')
+    }
+  }, [open])
+
+  async function handleSubmit() {
+    if (!booking || title.trim().length < 3 || description.trim().length < 10) return
+    setSubmitting(true)
+    try {
+      await apiPost('/api/disputes', {
+        bookingId: booking.id,
+        type,
+        title: title.trim(),
+        description: description.trim(),
+      })
+      toast.success(t('dispute.disputeOpened'))
+      onOpenChange(false)
+      onDone()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!booking) return null
+
+  const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="gavel" size={20} className="text-error" />
+            {t('dispute.openDispute')}
+          </DialogTitle>
+          <DialogDescription>
+            {providerName} · {t('dispute.disputeDesc')}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Dispute type */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('dispute.disputeType')}</Label>
+            <Select value={type} onValueChange={(v: any) => setType(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="REFUND_REQUEST">{t('dispute.typeRefund')}</SelectItem>
+                <SelectItem value="SERVICE_QUALITY">{t('dispute.typeService')}</SelectItem>
+                <SelectItem value="SCHEDULING_ISSUE">{t('dispute.typeSchedule')}</SelectItem>
+                <SelectItem value="PAYMENT_ISSUE">{t('dispute.typePayment')}</SelectItem>
+                <SelectItem value="OTHER">{t('dispute.typeOther')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Title */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('dispute.disputeTitle')}</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Brief summary of the issue"
+              maxLength={200}
+            />
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('dispute.disputeReason')}</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe the issue in detail (min 10 characters)..."
+              rows={4}
+              maxLength={2000}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">{description.length}/2000</p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>{t('common.cancel')}</Button>
+          <Button
+            variant="destructive"
+            onClick={handleSubmit}
+            disabled={submitting || title.trim().length < 3 || description.trim().length < 10}
+            className="gap-1.5"
+          >
+            {submitting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="gavel" size={16} />}
+            {t('dispute.submit')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* =========================================================================
+ * Section: Patient Disputes — view disputes they raised or are against them
+ * ======================================================================= */
+
+function PatientDisputesSection() {
+  const { t, locale } = useT()
+  const goDashboard = useApp((s) => s.goDashboard)
+  const { data, loading, error, refetch } = useApi<{ disputes: any[] }>('/api/disputes')
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5">
+        <SectionHeader title={t('dispute.title')} />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={`dispute-skel-${i}`} className="h-28 w-full rounded-[16px]" />)}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) return <div className="py-10 text-center text-sm text-muted-foreground">{error}</div>
+
+  const disputes = data?.disputes || []
+
+  if (disputes.length === 0) {
+    return (
+      <div className="flex flex-col gap-5">
+        <SectionHeader title={t('dispute.title')} />
+        <EmptyState
+          icon="gavel"
+          title={t('dispute.noDisputes')}
+          description={t('dispute.noDisputesDesc')}
+          action={<Button onClick={() => goDashboard('bookings')} className="gap-1.5"><Icon name="event" size={16} />{t('dash.bookings')}</Button>}
+        />
+      </div>
+    )
+  }
+
+  const statusBadge: Record<string, { cls: string; key: string }> = {
+    OPEN: { cls: 'bg-warning/10 text-warning border-warning/20', key: 'dispute.open' },
+    UNDER_REVIEW: { cls: 'bg-info/10 text-info border-info/20', key: 'dispute.underReview' },
+    RESOLVED: { cls: 'bg-success/10 text-success border-success/20', key: 'dispute.resolved' },
+    CLOSED: { cls: 'bg-muted text-muted-foreground border-divider', key: 'dispute.closed' },
+  }
+  const typeIcon: Record<string, string> = {
+    REFUND_REQUEST: 'undo', SERVICE_QUALITY: 'thumb_down', SCHEDULING_ISSUE: 'event_busy', PAYMENT_ISSUE: 'payments', OTHER: 'help',
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionHeader title={t('dispute.title')} subtitle={`${disputes.length} ${disputes.length === 1 ? 'dispute' : 'disputes'}`} />
+      <div className="space-y-3">
+        {disputes.map((d) => {
+          const badge = statusBadge[d.status] || statusBadge.OPEN
+          const providerName = d.booking?.doctor?.user?.name || d.booking?.hospital?.name || d.booking?.hotel?.name || d.booking?.translator?.user?.name || '—'
+          return (
+            <Card key={d.id} className="gap-0 transition-all hover:shadow-md">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-[12px] bg-surface-secondary text-muted-foreground">
+                    <Icon name={typeIcon[d.type] || 'help'} size={22} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{d.title}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{providerName} · {formatCurrency(d.booking?.amount || '0', 'USD', locale)}</p>
+                      </div>
+                      <span className={cn('inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium', badge.cls)}>
+                        {t(badge.key)}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{d.description}</p>
+                    {d.adminResponse && (
+                      <div className="mt-3 rounded-[12px] border-s-2 border-primary bg-accent/20 p-3">
+                        <div className="flex items-center gap-1.5">
+                          <Icon name="reply" size={12} className="text-primary" />
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">{t('dispute.adminResponse')}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-foreground">{d.adminResponse}</p>
+                      </div>
+                    )}
+                    <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <Icon name="schedule" size={12} />
+                      <span>{relativeTime(d.createdAt, locale)}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -2687,6 +2931,7 @@ export function PatientDashboard({ section }: { section: string }) {
     case 'compare': return <CompareSection />
     case 'favorites': return <FavoritesSection />
     case 'bookings': return <BookingsSection />
+    case 'disputes': return <PatientDisputesSection />
     case 'reviews': return <ReviewsSection />
     case 'profile': return <ProfileSection />
     default: return <OverviewSection />

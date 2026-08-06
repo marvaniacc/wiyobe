@@ -558,3 +558,72 @@ Platform was stable. Found and fixed a stale Turbopack cache error in otp-input.
 5. Add multi-currency support
 6. Add real-time notifications via WebSocket
 7. Add provider profile photo upload
+
+---
+Task ID: 12
+Agent: main (orchestrator) — scheduled cron review round 5
+Task: Add dispute creation UI for patients/providers + disputes sections in patient and provider dashboards + end-to-end dispute workflow testing.
+
+## Current Project Status Assessment
+Platform was stable. The dispute API (created in round 4) supported creation but there was no UI for patients or providers to open disputes. The admin could view disputes but no one could create them from the UI. This round completed the full dispute workflow end-to-end.
+
+## Completed Modifications
+
+### New Features
+
+#### 1. Dispute Creation UI (Patient)
+- **BookingDetailDialog**: Added "Open a dispute" button (gavel icon, red text) to the dialog footer. Visible for CONFIRMED and COMPLETED bookings. Clicking it closes the detail dialog and opens the dispute creation dialog.
+- **DisputeDialog component**: Full form with:
+  - Dispute type select (Refund request, Service quality, Scheduling issue, Payment issue, Other)
+  - Title input (min 3 chars, max 200)
+  - Description textarea (min 10 chars, max 2000, with character counter)
+  - Submit button with validation (disabled until title + description meet minimums)
+  - Success toast: "Dispute opened successfully"
+  - Form auto-resets when dialog opens
+
+#### 2. Patient Disputes Section
+- New "Disputes" nav item (gavel icon) added to patient sidebar between Bookings and Reviews.
+- **PatientDisputesSection**: Shows disputes the patient raised or that are against them:
+  - Dispute cards with type icon, title, provider name, amount, status badge
+  - Description preview (2-line clamp)
+  - Admin response shown in highlighted blue-accented box if present
+  - Relative timestamp
+  - Empty state: "No disputes" / "No active disputes at this time" with CTA to Bookings
+  - Loading skeletons
+
+#### 3. Provider Disputes Section
+- New "Disputes" nav item added to all 4 provider sidebars (Doctor, Hospital, Hotel, Translator) between Reviews and Payouts.
+- **ProviderDisputesSection**: Same card layout as patient but shows "Raised by: [patient name]" instead of provider name.
+- Added **LoadingCard** helper component (was missing in provider dashboard).
+
+#### 4. End-to-End Dispute Workflow
+Full lifecycle now tested and working:
+1. Patient opens booking detail → clicks "Open a dispute" → fills form → submits → dispute created
+2. Patient views dispute in their Disputes section with "Open" status
+3. Admin sees dispute in their Disputes section with "1 active disputes need attention"
+4. Admin clicks dispute → enters response → clicks "Resolve" → dispute status → RESOLVED
+5. Admin sees "All disputes are resolved"
+6. Notifications sent to both parties at each step
+
+## Verification Results
+- **Lint**: 0 errors, 8 warnings (all cosmetic)
+- **Agent-browser QA** (full end-to-end dispute flow):
+  - Patient: ✓ Opened booking detail → "Open a dispute" button found → dispute dialog opened with type/title/description fields → submitted successfully → dispute created (verified via API: count=1, title="Test dispute - service quality issue")
+  - Patient disputes section: ✓ Shows "1 dispute" with "Test dispute - service quality issue", "Open" status badge, description, relative time
+  - Admin disputes: ✓ Shows "1 active disputes need attention" → clicked dispute card → detail panel opened → entered admin response → clicked "Resolve" → status changed to "All disputes are resolved"
+  - All existing flows still working (booking, payments, auth, notifications, calendar export, etc.)
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 8 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for newer keys — functional but not ideal
+- Provider dispute creation UI (provider opening dispute against patient) not yet added — only patient→provider disputes have a creation UI. The API supports both directions.
+
+## Priority Recommendations for Next Phase
+1. Add "Open dispute" button to provider booking detail/appointments view
+2. Proper translation of remaining English-fallback keys to tr/fa/ar
+3. Add email notification sending (SMTP integration)
+4. Add multi-currency support
+5. Add real-time notifications via WebSocket
+6. Add provider profile photo upload
+7. Add booking iCal export to provider dashboard (currently only patient)
