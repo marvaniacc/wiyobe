@@ -897,3 +897,60 @@ Platform was stable with all core flows working (0 lint errors, no console error
 5. Add real-time notifications via WebSocket
 6. Move document/avatar storage to S3/Cloudinary for production
 7. Add document sharing with providers (patient can share docs with a specific doctor/hospital)
+
+---
+Task ID: 17
+Agent: main (orchestrator) — scheduled cron review round 10
+Task: Add admin platform-wide analytics dashboard with revenue trends, user growth, booking volume, and top providers.
+
+## Current Project Status Assessment
+Platform was stable with all core flows working (0 lint errors, no console errors). The admin dashboard had an overview page with basic stats and a financial reports section, but lacked a dedicated analytics dashboard with visual charts for tracking platform-wide trends over time. This round added a comprehensive analytics section.
+
+## Completed Modifications
+
+### New Feature: Admin Platform-Wide Analytics Dashboard
+
+#### API: `GET /api/admin/analytics`
+- Admin-only endpoint returning aggregated platform analytics:
+  - **Monthly revenue** (last 12 months): commission minus reversals per month
+  - **User growth** (last 6 months): cumulative patient and provider counts
+  - **Bookings by provider type**: count grouped by DOCTOR/HOSPITAL/HOTEL/TRANSLATOR
+  - **Revenue by provider type**: commission grouped by provider type
+  - **Top 5 providers by revenue**: name, type, revenue, email
+  - **Summary stats**: totalUsers, totalProviders, totalPatients, totalBookings, completedBookings, platformRevenue, totalProcessed, totalRefunded, completionRate
+
+#### UI: AdminAnalyticsSection in admin dashboard
+- **New "Analytics" nav item** (monitoring icon) in admin sidebar, second position after Overview
+- **5 summary stat cards**: Platform revenue ($93.60), Total processed ($610.00), Total refunded ($0.00), Completion rate (16.7%), Total users (15) — using existing StatCard component with hover effects
+- **Monthly platform revenue area chart**: 12-month trend with green gradient fill, currency Y-axis, interactive tooltip
+- **User growth stacked bar chart**: Patients (blue) + Providers (green) stacked, 6-month cumulative, with color legend
+- **Bookings by provider type donut chart**: PieChart with inner radius, color-coded legend showing counts per type
+- **Revenue by provider type horizontal bar chart**: Vertical layout BarChart with currency-formatted X-axis
+- **Top 5 providers by revenue**: Ranked list with progress bars, provider type labels, revenue amounts
+- All charts use Google design system colors and recharts library
+- Loading skeletons, error states, empty states throughout
+- 12 new i18n keys added to all 4 locales
+
+## Verification Results
+- **Lint**: 0 errors, 9 warnings (all cosmetic)
+- **Agent-browser QA**:
+  - Analytics page: ✓ Renders with heading "Platform analytics" + subtitle "Platform-wide revenue, user growth, and booking insights"
+  - Stat cards: ✓ Platform revenue $93.60, Total processed $610.00, Total refunded $0.00, Completion rate 16.7%, Total users 15
+  - Charts: ✓ 4 SVG charts rendered (area chart, stacked bar chart, pie chart, horizontal bar chart)
+  - All sections visible: Monthly platform revenue, User growth, Bookings by type, Revenue by type, Top providers
+  - All existing flows still working
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 9 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for newer keys
+- Documents/avatars stored as base64 data URLs in DB — should use S3 in production
+
+## Priority Recommendations for Next Phase
+1. Proper translation of remaining English-fallback keys to tr/fa/ar
+2. Add email notification sending (SMTP integration)
+3. Add multi-currency support (EUR, TRY, IRR, SAR)
+4. Add real-time notifications via WebSocket
+5. Move document/avatar storage to S3/Cloudinary for production
+6. Add document sharing with providers
+7. Add booking iCal export to admin/overview

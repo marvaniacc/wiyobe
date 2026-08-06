@@ -667,6 +667,19 @@ const en: Dict = {
   'documents.selectFile': 'Select file',
   'documents.dragDrop': 'Drag and drop a file here, or click to browse',
   'documents.maxSize': 'Max file size: 5MB. Supported: PDF, images, documents',
+
+  'admin.analyticsTitle': 'Platform analytics',
+  'admin.analyticsDesc': 'Platform-wide revenue, user growth, and booking insights',
+  'admin.monthlyRevenue': 'Monthly platform revenue',
+  'admin.userGrowth': 'User growth',
+  'admin.bookingsByType': 'Bookings by provider type',
+  'admin.revenueByType': 'Revenue by provider type',
+  'admin.topProviders': 'Top providers by revenue',
+  'admin.totalProcessedShort': 'Total processed',
+  'admin.totalRefundedShort': 'Total refunded',
+  'admin.completionRateShort': 'Completion rate',
+  'admin.patients': 'Patients',
+  'admin.providersShort': 'Providers',
 }
 
 const tr: Dict = {
@@ -1302,6 +1315,19 @@ const tr: Dict = {
   'documents.selectFile': 'Select file',
   'documents.dragDrop': 'Drag and drop a file here, or click to browse',
   'documents.maxSize': 'Max file size: 5MB. Supported: PDF, images, documents',
+
+  'admin.analyticsTitle': 'Platform analytics',
+  'admin.analyticsDesc': 'Platform-wide revenue, user growth, and booking insights',
+  'admin.monthlyRevenue': 'Monthly platform revenue',
+  'admin.userGrowth': 'User growth',
+  'admin.bookingsByType': 'Bookings by provider type',
+  'admin.revenueByType': 'Revenue by provider type',
+  'admin.topProviders': 'Top providers by revenue',
+  'admin.totalProcessedShort': 'Total processed',
+  'admin.totalRefundedShort': 'Total refunded',
+  'admin.completionRateShort': 'Completion rate',
+  'admin.patients': 'Patients',
+  'admin.providersShort': 'Providers',
 }
 
 const fa: Dict = {
@@ -1937,6 +1963,19 @@ const fa: Dict = {
   'documents.selectFile': 'Select file',
   'documents.dragDrop': 'Drag and drop a file here, or click to browse',
   'documents.maxSize': 'Max file size: 5MB. Supported: PDF, images, documents',
+
+  'admin.analyticsTitle': 'Platform analytics',
+  'admin.analyticsDesc': 'Platform-wide revenue, user growth, and booking insights',
+  'admin.monthlyRevenue': 'Monthly platform revenue',
+  'admin.userGrowth': 'User growth',
+  'admin.bookingsByType': 'Bookings by provider type',
+  'admin.revenueByType': 'Revenue by provider type',
+  'admin.topProviders': 'Top providers by revenue',
+  'admin.totalProcessedShort': 'Total processed',
+  'admin.totalRefundedShort': 'Total refunded',
+  'admin.completionRateShort': 'Completion rate',
+  'admin.patients': 'Patients',
+  'admin.providersShort': 'Providers',
 }
 
 const ar: Dict = {
@@ -2572,6 +2611,19 @@ const ar: Dict = {
   'documents.selectFile': 'Select file',
   'documents.dragDrop': 'Drag and drop a file here, or click to browse',
   'documents.maxSize': 'Max file size: 5MB. Supported: PDF, images, documents',
+
+  'admin.analyticsTitle': 'Platform analytics',
+  'admin.analyticsDesc': 'Platform-wide revenue, user growth, and booking insights',
+  'admin.monthlyRevenue': 'Monthly platform revenue',
+  'admin.userGrowth': 'User growth',
+  'admin.bookingsByType': 'Bookings by provider type',
+  'admin.revenueByType': 'Revenue by provider type',
+  'admin.topProviders': 'Top providers by revenue',
+  'admin.totalProcessedShort': 'Total processed',
+  'admin.totalRefundedShort': 'Total refunded',
+  'admin.completionRateShort': 'Completion rate',
+  'admin.patients': 'Patients',
+  'admin.providersShort': 'Providers',
 }
 
 export const DICTS: Record<Locale, Dict> = { en, tr, fa, ar }

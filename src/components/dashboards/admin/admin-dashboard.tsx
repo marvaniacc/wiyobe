@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
+  PieChart, Pie, Cell,
 } from 'recharts'
 
 // ============================================================================
@@ -1743,6 +1744,7 @@ function ReportsSection() {
 export function AdminDashboard({ section }: { section: string }) {
   switch (section) {
     case 'overview': return <OverviewSection />
+    case 'analytics': return <AdminAnalyticsSection />
     case 'providers': return <ProvidersSection />
     case 'users': return <UsersSection />
     case 'moderation': return <ModerationSection />
@@ -1754,6 +1756,219 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'disputes': return <DisputesSection />
     default: return <OverviewSection />
   }
+}
+
+// ============================================================================
+// Admin Analytics section — platform-wide revenue, user growth, booking trends
+// ============================================================================
+
+const ANALYTICS_PIE_COLORS = ['#1A73E8', '#188038', '#F9AB00', '#D93025', '#9334E6']
+
+function AdminAnalyticsSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<any>('/api/admin/analytics')
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('admin.analyticsTitle')} description={t('admin.analyticsDesc')} icon="analytics" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={`item-${i}`} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+          ))}
+        </div>
+        <Card><CardContent className="p-6"><Skeleton className="h-72 w-full" /></CardContent></Card>
+      </div>
+    )
+  }
+  if (error || !data) return <ErrorState message={error || t('admin.noData')} onRetry={refetch} />
+
+  const s = data.summary
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('admin.analyticsTitle')} description={t('admin.analyticsDesc')} icon="analytics" />
+
+      {/* Summary stat cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+        <StatCard icon="payments" label={t('admin.platformRevenue')} value={formatCurrency(s.platformRevenue, 'USD', locale)} tone="success" />
+        <StatCard icon="receipt_long" label={t('admin.totalProcessedShort')} value={formatCurrency(s.totalProcessed, 'USD', locale)} tone="primary" />
+        <StatCard icon="undo" label={t('admin.totalRefundedShort')} value={formatCurrency(s.totalRefunded, 'USD', locale)} tone="warning" />
+        <StatCard icon="check_circle" label={t('admin.completionRateShort')} value={`${s.completionRate}%`} tone="info" />
+        <StatCard icon="group" label={t('admin.totalUsers')} value={String(s.totalUsers)} tone="primary" />
+      </div>
+
+      {/* Monthly revenue chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="trending_up" size={18} className="text-success" />
+            {t('admin.monthlyRevenue')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.monthlyRevenue} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="adminRevGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#188038" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#188038" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={56}
+                  tickFormatter={(v) => formatCurrency(String(v), 'USD', locale).replace(/\.\d+$/, '')} />
+                <Tooltip
+                  cursor={{ stroke: '#188038', strokeWidth: 1 }}
+                  contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+                  formatter={(v: number) => [formatCurrency(String(v), 'USD', locale), t('admin.platformRevenue')]}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#188038" strokeWidth={2} fill="url(#adminRevGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Two-column: user growth + bookings by type */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="group_add" size={18} className="text-primary" />
+              {t('admin.userGrowth')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.userGrowth} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={32} />
+                  <Tooltip cursor={{ fill: '#F1F3F4' }} contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }} />
+                  <Bar dataKey="patients" stackId="a" fill="#1A73E8" />
+                  <Bar dataKey="providers" stackId="a" fill="#188038" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="size-3 rounded-full bg-primary" />
+                <span className="text-muted-foreground">{t('admin.patients')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="size-3 rounded-full bg-success" />
+                <span className="text-muted-foreground">{t('admin.providersShort')}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="pie_chart" size={18} className="text-primary" />
+              {t('admin.bookingsByType')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.providerTypeData.length > 0 ? (
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={data.providerTypeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={2}>
+                        {data.providerTypeData.map((_: any, i: number) => <Cell key={`cell-${i}`} fill={ANALYTICS_PIE_COLORS[i % ANALYTICS_PIE_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-wrap justify-center gap-4">
+                  {data.providerTypeData.map((d: any, i: number) => (
+                    <div key={d.name} className="flex items-center gap-2 text-sm">
+                      <span className="size-3 rounded-full" style={{ backgroundColor: ANALYTICS_PIE_COLORS[i % ANALYTICS_PIE_COLORS.length] }} />
+                      <span className="text-muted-foreground">{d.name}</span>
+                      <span className="font-semibold text-foreground">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">{t('admin.noData')}</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenue by type + Top providers */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="bar_chart" size={18} className="text-primary" />
+              {t('admin.revenueByType')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.revenueByType.length > 0 ? (
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.revenueByType} layout="vertical" margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} tickFormatter={(v) => '$' + v} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={72} />
+                    <Tooltip cursor={{ fill: '#F1F3F4' }} contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+                      formatter={(v: number) => [formatCurrency(String(v), 'USD', locale), t('admin.platformRevenue')]} />
+                    <Bar dataKey="value" fill="#1A73E8" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">{t('admin.noData')}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="workspace_premium" size={18} className="text-primary" />
+              {t('admin.topProviders')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.topProviders.length > 0 ? (
+              data.topProviders.map((p: any, i: number) => (
+                <div key={p.email} className="flex items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-secondary text-xs font-bold text-muted-foreground">
+                    {i + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.type}</p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">{formatCurrency(String(p.revenue), 'USD', locale)}</span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-secondary">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${(p.revenue / data.topProviders[0].revenue) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{t('admin.noData')}</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
 }
 
 // ============================================================================

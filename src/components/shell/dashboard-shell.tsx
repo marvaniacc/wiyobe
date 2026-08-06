@@ -75,6 +75,7 @@ const NAV: Record<string, NavItem[]> = {
   ],
   ADMIN: [
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
+    { key: 'analytics', labelKey: 'dash.analytics', icon: 'monitoring' },
     { key: 'providers', labelKey: 'dash.providers', icon: 'verified' },
     { key: 'users', labelKey: 'dash.users', icon: 'group' },
     { key: 'moderation', labelKey: 'dash.moderation', icon: 'manage_accounts' },
