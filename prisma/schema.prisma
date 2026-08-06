@@ -71,7 +71,10 @@ enum PayoutStatus {
 model User {
   id                String       @id @default(cuid())
   email             String       @unique
-  passwordHash      String
+  passwordHash      String?      // optional — Google-only users have no password
+  googleId          String?      @unique
+  authProvider      String       @default("password") // "password" | "google" | "otp"
+  emailVerified     DateTime?
   role              Role
   status            UserStatus   @default(ACTIVE)
   name              String?
@@ -93,6 +96,18 @@ model User {
   reviewsAuthored   Review[]     @relation("reviewAuthor")
   reviewsReceived   Review[]     @relation("reviewSubject")
   payouts           Payout[]
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String   // 6-digit code
+  purpose   String   // "signup" | "signin" | "reset"
+  payload   String?  // JSON of stashed signup data for signup OTP
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 model Patient {

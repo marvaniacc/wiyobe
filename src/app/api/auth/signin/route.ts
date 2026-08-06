@@ -14,7 +14,12 @@ export async function POST(req: Request) {
   try {
     const body = await parseBody(req, schema)
     const user = await db.user.findUnique({ where: { email: body.email } })
-    if (!user || !verifyPassword(body.password, user.passwordHash)) {
+    if (!user) return error(401, 'Invalid email or password.')
+    // Google-only accounts have no password — guide them to Google sign-in
+    if (!user.passwordHash) {
+      return error(401, 'This account uses Google sign-in. Please continue with Google.')
+    }
+    if (!verifyPassword(body.password, user.passwordHash)) {
       return error(401, 'Invalid email or password.')
     }
     if (user.status === 'SUSPENDED') return error(403, 'Your account has been suspended.')

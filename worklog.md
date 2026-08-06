@@ -249,3 +249,36 @@ Stage Summary:
   - Add CSV/PDF report exports (CSV scaffolding exists in admin dashboard).
   - Add multi-currency support (currently USD only).
   - Polish mobile responsiveness edge cases.
+
+---
+Task ID: 7
+Agent: main (orchestrator)
+Task: Add complete auth system with OTP verification and Google sign-in.
+
+Work Log:
+- Updated Prisma schema: made `passwordHash` optional (Google-only users have no password), added `googleId` (unique), `authProvider` (password|google|otp), `emailVerified` fields to User model. Added new `OtpCode` model (id, email, code, purpose, payload, expiresAt, used, attempts, createdAt).
+- Created OTP API routes:
+  - `/api/auth/otp/send` — generates 6-digit code, stores in DB with 10-min TTL, 45-sec resend cooldown, invalidates previous codes. In dev mode (no SMTP configured), returns `devCode` in response for demo convenience. In production, would call email service. Logs code to console.
+  - `/api/auth/otp/verify` — verifies code with max 5 attempts, handles 3 purposes: signup (creates user + profile + session), signin (marks email verified + sets session), reset (sets new password). Expires codes after 10 min.
+- Created Google OAuth API routes:
+  - `/api/auth/google` (GET) — returns config (hasGoogle, clientId, demoMode) so client knows whether to use real GIS or demo.
+  - `/api/auth/google/verify` (POST) — verifies Google ID token via Google's tokeninfo endpoint (real mode) OR accepts demoEmail (demo mode). Creates/finds/links users. Sets `googleId`, `authProvider='google'`, `emailVerified`. Auto-creates role-specific profiles.
+- Updated signin route: now handles Google-only accounts (no passwordHash) with clear error message guiding to Google sign-in.
+- Added 30 new i18n keys across ALL 4 locales (en/tr/fa/ar) for: Google sign-in, OTP verification, resend cooldown, password reset, demo mode descriptions.
+- Built `OtpInput` component: 6-box digit input with auto-advance, paste support, backspace navigation, arrow key navigation, keyboard accessible. Derived from external value (no useEffect setState).
+- Built `GoogleIcon` component: official multicolor Google "G" SVG logo for sign-in buttons.
+- Rebuilt auth screen with multi-step flow:
+  - **Credentials step**: Google sign-in button (top), divider, form with role tabs. Signup submits to OTP flow. Signin supports password OR OTP method (toggle). "Forgot password?" triggers reset OTP flow.
+  - **OTP step**: 6-digit input boxes, dev code display (dev mode), resend cooldown timer, auto-verify on complete, back button.
+  - **Google demo dialog**: shown when no Google credentials configured — lets user enter email+name to simulate Google sign-in.
+  - Real Google OAuth: loads GIS script when `GOOGLE_CLIENT_ID` is set, uses `google.accounts.id.prompt()` for One Tap flow.
+
+Stage Summary:
+- ALL THREE AUTH FLOWS VERIFIED WORKING via agent-browser:
+  1. OTP Signup: new patient `newpatient@example.com` created via 6-digit OTP verification → logged in to patient dashboard. ✓
+  2. Google Sign-In (demo mode): `google.user@gmail.com` created via demo Google dialog → logged in to patient dashboard. ✓
+  3. OTP Sign-in: existing patient `patient@medtravel.com` (Sara Ahmadi) logged in via OTP code sent to email → verified → dashboard. ✓
+- Lint: 0 errors, 5 warnings (all pre-existing).
+- Auth system now supports: password signin, OTP signin, Google OAuth (real + demo), OTP signup with email verification, password reset via OTP.
+- Demo credentials still work: admin@/admin123, patient@/patient123, etc.
+- To enable real Google OAuth: set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` env vars — the system automatically switches from demo to real mode.
