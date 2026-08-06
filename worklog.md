@@ -763,3 +763,67 @@ Platform was stable. Provider appointments had "Mark as completed", "Cancel", an
 5. Move avatar storage to S3/Cloudinary for production
 6. Add provider analytics dashboard (earnings chart, booking trends)
 7. Add patient medical document upload (prescriptions, test results)
+
+---
+Task ID: 15
+Agent: main (orchestrator) — scheduled cron review round 8
+Task: Add provider analytics dashboard with earnings charts, booking trends, and performance metrics.
+
+## Current Project Status Assessment
+Platform was stable with all core flows working. Provider dashboards had overview, appointments, services, availability, reviews, disputes, payouts, and profile sections but lacked an analytics dashboard for tracking earnings and performance over time. This round added a comprehensive analytics section.
+
+## Completed Modifications
+
+### New Feature: Provider Analytics Dashboard
+
+#### API: `GET /api/analytics`
+- Returns aggregated analytics data for the logged-in provider:
+  - **Monthly earnings** (last 12 months): array of {month, earnings, bookings} with provider net amounts for confirmed+completed bookings
+  - **Visit type breakdown**: in-person count vs online count
+  - **Status breakdown**: confirmed, completed, cancelled counts
+  - **Top services by revenue**: top 5 services sorted by revenue with booking counts
+  - **Totals**: totalEarnings, avgBookingValue, completionRate, cancellationRate, totalBookings
+- Works for all 4 provider types (doctor, hospital, hotel, translator)
+
+#### UI: AnalyticsSection component
+- **4 stat cards** (AnalyticsStatCard): Total earnings (green), Avg booking value (blue), Completion rate (info), Cancellation rate (warning) — each with icon, hover lift effect, tabular numbers
+- **Monthly earnings area chart**: 12-month trend using recharts AreaChart with green gradient fill, currency-formatted Y-axis, tooltip
+- **Booking trends bar chart**: 12-month booking count using recharts BarChart with blue bars and rounded corners
+- **Visit types donut chart**: recharts PieChart with inner radius, color-coded legend (blue=in-person, green=online)
+- **Top services by revenue**: Ranked list with progress bars showing relative revenue, booking counts, medal-style numbered icons
+- All charts use Google design system colors (#1A73E8, #188038, #F9AB00, #D93025, #9334E6)
+- Loading skeletons for all sections
+- Error and empty states
+
+#### Navigation
+- Added "Analytics" nav item (analytics icon) to all 4 provider sidebars (DOCTOR, HOSPITAL, HOTEL, TRANSLATOR) — positioned between Disputes and Payouts
+- Added `dash.analytics` i18n key to all 4 locales
+
+#### i18n
+- Added 18 analytics-related keys to all 4 locales (en/tr/fa/ar)
+
+## Verification Results
+- **Lint**: 0 errors, 9 warnings (all cosmetic)
+- **Agent-browser QA**:
+  - Analytics page: ✓ Renders with heading "Analytics" + subtitle "Track your earnings, booking trends, and performance"
+  - Stat cards: ✓ Total earnings $459.00, Avg booking value $135.00, Completion rate 25%, Cancellation rate 0%
+  - Charts: ✓ 3 SVG charts rendering (area chart 1098x288, bar chart 707x256, pie chart 317x192)
+  - Top services: ✓ Shows 1 service with revenue and booking count
+  - API: ✓ Returns 12 months of data, 1 top service, correct totals
+  - All existing flows still working
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 9 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for newer keys — functional but not ideal
+- Avatar stored as data URL in DB — works for MVP but should use S3 in production
+- Patient medical documents upload not yet added
+
+## Priority Recommendations for Next Phase
+1. Add patient medical documents upload (prescriptions, test results)
+2. Proper translation of remaining English-fallback keys to tr/fa/ar
+3. Add email notification sending (SMTP integration)
+4. Add multi-currency support (EUR, TRY, IRR, SAR)
+5. Add real-time notifications via WebSocket
+6. Move avatar storage to S3/Cloudinary for production
+7. Add admin platform-wide analytics dashboard

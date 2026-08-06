@@ -8,6 +8,10 @@ import { StarRating } from '@/components/shared/star-rating'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
 import { downloadICal } from '@/lib/ical'
 import {
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
+} from 'recharts'
+import {
   Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -2362,6 +2366,8 @@ export function ProviderDashboard({ section, role }: { section: string; role: st
       return <ReviewsSection />
     case 'disputes':
       return <ProviderDisputesSection />
+    case 'analytics':
+      return <AnalyticsSection />
     case 'payouts':
       return <PayoutsSection />
     case 'profile':
@@ -2369,4 +2375,215 @@ export function ProviderDashboard({ section, role }: { section: string; role: st
     default:
       return <OverviewSection role={role} />
   }
+}
+
+/* =========================================================================
+ * Section: Analytics — earnings charts, booking trends, performance metrics
+ * ======================================================================= */
+
+const PIE_COLORS = ['#1A73E8', '#188038', '#F9AB00', '#D93025', '#9334E6']
+
+function AnalyticsSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<any>('/api/analytics')
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={t('analytics.title')} description={t('analytics.desc')} icon="analytics" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={`item-${i}`} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+          ))}
+        </div>
+        <Card><CardContent className="p-6"><Skeleton className="h-72 w-full" /></CardContent></Card>
+      </div>
+    )
+  }
+  if (error) return <ErrorState message={error} onRetry={refetch} />
+  if (!data) return <ErrorState message={t('analytics.noData')} onRetry={refetch} />
+
+  const stats = data.totals
+  const chartData = data.monthlyEarnings.map((m: any) => ({
+    month: m.month,
+    earnings: m.earnings,
+    bookings: m.bookings,
+  }))
+  const pieData = [
+    { name: t('analytics.inPerson'), value: data.visitTypeBreakdown.inPerson },
+    { name: t('analytics.online'), value: data.visitTypeBreakdown.online },
+  ].filter(d => d.value > 0)
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('analytics.title')} description={t('analytics.desc')} icon="analytics" />
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <AnalyticsStatCard icon="payments" label={t('analytics.totalEarnings')} value={formatCurrency(stats.totalEarnings, 'USD', locale)} tone="success" />
+        <AnalyticsStatCard icon="trending_up" label={t('analytics.avgBookingValue')} value={formatCurrency(stats.avgBookingValue, 'USD', locale)} tone="primary" />
+        <AnalyticsStatCard icon="check_circle" label={t('analytics.completionRate')} value={`${stats.completionRate}%`} tone="info" />
+        <AnalyticsStatCard icon="cancel" label={t('analytics.cancellationRate')} value={`${stats.cancellationRate}%`} tone="warning" />
+      </div>
+
+      {/* Monthly earnings chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="trending_up" size={18} className="text-primary" />
+            {t('analytics.monthlyEarnings')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="earnGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#188038" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#188038" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={56}
+                  tickFormatter={(v) => formatCurrency(String(v), 'USD', locale).replace(/\.\d+$/, '')} />
+                <Tooltip
+                  cursor={{ stroke: '#188038', strokeWidth: 1 }}
+                  contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+                  formatter={(v: number) => [formatCurrency(String(v), 'USD', locale), t('analytics.revenue')]}
+                />
+                <Area type="monotone" dataKey="earnings" stroke="#188038" strokeWidth={2} fill="url(#earnGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Two-column: booking trends + visit types */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Booking trends bar chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="bar_chart" size={18} className="text-primary" />
+              {t('analytics.bookingTrends')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={32} />
+                  <Tooltip
+                    cursor={{ fill: '#F1F3F4' }}
+                    contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+                    formatter={(v: number) => [v, t('analytics.bookings')]}
+                  />
+                  <Bar dataKey="bookings" fill="#1A73E8" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Visit types pie chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="pie_chart" size={18} className="text-primary" />
+              {t('analytics.visitTypes')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pieData.length > 0 ? (
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={2}>
+                        {pieData.map((_: any, i: number) => <Cell key={`cell-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {pieData.map((d: any, i: number) => (
+                    <div key={d.name} className="flex items-center gap-2 text-sm">
+                      <span className="size-3 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="text-muted-foreground">{d.name}</span>
+                      <span className="font-semibold text-foreground">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">{t('analytics.noData')}</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top services by revenue */}
+      {data.topServices.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="workspace_premium" size={18} className="text-primary" />
+              {t('analytics.topServices')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.topServices.map((s: any, i: number) => (
+              <div key={s.name} className="flex items-center gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-secondary text-xs font-bold text-muted-foreground">
+                  {i + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium text-foreground">{s.name}</p>
+                    <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">{formatCurrency(String(s.revenue), 'USD', locale)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-secondary">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${(s.revenue / data.topServices[0].revenue) * 100}%` }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">{s.count} {s.count === 1 ? 'booking' : 'bookings'}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function AnalyticsStatCard({ icon, label, value, tone }: { icon: string; label: string; value: string; tone: 'primary' | 'success' | 'warning' | 'info' }) {
+  const toneCls = {
+    primary: 'bg-primary/10 text-primary',
+    success: 'bg-success/10 text-success',
+    warning: 'bg-warning/10 text-warning',
+    info: 'bg-info/10 text-info',
+  }[tone]
+  return (
+    <Card className="group gap-0 overflow-hidden py-0 transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <CardContent className="flex items-start gap-4 p-5">
+        <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105', toneCls)}>
+          <Icon name={icon} size={24} fill />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="mt-1 truncate text-2xl font-semibold tabular-nums text-foreground">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }

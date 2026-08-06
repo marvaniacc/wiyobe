@@ -623,6 +623,25 @@ const en: Dict = {
   'profile.completeProfile': 'Complete profile',
   'profile.addMedicalInfo': 'Add medical information',
   'profile.addContactInfo': 'Add contact information',
+
+  'dash.analytics': 'Analytics',
+  'analytics.title': 'Analytics',
+  'analytics.desc': 'Track your earnings, booking trends, and performance',
+  'analytics.monthlyEarnings': 'Monthly earnings',
+  'analytics.bookingTrends': 'Booking trends',
+  'analytics.visitTypes': 'Visit types',
+  'analytics.topServices': 'Top services by revenue',
+  'analytics.totalEarnings': 'Total earnings',
+  'analytics.avgBookingValue': 'Avg. booking value',
+  'analytics.completionRate': 'Completion rate',
+  'analytics.cancellationRate': 'Cancellation rate',
+  'analytics.totalBookings': 'Total bookings',
+  'analytics.inPerson': 'In-person',
+  'analytics.online': 'Online',
+  'analytics.revenue': 'Revenue',
+  'analytics.bookings': 'Bookings',
+  'analytics.noData': 'No data available yet',
+  'analytics.noDataDesc': 'Start receiving bookings to see analytics',
 }
 
 const tr: Dict = {
@@ -1214,6 +1233,25 @@ const tr: Dict = {
   'profile.completeProfile': 'Complete profile',
   'profile.addMedicalInfo': 'Add medical information',
   'profile.addContactInfo': 'Add contact information',
+
+  'dash.analytics': 'Analytics',
+  'analytics.title': 'Analytics',
+  'analytics.desc': 'Track your earnings, booking trends, and performance',
+  'analytics.monthlyEarnings': 'Monthly earnings',
+  'analytics.bookingTrends': 'Booking trends',
+  'analytics.visitTypes': 'Visit types',
+  'analytics.topServices': 'Top services by revenue',
+  'analytics.totalEarnings': 'Total earnings',
+  'analytics.avgBookingValue': 'Avg. booking value',
+  'analytics.completionRate': 'Completion rate',
+  'analytics.cancellationRate': 'Cancellation rate',
+  'analytics.totalBookings': 'Total bookings',
+  'analytics.inPerson': 'In-person',
+  'analytics.online': 'Online',
+  'analytics.revenue': 'Revenue',
+  'analytics.bookings': 'Bookings',
+  'analytics.noData': 'No data available yet',
+  'analytics.noDataDesc': 'Start receiving bookings to see analytics',
 }
 
 const fa: Dict = {
@@ -1805,6 +1843,25 @@ const fa: Dict = {
   'profile.completeProfile': 'Complete profile',
   'profile.addMedicalInfo': 'Add medical information',
   'profile.addContactInfo': 'Add contact information',
+
+  'dash.analytics': 'Analytics',
+  'analytics.title': 'Analytics',
+  'analytics.desc': 'Track your earnings, booking trends, and performance',
+  'analytics.monthlyEarnings': 'Monthly earnings',
+  'analytics.bookingTrends': 'Booking trends',
+  'analytics.visitTypes': 'Visit types',
+  'analytics.topServices': 'Top services by revenue',
+  'analytics.totalEarnings': 'Total earnings',
+  'analytics.avgBookingValue': 'Avg. booking value',
+  'analytics.completionRate': 'Completion rate',
+  'analytics.cancellationRate': 'Cancellation rate',
+  'analytics.totalBookings': 'Total bookings',
+  'analytics.inPerson': 'In-person',
+  'analytics.online': 'Online',
+  'analytics.revenue': 'Revenue',
+  'analytics.bookings': 'Bookings',
+  'analytics.noData': 'No data available yet',
+  'analytics.noDataDesc': 'Start receiving bookings to see analytics',
 }
 
 const ar: Dict = {
@@ -2396,6 +2453,25 @@ const ar: Dict = {
   'profile.completeProfile': 'Complete profile',
   'profile.addMedicalInfo': 'Add medical information',
   'profile.addContactInfo': 'Add contact information',
+
+  'dash.analytics': 'Analytics',
+  'analytics.title': 'Analytics',
+  'analytics.desc': 'Track your earnings, booking trends, and performance',
+  'analytics.monthlyEarnings': 'Monthly earnings',
+  'analytics.bookingTrends': 'Booking trends',
+  'analytics.visitTypes': 'Visit types',
+  'analytics.topServices': 'Top services by revenue',
+  'analytics.totalEarnings': 'Total earnings',
+  'analytics.avgBookingValue': 'Avg. booking value',
+  'analytics.completionRate': 'Completion rate',
+  'analytics.cancellationRate': 'Cancellation rate',
+  'analytics.totalBookings': 'Total bookings',
+  'analytics.inPerson': 'In-person',
+  'analytics.online': 'Online',
+  'analytics.revenue': 'Revenue',
+  'analytics.bookings': 'Bookings',
+  'analytics.noData': 'No data available yet',
+  'analytics.noDataDesc': 'Start receiving bookings to see analytics',
 }
 
 export const DICTS: Record<Locale, Dict> = { en, tr, fa, ar }
