@@ -64,6 +64,7 @@ export type SessionUser = {
   name: string | null
   status: string
   preferredLanguage: string
+  avatarUrl: string | null
 }
 
 export async function getSession(): Promise<SessionUser | null> {
@@ -80,6 +81,7 @@ export async function getSession(): Promise<SessionUser | null> {
       name: true,
       status: true,
       preferredLanguage: true,
+      avatarUrl: true,
     },
   })
   if (!user || user.status === 'SUSPENDED') return null

@@ -4,7 +4,7 @@ import { useApp } from '@/stores/app-store'
 import { Icon } from '@/components/shared/icon'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
@@ -227,6 +227,7 @@ export function DashboardShell() {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-full p-1 pe-2 transition-colors hover:bg-surface-secondary">
                   <Avatar className="size-8">
+                    {session.avatarUrl && <AvatarImage src={session.avatarUrl} alt={session.name || 'Avatar'} />}
                     <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">{initials}</AvatarFallback>
                   </Avatar>
                   <span className="hidden text-sm font-medium md:inline">{session.name?.split(' ')[0]}</span>

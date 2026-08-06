@@ -35,6 +35,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { downloadICal } from '@/lib/ical'
+import { AvatarUpload } from '@/components/shared/avatar-upload'
+import { Progress } from '@/components/ui/progress'
 
 /* =========================================================================
  * Types
@@ -2116,6 +2118,45 @@ function ReviewsSection() {
  * Section: Profile
  * ======================================================================= */
 
+function ProfileCompletion({ form, t }: { form: any; t: (k: string, fb?: string) => string }) {
+  const fields = [
+    { key: 'name', label: t('common.name') },
+    { key: 'phone', label: t('common.phone') },
+    { key: 'country', label: t('common.country') },
+    { key: 'city', label: t('common.city') },
+    { key: 'dateOfBirth', label: t('common.dateOfBirth') },
+    { key: 'gender', label: t('common.gender') },
+    { key: 'bloodGroup', label: t('common.bloodGroup') },
+    { key: 'passportNumber', label: t('common.passportNumber') },
+    { key: 'emergencyContact', label: t('common.emergencyContact') },
+    { key: 'medicalHistory', label: t('common.medicalHistory') },
+  ]
+  const filled = fields.filter((f) => form[f.key] && String(form[f.key]).trim().length > 0).length
+  const pct = Math.round((filled / fields.length) * 100)
+  const missing = fields.filter((f) => !form[f.key] || String(form[f.key]).trim().length === 0).map((f) => f.label)
+
+  return (
+    <div className="mt-2 w-full space-y-2 text-start">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{t('profile.completion')}</span>
+        <span className="text-xs font-semibold text-foreground">{pct}%</span>
+      </div>
+      <Progress value={pct} className="h-2" />
+      {pct < 100 && missing.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          {t('profile.completionDesc')}: {missing.slice(0, 3).join(', ')}{missing.length > 3 ? '…' : ''}
+        </p>
+      )}
+      {pct === 100 && (
+        <p className="flex items-center gap-1 text-[11px] font-medium text-success">
+          <Icon name="check_circle" size={12} fill />
+          {t('common.verified')}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function ProfileSection() {
   const { t } = useT()
   const { data, loading, error, refetch } = useApi<{ user: any }>('/api/profile')
@@ -2174,9 +2215,12 @@ function ProfileForm({ user }: { user: any }) {
         {/* Avatar / summary card */}
         <Card className="lg:col-span-1">
           <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
-            <div className="flex size-20 items-center justify-center rounded-full bg-primary/10 text-2xl font-semibold text-primary">
-              {initials(form.name || user.email)}
-            </div>
+            <AvatarUpload
+              initialAvatarUrl={user.avatarUrl}
+              name={form.name || user.email}
+              size={96}
+              onUpdated={() => refetch?.()}
+            />
             <div>
               <div className="text-base font-semibold text-foreground">{form.name || user.email}</div>
               <div className="text-sm text-muted-foreground">{user.email}</div>
@@ -2185,6 +2229,9 @@ function ProfileForm({ user }: { user: any }) {
               <Icon name="personal_injury" size={12} fill />
               {t('role.patient')}
             </Badge>
+
+            {/* Profile completion progress */}
+            <ProfileCompletion form={form} t={t} />
           </CardContent>
         </Card>
 

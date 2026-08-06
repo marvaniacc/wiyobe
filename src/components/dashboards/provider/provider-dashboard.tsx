@@ -5,6 +5,7 @@ import { useT } from '@/hooks/use-t'
 import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
 import { Icon } from '@/components/shared/icon'
 import { StarRating } from '@/components/shared/star-rating'
+import { AvatarUpload } from '@/components/shared/avatar-upload'
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction,
 } from '@/components/ui/card'
@@ -1858,6 +1859,7 @@ function ProfileForm({ user, role, t, locale, onSaved }: {
   }
 
   const roleIcon = role === 'DOCTOR' ? 'medical_services' : role === 'HOSPITAL' ? 'local_hospital' : role === 'HOTEL' ? 'hotel' : 'translate'
+  const roleColor = role === 'DOCTOR' ? 'border-primary/20 bg-primary/5 text-primary' : role === 'HOSPITAL' ? 'border-info/20 bg-info/5 text-info' : role === 'HOTEL' ? 'border-warning/20 bg-warning/5 text-warning' : 'border-[#9334E6]/20 bg-[#9334E6]/5 text-[#9334E6]'
 
   return (
     <div className="flex flex-col gap-6">
@@ -1873,6 +1875,24 @@ function ProfileForm({ user, role, t, locale, onSaved }: {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
+            {/* Avatar */}
+            <div className="mb-6 flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-6">
+              <AvatarUpload
+                initialAvatarUrl={user.avatarUrl}
+                name={name || user.email}
+                size={80}
+                onUpdated={() => onSaved()}
+              />
+              <div className="text-center sm:text-start">
+                <p className="text-sm font-medium text-foreground">{name || user.email}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
+                <Badge variant="outline" className={cn('mt-1.5 rounded-full', roleColor)}>
+                  <Icon name={roleIcon} size={12} fill />
+                  {t('role.' + role.toLowerCase())}
+                </Badge>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label={t('common.name')}>
                 <Input value={name} onChange={(e) => setName(e.target.value)} />

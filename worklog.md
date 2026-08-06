@@ -627,3 +627,77 @@ Full lifecycle now tested and working:
 5. Add real-time notifications via WebSocket
 6. Add provider profile photo upload
 7. Add booking iCal export to provider dashboard (currently only patient)
+
+---
+Task ID: 13
+Agent: main (orchestrator) — scheduled cron review round 6
+Task: Add profile photo upload (avatar) for patients and providers + profile completion progress bar + show avatar in topbar.
+
+## Current Project Status Assessment
+Platform was stable. Profile pages lacked avatar/photo upload capability and had no profile completion indicator. The topbar user menu showed only initials. This round added full avatar upload support, profile completion progress, and avatar display in the topbar.
+
+## Completed Modifications
+
+### New Features
+
+#### 1. Profile Photo Upload (Avatar)
+- **API**: `POST /api/profile/avatar` — accepts base64 image data URL (max 2MB), validates it's an image, stores as `avatarUrl` field on User. Works for all roles.
+- **Component**: `AvatarUpload` (`src/components/shared/avatar-upload.tsx`):
+  - Circular avatar display with initials fallback (blue bg + white initials)
+  - Camera icon overlay on hover with "Change photo" tooltip
+  - Click to open file picker, validates image type + size
+  - FileReader converts to base64 data URL, uploads to API
+  - Loading spinner during upload
+  - "Upload photo" / "Change photo" / "Remove photo" text links below avatar
+  - Success/error toast notifications
+  - Configurable size prop
+
+#### 2. Avatar Display in Profile Pages
+- **Patient profile**: AvatarUpload component replaces the static initials circle in the summary card. Shows uploaded photo or initials fallback. Triggers profile refetch on update.
+- **Provider profile**: AvatarUpload added at the top of the "Account details" card, with name, email, and role badge displayed alongside it in a responsive flex layout. Role-specific badge colors (doctor=blue, hospital=info, hotel=warning, translator=purple).
+
+#### 3. Profile Completion Progress Bar (Patient)
+- **ProfileCompletion component**: Shows percentage of filled profile fields with a progress bar:
+  - Tracks 10 fields: name, phone, country, city, dateOfBirth, gender, bloodGroup, passportNumber, emergencyContact, medicalHistory
+  - Blue progress bar with percentage label
+  - Helper text: "Complete your profile to get the best experience: [missing fields]"
+  - Green checkmark + "Verified" when 100% complete
+  - Uses shadcn Progress component
+
+#### 4. Avatar in Topbar User Menu
+- **SessionUser type**: Added `avatarUrl: string | null` to the session user type
+- **getSession()**: Now selects `avatarUrl` from the database
+- **SessionInfo type** (Zustand store): Added optional `avatarUrl` field
+- **Dashboard topbar**: Avatar now shows the uploaded photo via `<AvatarImage>` when available, falls back to initials via `<AvatarFallback>`. Updated both the trigger button and dropdown menu.
+
+### Bug Fixes
+- **Lint error**: Fixed "Modifying component props is not allowed" error in patient profile where `onUpdated` callback mutated the `user` prop directly. Changed to call `refetch()` instead. Same fix applied to provider profile (calls `onSaved()` callback).
+
+### i18n
+- Added 12 new keys for avatar upload and profile completion to all 4 locales (en/tr/fa/ar)
+
+## Verification Results
+- **Lint**: 0 errors, 9 warnings (all cosmetic)
+- **Agent-browser QA**:
+  - Patient profile: ✓ AvatarUpload component shows with initials "SA", "Upload photo" link, profile completion at 80% with progress bar and "Complete your profile to get the best experience: Emergency contact, Medical history" helper text
+  - Doctor profile: ✓ AvatarUpload shows with initials "DM" at top of Account details card, with name "Dr. Mehmet Yilmaz", email, and "Doctor" role badge
+  - Avatar upload API: ✓ Tested with base64 image — returned 200 with avatarUrl, verified saved via /api/profile
+  - Avatar display: ✓ Verified uploaded image shows in profile via `<img>` tag
+  - Topbar: Updated to show avatar image when available
+  - All existing flows still working
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 9 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for newer keys — functional but not ideal
+- Avatar stored as data URL in DB (base64) — works for MVP but in production should use S3/Cloudinary
+- Provider dispute creation UI not yet added (only patient→provider disputes have creation UI)
+
+## Priority Recommendations for Next Phase
+1. Add "Open dispute" button to provider appointment detail view
+2. Proper translation of remaining English-fallback keys to tr/fa/ar
+3. Add email notification sending (SMTP integration)
+4. Add multi-currency support
+5. Add real-time notifications via WebSocket
+6. Add iCal export to provider dashboard
+7. Move avatar storage to S3/Cloudinary for production

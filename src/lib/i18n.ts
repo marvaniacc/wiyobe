@@ -610,6 +610,19 @@ const en: Dict = {
   'dispute.typeSchedule': 'Scheduling issue',
   'dispute.typePayment': 'Payment issue',
   'dispute.typeOther': 'Other',
+
+  'profile.avatar': 'Profile photo',
+  'profile.uploadAvatar': 'Upload photo',
+  'profile.changeAvatar': 'Change photo',
+  'profile.removeAvatar': 'Remove photo',
+  'profile.avatarUploaded': 'Photo updated successfully',
+  'profile.avatarRemoved': 'Photo removed',
+  'profile.avatarError': 'Failed to upload photo. Image must be under 2MB.',
+  'profile.completion': 'Profile completion',
+  'profile.completionDesc': 'Complete your profile to get the best experience',
+  'profile.completeProfile': 'Complete profile',
+  'profile.addMedicalInfo': 'Add medical information',
+  'profile.addContactInfo': 'Add contact information',
 }
 
 const tr: Dict = {
@@ -1188,6 +1201,19 @@ const tr: Dict = {
   'dispute.typeSchedule': 'Scheduling issue',
   'dispute.typePayment': 'Payment issue',
   'dispute.typeOther': 'Other',
+
+  'profile.avatar': 'Profile photo',
+  'profile.uploadAvatar': 'Upload photo',
+  'profile.changeAvatar': 'Change photo',
+  'profile.removeAvatar': 'Remove photo',
+  'profile.avatarUploaded': 'Photo updated successfully',
+  'profile.avatarRemoved': 'Photo removed',
+  'profile.avatarError': 'Failed to upload photo. Image must be under 2MB.',
+  'profile.completion': 'Profile completion',
+  'profile.completionDesc': 'Complete your profile to get the best experience',
+  'profile.completeProfile': 'Complete profile',
+  'profile.addMedicalInfo': 'Add medical information',
+  'profile.addContactInfo': 'Add contact information',
 }
 
 const fa: Dict = {
@@ -1766,6 +1792,19 @@ const fa: Dict = {
   'dispute.typeSchedule': 'Scheduling issue',
   'dispute.typePayment': 'Payment issue',
   'dispute.typeOther': 'Other',
+
+  'profile.avatar': 'Profile photo',
+  'profile.uploadAvatar': 'Upload photo',
+  'profile.changeAvatar': 'Change photo',
+  'profile.removeAvatar': 'Remove photo',
+  'profile.avatarUploaded': 'Photo updated successfully',
+  'profile.avatarRemoved': 'Photo removed',
+  'profile.avatarError': 'Failed to upload photo. Image must be under 2MB.',
+  'profile.completion': 'Profile completion',
+  'profile.completionDesc': 'Complete your profile to get the best experience',
+  'profile.completeProfile': 'Complete profile',
+  'profile.addMedicalInfo': 'Add medical information',
+  'profile.addContactInfo': 'Add contact information',
 }
 
 const ar: Dict = {
@@ -2344,6 +2383,19 @@ const ar: Dict = {
   'dispute.typeSchedule': 'Scheduling issue',
   'dispute.typePayment': 'Payment issue',
   'dispute.typeOther': 'Other',
+
+  'profile.avatar': 'Profile photo',
+  'profile.uploadAvatar': 'Upload photo',
+  'profile.changeAvatar': 'Change photo',
+  'profile.removeAvatar': 'Remove photo',
+  'profile.avatarUploaded': 'Photo updated successfully',
+  'profile.avatarRemoved': 'Photo removed',
+  'profile.avatarError': 'Failed to upload photo. Image must be under 2MB.',
+  'profile.completion': 'Profile completion',
+  'profile.completionDesc': 'Complete your profile to get the best experience',
+  'profile.completeProfile': 'Complete profile',
+  'profile.addMedicalInfo': 'Add medical information',
+  'profile.addContactInfo': 'Add contact information',
 }
 
 export const DICTS: Record<Locale, Dict> = { en, tr, fa, ar }

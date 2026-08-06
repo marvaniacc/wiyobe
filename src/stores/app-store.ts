@@ -15,6 +15,7 @@ export type SessionInfo = {
   role: string
   name: string | null
   preferredLanguage: string
+  avatarUrl?: string | null
 } | null
 
 interface AppState {
