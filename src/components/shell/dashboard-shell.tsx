@@ -26,6 +26,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'compare', labelKey: 'dash.compare', icon: 'compare' },
     { key: 'favorites', labelKey: 'dash.favorites', icon: 'favorite' },
     { key: 'bookings', labelKey: 'dash.bookings', icon: 'event' },
+    { key: 'documents', labelKey: 'dash.documents', icon: 'folder_shared' },
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },

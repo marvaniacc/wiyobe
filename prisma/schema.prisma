@@ -98,6 +98,7 @@ model User {
   payouts           Payout[]
   notifications     Notification[]
   favorites         Favorite[]   @relation("favorites")
+  medicalDocuments  MedicalDocument[] @relation("medicalDocuments")
   disputesRaised    Dispute[]    @relation("disputesRaised")
   disputesAgainst   Dispute[]    @relation("disputesAgainst")
   disputesResolved  Dispute[]    @relation("disputesResolved")
@@ -412,6 +413,19 @@ model Setting {
   id    String @id @default(cuid())
   key   String @unique
   value String
+}
+
+model MedicalDocument {
+  id         String   @id @default(cuid())
+  patientId  String   // patient user id
+  patient    User     @relation("medicalDocuments", fields: [patientId], references: [id], onDelete: Cascade)
+  fileName   String
+  fileType   String   // MIME type
+  fileSize   Int
+  category   String   // "prescription" | "test_result" | "insurance" | "passport" | "other"
+  dataUrl    String   // base64 data URL (MVP) — would be S3 URL in production
+  notes      String?
+  createdAt  DateTime @default(now())
 }
 
 enum DisputeStatus {

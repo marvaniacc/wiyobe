@@ -827,3 +827,73 @@ Platform was stable with all core flows working. Provider dashboards had overvie
 5. Add real-time notifications via WebSocket
 6. Move avatar storage to S3/Cloudinary for production
 7. Add admin platform-wide analytics dashboard
+
+---
+Task ID: 16
+Agent: main (orchestrator) — scheduled cron review round 9
+Task: Add patient medical documents upload system with categorization, drag-and-drop, and file management.
+
+## Current Project Status Assessment
+Platform was stable with all core flows working (0 lint errors, no console errors). The patient dashboard had no way to store and manage medical documents like prescriptions, test results, insurance cards, or passport copies. This round added a complete document management system.
+
+## Completed Modifications
+
+### New Feature: Patient Medical Documents Upload
+
+#### Schema: MedicalDocument model
+- Added `MedicalDocument` model with: id, patientId (relation to User), fileName, fileType (MIME), fileSize, category (prescription/test_result/insurance/passport/other), dataUrl (base64 data URL), notes, createdAt
+- Added `medicalDocuments` relation to User model
+
+#### API: `/api/documents`
+- **GET** — list all documents for the logged-in patient
+- **POST** — upload a document (accepts fileName, fileType, fileSize, category, dataUrl, notes; validates max 5MB; creates record)
+- **DELETE** — delete a document by id (validates ownership)
+
+#### UI: DocumentsSection in patient dashboard
+- **New "Documents" nav item** (folder_shared icon) in patient sidebar between Bookings and Disputes
+- **Documents listing**: Documents grouped by category with category headers (icon + label + count). Each document shown as a card with:
+  - Category-colored icon (prescription=blue, test_result=green, insurance=info, passport=amber, other=gray)
+  - File name, file size (auto-formatted B/KB/MB), relative timestamp
+  - Optional notes (2-line clamp)
+  - Download button (triggers browser download via data URL)
+  - Delete button (opens confirmation dialog)
+- **Empty state**: "No documents yet" with upload CTA
+- **Loading skeletons** while data loads
+- **Delete confirmation dialog**: Warning icon, confirmation text, destructive button
+
+#### UploadDialog component
+- **Category select**: Prescription, Test result, Insurance, Passport, Other
+- **Drag-and-drop file zone**: Dashed border area that accepts file drops, click to browse, shows selected file with icon/name/size, validates max 5MB
+- **Notes textarea**: Optional, max 500 chars
+- **Upload button**: Disabled until file selected, shows spinner during upload
+- Form auto-resets when dialog opens
+- Success/error toast notifications
+
+#### i18n
+- Added 24 document-related keys to all 4 locales (en/tr/fa/ar)
+
+## Verification Results
+- **Lint**: 0 errors, 9 warnings (all cosmetic)
+- **Agent-browser QA**:
+  - Documents empty state: ✓ "No documents yet" / "Upload your medical files to keep them organized and shareable with providers"
+  - Upload dialog: ✓ Opens with category select (default: Prescription), drag-drop zone ("Drag and drop a file here, or click to browse"), notes field, disabled upload button
+  - Upload API: ✓ POST /api/documents 201 — uploaded "blood_test_result.png" as test_result category with notes
+  - Documents list: ✓ Shows "Test result (1)" category header with green flask icon, document card with filename, file size (95 B), relative time, notes, Download + Delete buttons
+  - VLM verified: "No glaring visual errors or bugs. The layout appears well-structured with consistent spacing, clear typography, and appropriate use of color"
+  - All existing flows still working
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 9 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for newer keys
+- Documents stored as base64 data URLs in DB — works for MVP but should use S3 in production
+- Admin platform-wide analytics dashboard not yet added
+
+## Priority Recommendations for Next Phase
+1. Add admin platform-wide analytics dashboard (revenue trends, user growth, booking volume)
+2. Proper translation of remaining English-fallback keys to tr/fa/ar
+3. Add email notification sending (SMTP integration)
+4. Add multi-currency support (EUR, TRY, IRR, SAR)
+5. Add real-time notifications via WebSocket
+6. Move document/avatar storage to S3/Cloudinary for production
+7. Add document sharing with providers (patient can share docs with a specific doctor/hospital)

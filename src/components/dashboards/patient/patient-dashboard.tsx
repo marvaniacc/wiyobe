@@ -1,11 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { Icon } from '@/components/shared/icon'
 import { StarRating } from '@/components/shared/star-rating'
 import { useT } from '@/hooks/use-t'
-import { useApi, apiPost, apiPut } from '@/hooks/use-api'
+import { useApi, apiPost, apiPut, apiDelete } from '@/hooks/use-api'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -2968,6 +2968,310 @@ function PatientDisputesSection() {
 }
 
 /* =========================================================================
+ * Section: Documents — medical document upload and management
+ * ======================================================================= */
+
+const DOC_CATEGORY_CONFIG: Record<string, { icon: string; cls: string; key: string }> = {
+  prescription: { icon: 'medication', cls: 'bg-primary/10 text-primary', key: 'documents.cat.prescription' },
+  test_result: { icon: 'biotech', cls: 'bg-success/10 text-success', key: 'documents.cat.test_result' },
+  insurance: { icon: 'health_and_safety', cls: 'bg-info/10 text-info', key: 'documents.cat.insurance' },
+  passport: { icon: 'badge', cls: 'bg-warning/10 text-warning', key: 'documents.cat.passport' },
+  other: { icon: 'description', cls: 'bg-muted text-muted-foreground', key: 'documents.cat.other' },
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+function DocumentsSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ documents: any[] }>('/api/documents')
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  const documents = data?.documents || []
+
+  // Group by category
+  const grouped: Record<string, any[]> = {}
+  for (const d of documents) {
+    if (!grouped[d.category]) grouped[d.category] = []
+    grouped[d.category].push(d)
+  }
+
+  function downloadDoc(doc: any) {
+    const a = document.createElement('a')
+    a.href = doc.dataUrl
+    a.download = doc.fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    try {
+      await apiDelete(`/api/documents?id=${deleteTarget}`)
+      toast.success(t('documents.deleted'))
+      setDeleteTarget(null)
+      refetch()
+    } catch (e: any) { toast.error(e.message) }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionHeader
+        title={t('documents.title')}
+        subtitle={t('documents.desc')}
+        action={
+          <Button onClick={() => setUploadOpen(true)} className="gap-1.5">
+            <Icon name="upload_file" size={18} />
+            {t('documents.upload')}
+          </Button>
+        }
+      />
+
+      <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} onUploaded={() => { setUploadOpen(false); refetch() }} />
+
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={`doc-skel-${i}`} className="h-32 rounded-[16px]" />)}
+        </div>
+      ) : error ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">{error}</div>
+      ) : documents.length === 0 ? (
+        <EmptyState
+          icon="folder_shared"
+          title={t('documents.empty')}
+          description={t('documents.emptyDesc')}
+          action={<Button onClick={() => setUploadOpen(true)} className="gap-1.5"><Icon name="upload_file" size={16} />{t('documents.upload')}</Button>}
+        />
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(grouped).map(([cat, docs]) => {
+            const cfg = DOC_CATEGORY_CONFIG[cat] || DOC_CATEGORY_CONFIG.other
+            return (
+              <div key={cat}>
+                <div className="mb-3 flex items-center gap-2">
+                  <div className={cn('flex size-7 items-center justify-center rounded-[8px]', cfg.cls)}>
+                    <Icon name={cfg.icon} size={16} fill />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">{t(cfg.key)}</h3>
+                  <span className="text-xs text-muted-foreground">({docs.length})</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {docs.map((doc) => (
+                    <Card key={doc.id} className="group gap-0 transition-all hover:shadow-md">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px]', cfg.cls)}>
+                            <Icon name={cfg.icon} size={20} fill />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-foreground">{doc.fileName}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(doc.fileSize)} · {relativeTime(doc.createdAt, locale)}</p>
+                            {doc.notes && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{doc.notes}</p>}
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => downloadDoc(doc)} className="gap-1.5 flex-1">
+                            <Icon name="download" size={14} />
+                            {t('documents.download')}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(doc.id)} className="text-error hover:bg-error/5" title={t('documents.delete')}>
+                            <Icon name="delete" size={14} />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="warning" size={20} className="text-error" />
+              {t('documents.delete')}
+            </DialogTitle>
+            <DialogDescription>{t('documents.deleteConfirm')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete} className="gap-1.5">
+              <Icon name="delete" size={16} />
+              {t('documents.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function UploadDialog({ open, onOpenChange, onUploaded }: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onUploaded: () => void
+}) {
+  const { t } = useT()
+  const [file, setFile] = useState<File | null>(null)
+  const [category, setCategory] = useState<string>('prescription')
+  const [notes, setNotes] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      setFile(null)
+      setCategory('prescription')
+      setNotes('')
+    }
+  }, [open])
+
+  function handleFileSelect(f: File | null) {
+    if (!f) return
+    if (f.size > 5_000_000) {
+      toast.error(t('documents.fileTooLarge'))
+      return
+    }
+    setFile(f)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    const f = e.dataTransfer.files?.[0]
+    if (f) handleFileSelect(f)
+  }
+
+  async function handleUpload() {
+    if (!file) return
+    setUploading(true)
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const dataUrl = reader.result as string
+      try {
+        await apiPost('/api/documents', {
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          category,
+          dataUrl,
+          notes: notes || undefined,
+        })
+        toast.success(t('documents.uploaded'))
+        onUploaded()
+      } catch (e: any) {
+        toast.error(e.message || t('documents.uploadError'))
+      } finally {
+        setUploading(false)
+      }
+    }
+    reader.onerror = () => {
+      toast.error(t('documents.uploadError'))
+      setUploading(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="upload_file" size={20} className="text-primary" />
+            {t('documents.upload')}
+          </DialogTitle>
+          <DialogDescription>{t('documents.maxSize')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Category select */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('documents.category')}</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="prescription">{t('documents.cat.prescription')}</SelectItem>
+                <SelectItem value="test_result">{t('documents.cat.test_result')}</SelectItem>
+                <SelectItem value="insurance">{t('documents.cat.insurance')}</SelectItem>
+                <SelectItem value="passport">{t('documents.cat.passport')}</SelectItem>
+                <SelectItem value="other">{t('documents.cat.other')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* File drop zone */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('documents.fileName')}</Label>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+              className={cn(
+                'flex cursor-pointer flex-col items-center gap-2 rounded-[16px] border-2 border-dashed p-8 text-center transition-colors',
+                dragOver ? 'border-primary bg-primary/5' : 'border-divider hover:border-primary/40 hover:bg-surface-secondary/50'
+              )}
+            >
+              {file ? (
+                <>
+                  <Icon name="description" size={32} className="text-primary" />
+                  <p className="text-sm font-medium text-foreground">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                </>
+              ) : (
+                <>
+                  <Icon name="cloud_upload" size={32} className="text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">{t('documents.dragDrop')}</p>
+                </>
+              )}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,.pdf,.doc,.docx"
+              onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+              className="hidden"
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('documents.notes')}</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="..."
+              rows={2}
+              maxLength={500}
+              className="resize-none"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>{t('common.cancel')}</Button>
+          <Button onClick={handleUpload} disabled={uploading || !file} className="gap-1.5">
+            {uploading ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="upload" size={16} />}
+            {t('documents.upload')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* =========================================================================
  * Main component
  * ======================================================================= */
 
@@ -2978,6 +3282,7 @@ export function PatientDashboard({ section }: { section: string }) {
     case 'compare': return <CompareSection />
     case 'favorites': return <FavoritesSection />
     case 'bookings': return <BookingsSection />
+    case 'documents': return <DocumentsSection />
     case 'disputes': return <PatientDisputesSection />
     case 'reviews': return <ReviewsSection />
     case 'profile': return <ProfileSection />
