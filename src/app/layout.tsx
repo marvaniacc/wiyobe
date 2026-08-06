@@ -10,6 +10,9 @@ const inter = Inter({
   display: "swap",
 });
 
+// Preload Material Symbols font for icon rendering reliability
+const materialSymbolsUrl = "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block";
+
 export const metadata: Metadata = {
   title: "MedTravel — Global Medical Tourism Marketplace",
   description: "Compare and book verified doctors, hospitals, accommodations and translators worldwide. Secure platform payments, multilingual support.",
@@ -21,7 +24,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href={materialSymbolsUrl} />
       </head>
       <body className={`${inter.variable} font-sans antialiased bg-background text-foreground`}>
         {children}

@@ -624,7 +624,7 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
               <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5 text-error hover:bg-error/5 hover:text-error">
-                    <Icon name="cancel" size={14} fill />
+                    <Icon name="close" size={14} />
                     <span className="hidden sm:inline">{t('common.cancel')}</span>
                   </Button>
                 </DialogTrigger>
@@ -646,7 +646,7 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={busy}>{t('common.close')}</Button>
                     <Button variant="destructive" onClick={handleCancel} disabled={busy} className="gap-1.5">
-                      {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="cancel" size={14} fill />}
+                      {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="close" size={14} />}
                       {t('booking.cancelBooking')}
                     </Button>
                   </DialogFooter>

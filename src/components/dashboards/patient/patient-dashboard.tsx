@@ -1522,7 +1522,7 @@ function BookingsSection() {
     { key: 'all', label: t('bookings.all'), icon: 'list' },
     { key: 'upcoming', label: t('bookings.upcoming'), icon: 'event_upcoming' },
     { key: 'completed', label: t('bookings.completed'), icon: 'task_alt' },
-    { key: 'cancelled', label: t('bookings.cancelled'), icon: 'event_cancel' },
+    { key: 'cancelled', label: t('bookings.cancelled'), icon: 'cancel' },
   ]
 
   return (
@@ -1700,7 +1700,7 @@ function BookingActions({ booking, onCancel, onReview }: {
           </Button>
         )}
         <Button size="sm" variant="outline" onClick={onCancel}>
-          <Icon name="event_cancel" size={14} />
+          <Icon name="close" size={14} />
           <span className="hidden sm:inline">{t('common.cancel')}</span>
         </Button>
       </div>

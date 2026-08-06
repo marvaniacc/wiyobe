@@ -150,8 +150,13 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv11", "ss01";
+    font-variant-ligatures: none;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+  /* Ensure button text and labels never inherit Material Symbols font or ligatures */
+  button, label, span, a, p, h1, h2, h3, h4, h5, h6, td, th, div {
+    font-variant-ligatures: none;
   }
   /* RTL support */
   [dir="rtl"] {
@@ -184,10 +189,26 @@
   }
 }
 
-/* Material Symbols icon sizing helper */
+/* Material Symbols icon font — fully self-contained so it doesn't depend on
+   the Google Fonts CSS loading, and its ligatures never leak to sibling text. */
 .material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-feature-settings: 'liga';
+  font-variant-ligatures: normal;
+  -webkit-font-smoothing: antialiased;
   user-select: none;
+  overflow: hidden;
 }
 .ms-fill {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
