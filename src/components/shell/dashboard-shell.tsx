@@ -69,6 +69,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'providers', labelKey: 'dash.providers', icon: 'verified' },
     { key: 'users', labelKey: 'dash.users', icon: 'group' },
     { key: 'moderation', labelKey: 'dash.moderation', icon: 'manage_accounts' },
+    { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
     { key: 'commission', labelKey: 'dash.commission', icon: 'percent' },
     { key: 'cancellations', labelKey: 'dash.cancellations', icon: 'cancel_schedule_send' },
     { key: 'payouts', labelKey: 'dash.payouts', icon: 'account_balance' },

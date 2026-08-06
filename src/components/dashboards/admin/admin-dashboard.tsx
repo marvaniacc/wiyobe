@@ -11,6 +11,7 @@ import { formatCurrency, formatDate, formatDateTime, relativeTime } from '@/lib/
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -293,6 +294,23 @@ function LoadingCard({ lines = 3 }: { lines?: number }) {
         {Array.from({ length: lines }).map((_, i) => (
           <Skeleton key={`item-${i}`} className="h-12 w-full" />
         ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function EmptyState({ icon, title, description, action }: { icon: string; title: string; description?: string; action?: React.ReactNode }) {
+  return (
+    <Card className="gap-0">
+      <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+        <div className="flex size-16 items-center justify-center rounded-[20px] bg-surface-secondary text-muted-foreground">
+          <Icon name={icon} size={32} />
+        </div>
+        <div>
+          <p className="text-base font-semibold text-foreground">{title}</p>
+          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        </div>
+        {action}
       </CardContent>
     </Card>
   )
@@ -1733,6 +1751,189 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'payouts': return <PayoutsSection />
     case 'ledger': return <LedgerSection />
     case 'reports': return <ReportsSection />
+    case 'disputes': return <DisputesSection />
     default: return <OverviewSection />
   }
+}
+
+// ============================================================================
+// Disputes section — admin manages booking disputes
+// ============================================================================
+
+const DISPUTE_STATUS_BADGE: Record<string, { cls: string; key: string }> = {
+  OPEN: { cls: 'bg-warning/10 text-warning border-warning/20', key: 'dispute.open' },
+  UNDER_REVIEW: { cls: 'bg-info/10 text-info border-info/20', key: 'dispute.underReview' },
+  RESOLVED: { cls: 'bg-success/10 text-success border-success/20', key: 'dispute.resolved' },
+  CLOSED: { cls: 'bg-muted text-muted-foreground border-divider', key: 'dispute.closed' },
+}
+
+const DISPUTE_TYPE_ICON: Record<string, string> = {
+  REFUND_REQUEST: 'undo',
+  SERVICE_QUALITY: 'thumb_down',
+  SCHEDULING_ISSUE: 'event_busy',
+  PAYMENT_ISSUE: 'payments',
+  OTHER: 'help',
+}
+
+function DisputesSection() {
+  const { t, locale } = useT()
+  const [tick, setTick] = React.useState(0)
+  const { data, loading, error, refetch } = useApi<{ disputes: any[] }>('/api/disputes', { deps: [tick] })
+  const [selected, setSelected] = React.useState<any | null>(null)
+  const [response, setResponse] = React.useState('')
+  const [busy, setBusy] = React.useState(false)
+
+  function refresh() { setTick((x) => x + 1); refetch() }
+
+  async function handleAction(action: 'review' | 'resolve' | 'close') {
+    if (!selected) return
+    setBusy(true)
+    try {
+      await apiPost('/api/disputes/resolve', { disputeId: selected.id, action, adminResponse: response || undefined })
+      toast.success(action === 'resolve' ? t('dispute.disputeResolved') : action === 'close' ? t('dispute.disputeClosed') : 'Status updated')
+      setSelected(null)
+      setResponse('')
+      refresh()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
+  const disputes = data?.disputes || []
+  const openCount = disputes.filter((d: any) => d.status === 'OPEN' || d.status === 'UNDER_REVIEW').length
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={t('dispute.title')}
+        description={openCount > 0 ? `${openCount} active disputes need attention` : 'All disputes are resolved'}
+        icon="gavel"
+      />
+
+      {loading ? (
+        <LoadingCard lines={4} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={refetch} />
+      ) : disputes.length === 0 ? (
+        <EmptyState icon="gavel" title={t('dispute.noDisputes')} description={t('dispute.noDisputesDesc')} />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Dispute list */}
+          <div className="space-y-3">
+            {disputes.map((d: any) => {
+              const badge = DISPUTE_STATUS_BADGE[d.status] || DISPUTE_STATUS_BADGE.OPEN
+              const providerName = d.booking?.doctor?.user?.name || d.booking?.hospital?.name || d.booking?.hotel?.name || d.booking?.translator?.user?.name || '—'
+              return (
+                <Card
+                  key={d.id}
+                  className={cn('cursor-pointer gap-0 transition-all hover:shadow-md', selected?.id === d.id && 'ring-2 ring-primary')}
+                  onClick={() => { setSelected(d); setResponse(d.adminResponse || '') }}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-surface-secondary text-muted-foreground">
+                        <Icon name={DISPUTE_TYPE_ICON[d.type] || 'help'} size={20} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground">{d.title}</p>
+                          <span className={cn('inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium', badge.cls)}>
+                            {t(badge.key)}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{d.description}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="person" size={12} />
+                            {d.raisedBy?.name || '—'}
+                          </span>
+                          <span>·</span>
+                          <span>{providerName}</span>
+                          <span>·</span>
+                          <span>{formatCurrency(d.booking?.amount || '0', 'USD', locale)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Detail panel */}
+          {selected && (
+            <Card className="sticky top-20 h-fit gap-0">
+              <CardHeader className="border-b border-divider">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Icon name="gavel" size={18} className="text-primary" />
+                  {selected.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 p-5">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('dispute.raisedBy')}</span>
+                    <span className="font-medium text-foreground">{selected.raisedBy?.name} ({selected.raisedBy?.role})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('dispute.openedOn')}</span>
+                    <span className="font-medium text-foreground">{formatDateTime(selected.createdAt, locale)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('dispute.bookingRef')}</span>
+                    <span className="font-mono text-xs text-foreground">{selected.bookingId.slice(-8)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('common.amount')}</span>
+                    <span className="font-medium text-foreground">{formatCurrency(selected.booking?.amount || '0', 'USD', locale)}</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('dispute.disputeDesc')}</p>
+                  <p className="rounded-[14px] border border-divider bg-surface-secondary/50 p-3 text-sm text-foreground">{selected.description}</p>
+                </div>
+
+                {selected.adminResponse && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('dispute.adminResponse')}</p>
+                    <p className="rounded-[14px] border-s-2 border-primary bg-accent/20 p-3 text-sm text-foreground">{selected.adminResponse}</p>
+                  </div>
+                )}
+
+                {(selected.status === 'OPEN' || selected.status === 'UNDER_REVIEW') && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">{t('dispute.adminResponse')}</Label>
+                    <Textarea
+                      value={response}
+                      onChange={(e) => setResponse(e.target.value)}
+                      placeholder={t('dispute.enterResponse')}
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {selected.status === 'OPEN' && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction('review')} disabled={busy} className="gap-1.5">
+                          <Icon name="visibility" size={14} />
+                          {t('dispute.underReview')}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="success" onClick={() => handleAction('resolve')} disabled={busy} className="gap-1.5">
+                        <Icon name="check_circle" size={14} fill />
+                        {t('dispute.resolve')}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleAction('close')} disabled={busy} className="gap-1.5 text-error hover:bg-error/5">
+                        <Icon name="close" size={14} />
+                        {t('dispute.close')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }

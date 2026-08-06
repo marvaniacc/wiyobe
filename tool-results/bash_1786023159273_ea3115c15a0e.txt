@@ -1,0 +1,592 @@
+  http://127.0.0.1:3000/
+"ok"
+null
+"ok"
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 271ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 105ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 176ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 151ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 160ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 125ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 495ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 313ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 307ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 155ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 177ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 194ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 178ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 356ms
+[log] [Fast Refresh] rebuilding
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] done in 421ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 471ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 193ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 189ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 176ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 128ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 229ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 166ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 132ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 250ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 169ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 121ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 143ms
+[log] [Fast Refresh] rebuilding
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] done in 167ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] done in 203ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] done in 169ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] done in 210ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 218ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 162ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 486ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 144ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 136ms
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 206ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 295ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 135ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[error] ./src/components/auth/otp-input.tsx:31:12
+Ecmascript file had an error
+  29 |   }, [local, length, onChange, onComplete])
+  30 |
+> 31 |   function setChar(i: number, char: string) {
+     |            ^^^^^^^
+  32 |     const digit = char.replace(/\D/g, '').slice(-1)
+  33 |     const next = [...local]
+  34 |     next[i] = digit
+
+the name `setChar` is defined multiple times
+
+Import traces:
+  Client Component Browser:
+    ./src/components/auth/otp-input.tsx [Client Component Browser]
+    ./src/components/auth/auth-screen.tsx [Client Component Browser]
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/auth/otp-input.tsx [Client Component SSR]
+    ./src/components/auth/auth-screen.tsx [Client Component SSR]
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 209ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 158ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 402ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 537ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 181ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 154ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 176ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 109ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 242ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 106ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 142ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 103ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 344ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 2ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 1ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 198ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 132ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 110ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 170ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 167ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 161ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 162ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 152ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 241ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 237ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 186ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 164ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 503ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 176ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 150ms
+[log] [Fast Refresh] rebuilding
+[warning] [Fast Refresh] performing full reload because your application had an unrecoverable error
+[log] [Fast Refresh] done in 369ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 310ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 234ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 129ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 662ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 495ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 511ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 335ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 800ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 388ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 522ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 360ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 380ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 176ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 275ms
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 179ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 238ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 112ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 168ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 1035ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 145ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 416ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 191ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 163ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 174ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 375ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 222ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 222ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 236ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 202ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 175ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 191ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 240ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 106ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 119ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 104ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 340ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 497ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 396ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 440ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 541ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 523ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 248ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 722ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 398ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 322ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 150ms
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 146ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 236ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[log] [Fast Refresh] rebuilding
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[log] [Fast Refresh] done in 186ms
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 211ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 1
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[error] Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 0
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 595ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 271ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 181ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 259ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 101ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 121ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 123ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 229ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 210ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 65ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 167ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 290ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 503ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 182ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 468ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 360ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 451ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 315ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 211ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 340ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 617ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 213ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 484ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 165ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 155ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 201ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 495ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 21ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 174ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 215ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 119ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 189ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 180ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 206ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 107ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 219ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 664ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 545ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 745ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 780ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 253ms
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 314ms
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 189ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[warning] [Fast Refresh] performing full reload because your application had an unrecoverable error
+[log] [Fast Refresh] done in 1727ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[warning] [Fast Refresh] performing full reload because your application had an unrecoverable error
+[log] [Fast Refresh] done in 793ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[log] [Fast Refresh] rebuilding
+[log] [Fast Refresh] done in 280ms
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] [HMR] connected

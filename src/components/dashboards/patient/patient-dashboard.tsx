@@ -34,6 +34,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { downloadICal } from '@/lib/ical'
 
 /* =========================================================================
  * Types
@@ -2533,6 +2534,25 @@ function RescheduleDialog({ booking, open, onOpenChange, onDone }: {
   )
 }
 
+function handleAddToCalendar(booking: any) {
+  const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
+  const startTime = new Date(booking.startDate)
+  const endTime = booking.endDate ? new Date(booking.endDate) : new Date(startTime.getTime() + 60 * 60 * 1000) // default 1 hour
+  const visitType = booking.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'
+  const location = booking.videoSessionUrl || (booking.doctor?.city || booking.hospital?.city || '') || 'TBD'
+
+  downloadICal(`medtravel-booking-${booking.id.slice(-8)}`, {
+    uid: booking.id,
+    title: `${visitType} with ${providerName}`,
+    description: `MedTravel booking\nProvider: ${providerName}\nVisit type: ${visitType}\nBooking ID: ${booking.id}\n${booking.notes ? 'Notes: ' + booking.notes : ''}`,
+    location,
+    startTime,
+    endTime,
+    organizer: { name: 'MedTravel', email: 'noreply@medtravel.com' },
+  })
+  toast.success('Calendar event downloaded')
+}
+
 function BookingDetailDialog({ booking, open, onOpenChange }: {
   booking: any
   open: boolean
@@ -2638,8 +2658,18 @@ function BookingDetailDialog({ booking, open, onOpenChange }: {
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">{t('booking.close')}</Button>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          {booking.status === 'CONFIRMED' && (
+            <Button
+              variant="outline"
+              onClick={() => handleAddToCalendar(booking)}
+              className="w-full gap-2 sm:w-auto"
+            >
+              <Icon name="event_available" size={16} />
+              {t('booking.addToCalendar')}
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">{t('booking.close')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

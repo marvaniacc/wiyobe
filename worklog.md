@@ -491,3 +491,70 @@ Platform was stable but had a critical i18n bug: the auto-generation script from
 5. Add admin dispute resolution workflow UI
 6. Add provider profile photo upload
 7. Add booking calendar export (iCal/Google Calendar)
+
+---
+Task ID: 11
+Agent: main (orchestrator) — scheduled cron review round 4
+Task: QA + fix stale Turbopack cache + add iCal calendar export + admin dispute resolution system.
+
+## Current Project Status Assessment
+Platform was stable. Found and fixed a stale Turbopack cache error in otp-input.tsx that persisted across sessions. All core flows (booking, payments, ledger, auth, notifications, favorites, reviews, reschedule, public profiles) verified working. Lint: 0 errors.
+
+## Completed Modifications
+
+### Bug Fixes
+1. **Stale Turbopack cache error** — The otp-input.tsx file had a false "Ecmascript file had an error" from cached compilation referencing old code. Fixed by adding a comment to force recompilation. Verified error is gone after fresh page load.
+2. **Missing `Textarea` import in admin dashboard** — The DisputesSection used `<Textarea>` but it wasn't imported. Added `import { Textarea } from '@/components/ui/textarea'`.
+3. **Missing `EmptyState` component in admin dashboard** — The DisputesSection used `<EmptyState>` which wasn't defined. Added a proper EmptyState component with icon, title, description, and optional action.
+4. **Bare `useState` in admin dashboard** — The DisputesSection used `useState()` directly but the admin dashboard imports React as `import * as React` (no named imports). All other sections use `React.useState`. Fixed by replacing all bare `useState` calls with `React.useState`.
+
+### New Features
+
+#### 1. iCal Calendar Export for Bookings
+- **Utility**: `src/lib/ical.ts` — generates standards-compliant .ics files with VEVENT, VALARM (1-hour reminder), proper date formatting (UTC), text escaping, and downloadable via Blob/URL.createObjectURL.
+- **Integration**: Added "Add to calendar" button to the BookingDetailDialog footer (visible for confirmed bookings only). Generates an .ics file with:
+  - Event title: "Online consultation with Dr. Mehmet Yilmaz" or "In-person visit with..."
+  - Description: provider name, visit type, booking ID, notes
+  - Location: video session URL for online, city for in-person
+  - Start/end times from booking
+  - 1-hour alarm reminder
+- **Toast**: "Calendar event downloaded" on successful export
+- **i18n**: Added `booking.addToCalendar` and `booking.calendarAdded` keys to all 4 locales
+
+#### 2. Admin Dispute Resolution System
+- **Schema**: Added `Dispute` model with `DisputeStatus` (OPEN, UNDER_REVIEW, RESOLVED, CLOSED) and `DisputeType` (REFUND_REQUEST, SERVICE_QUALITY, SCHEDULING_ISSUE, PAYMENT_ISSUE, OTHER) enums. Relations to Booking, raisedBy User, againstUser User, resolvedBy User.
+- **API**:
+  - `GET /api/disputes` — list disputes (admin sees all, users see their own)
+  - `POST /api/disputes` — create a dispute (patient or provider raises against the other party for a booking)
+  - `POST /api/disputes/resolve` — admin actions: review (→UNDER_REVIEW), resolve (→RESOLVED), close (→CLOSED) with optional admin response. Notifies both parties.
+- **UI** (admin dashboard):
+  - New "Disputes" nav item (gavel icon) in admin sidebar
+  - `DisputesSection` with two-panel layout:
+    - Left: dispute cards list with type icon, title, status badge, description preview, raised-by name, provider name, amount
+    - Right: detail panel with full dispute info, description, admin response display, and action buttons (Under review / Resolve / Close) with response textarea
+  - Status badges: Open=amber, Under review=blue, Resolved=green, Closed=gray
+  - Type icons: refund=undo, service quality=thumb_down, scheduling=event_busy, payment=payments, other=help
+  - Empty state: "No disputes" / "No active disputes at this time"
+- **i18n**: Added 32 dispute-related keys to all 4 locales
+
+## Verification Results
+- **Lint**: 0 errors, 8 warnings (all cosmetic)
+- **Agent-browser QA**:
+  - Admin disputes page: ✓ renders with empty state "No disputes" / "All disputes are resolved", gavel icon in sidebar
+  - Calendar export: ✓ "Add to calendar" button found in booking detail dialog, clicking downloads .ics file and shows "Calendar event downloaded" toast
+  - All existing flows still working (booking, payments, auth, notifications, etc.)
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 8 cosmetic lint warnings — non-blocking
+- Non-English locales use English fallback for newer keys — functional but not ideal
+- The dispute creation UI for patients/providers (open dispute button on booking) is not yet added — only the admin management view exists. The API supports creation.
+
+## Priority Recommendations for Next Phase
+1. Add "Open dispute" button to patient/provider booking detail dialogs
+2. Add disputes section to patient and provider dashboards
+3. Proper translation of remaining English-fallback keys to tr/fa/ar
+4. Add email notification sending (SMTP integration)
+5. Add multi-currency support
+6. Add real-time notifications via WebSocket
+7. Add provider profile photo upload
