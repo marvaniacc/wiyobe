@@ -106,6 +106,8 @@ type Review = {
   comment: string
   createdAt: string
   author: { name: string | null; avatarUrl: string | null }
+  reply?: string | null
+  repliedAt?: string | null
 }
 
 type StatsResponse = {
@@ -936,6 +938,7 @@ function AvailabilitySection({ role }: { role: string }) {
   const { t, locale } = useT()
   const { data, loading, error, refetch } = useApi<{ slots: Slot[] }>('/api/slots')
   const [addOpen, setAddOpen] = useState(false)
+  const [recurringOpen, setRecurringOpen] = useState(false)
 
   // Hotels shouldn't have a slot calendar — show a friendly notice instead
   if (role === 'HOTEL') {
@@ -947,20 +950,37 @@ function AvailabilitySection({ role }: { role: string }) {
     )
   }
 
+  // Group slots by date for calendar view
+  const slots = data?.slots || []
+  const grouped: Record<string, Slot[]> = {}
+  for (const s of slots) {
+    const key = new Date(s.startTime).toISOString().slice(0, 10)
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(s)
+  }
+  const sortedDates = Object.keys(grouped).sort()
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title={t('dash.availability')}
         description={t('provider.addSlot')}
         action={
-          <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-            <Icon name="add" size={18} fill />
-            {t('provider.addSlot')}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setRecurringOpen(true)} className="gap-1.5">
+              <Icon name="event_repeat" size={18} />
+              {t('availability.recurring')}
+            </Button>
+            <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+              <Icon name="add" size={18} fill />
+              {t('provider.addSlot')}
+            </Button>
+          </div>
         }
       />
 
       <AddSlotDialog open={addOpen} onOpenChange={setAddOpen} onCreated={() => { setAddOpen(false); refetch() }} />
+      <RecurringSlotsDialog open={recurringOpen} onOpenChange={setRecurringOpen} onCreated={() => { setRecurringOpen(false); refetch() }} />
 
       {loading ? (
         <Card><CardContent className="p-0">
@@ -977,35 +997,247 @@ function AvailabilitySection({ role }: { role: string }) {
         </CardContent></Card>
       ) : error ? (
         <ErrorState message={error} onRetry={refetch} />
-      ) : !data?.slots || data.slots.length === 0 ? (
+      ) : slots.length === 0 ? (
         <EmptyState
           icon="calendar_month"
           title={t('provider.noSlots')}
-          action={<Button onClick={() => setAddOpen(true)} className="gap-1.5"><Icon name="add" size={16} fill />{t('provider.addSlot')}</Button>}
+          action={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setRecurringOpen(true)} className="gap-1.5"><Icon name="event_repeat" size={16} />{t('availability.recurring')}</Button>
+              <Button onClick={() => setAddOpen(true)} className="gap-1.5"><Icon name="add" size={16} fill />{t('provider.addSlot')}</Button>
+            </div>
+          }
         />
       ) : (
-        <Card className="gap-0">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="ps-4">{t('common.date')}</TableHead>
-                  <TableHead>{t('common.time')}</TableHead>
-                  <TableHead>{t('common.visitType')}</TableHead>
-                  <TableHead>{t('common.status')}</TableHead>
-                  <TableHead className="pe-4 text-end">{t('common.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.slots.map((slot) => (
-                  <SlotRow key={slot.id} slot={slot} t={t} locale={locale} onDeleted={refetch} />
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-4">
+          {/* Calendar-style grouped view */}
+          {sortedDates.map((dateKey) => {
+            const daySlots = grouped[dateKey]
+            const date = new Date(dateKey)
+            const isToday = dateKey === new Date().toISOString().slice(0, 10)
+            return (
+              <Card key={dateKey} className="gap-0">
+                <CardHeader className="border-b border-divider pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <span className={`flex size-8 items-center justify-center rounded-[8px] ${isToday ? 'bg-primary text-primary-foreground' : 'bg-surface-secondary text-muted-foreground'}`}>
+                      <Icon name="calendar_today" size={16} fill />
+                    </span>
+                    <span className="font-medium">{new Intl.DateTimeFormat(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(date)}</span>
+                    <span className="text-xs text-muted-foreground">· {daySlots.length} {daySlots.length === 1 ? 'slot' : 'slots'}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="flex flex-wrap gap-2">
+                    {daySlots.map((slot) => (
+                      <SlotChip key={slot.id} slot={slot} t={t} locale={locale} onDeleted={refetch} />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
       )}
     </div>
+  )
+}
+
+function SlotChip({ slot, t, locale, onDeleted }: { slot: Slot; t: (k: string, fb?: string) => string; locale: string; onDeleted: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const timeFmt = new Intl.DateTimeFormat(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+
+  async function handleDelete() {
+    setBusy(true)
+    try {
+      await apiDelete(`/api/slots?id=${slot.id}`)
+      toast.success(t('provider.slotDeleted'))
+      onDeleted()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <div className={`group relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-all ${
+        slot.isBooked
+          ? 'border-success/30 bg-success/5 text-success'
+          : 'border-divider bg-surface text-foreground hover:border-error/30 hover:bg-error/5'
+      }`}>
+        <Icon name={slot.visitType === 'ONLINE' ? 'videocam' : 'person'} size={14} />
+        <span className="font-medium tabular-nums">{timeFmt.format(new Date(slot.startTime))}</span>
+        {slot.isBooked ? (
+          <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold text-success">{t('availability.booked')}</span>
+        ) : (
+          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">{t('availability.available')}</span>
+        )}
+        {!slot.isBooked && (
+          <button
+            onClick={() => setOpen(true)}
+            disabled={busy}
+            className="ms-1 flex size-5 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-error/10 hover:text-error group-hover:opacity-100"
+            title={t('common.delete')}
+          >
+            <Icon name="close" size={14} />
+          </button>
+        )}
+      </div>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('provider.deleteSlot')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('provider.confirmDeleteSlot')}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={busy} className="bg-error text-error-foreground hover:bg-error/90">
+            {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : t('common.delete')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+function RecurringSlotsDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void }) {
+  const { t } = useT()
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime] = useState('17:00')
+  const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]) // Mon-Fri by default
+  const [visitType, setVisitType] = useState<'IN_PERSON' | 'ONLINE'>('IN_PERSON')
+  const [duration, setDuration] = useState(60)
+  const [busy, setBusy] = useState(false)
+
+  const DAY_LABELS = [
+    { day: 0, key: 'availability.sun' },
+    { day: 1, key: 'availability.mon' },
+    { day: 2, key: 'availability.tue' },
+    { day: 3, key: 'availability.wed' },
+    { day: 4, key: 'availability.thu' },
+    { day: 5, key: 'availability.fri' },
+    { day: 6, key: 'availability.sat' },
+  ]
+
+  function toggleDay(d: number) {
+    setDays((prev) => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
+  }
+
+  async function handleSubmit() {
+    if (!startDate || !endDate || days.length === 0) return
+    setBusy(true)
+    try {
+      const res = await apiPost('/api/slots/bulk', { startDate, endDate, daysOfWeek: days, startTime, endTime, visitType, slotDurationMinutes: duration })
+      toast.success(t('availability.slotsCreated').replace('{count}', String(res.created)))
+      onCreated()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally { setBusy(false) }
+  }
+
+  // Default dates: today and +30 days
+  useEffect(() => {
+    if (!startDate) {
+      const today = new Date()
+      const future = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+      setStartDate(today.toISOString().slice(0, 10))
+      setEndDate(future.toISOString().slice(0, 10))
+    }
+  }, [])
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="event_repeat" size={20} className="text-primary" />
+            {t('availability.recurring')}
+          </DialogTitle>
+          <DialogDescription>{t('availability.recurringDesc')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('availability.startDate')}</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('availability.endDate')}</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Days of week */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('availability.daysOfWeek')}</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {DAY_LABELS.map(({ day, key }) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleDay(day)}
+                  className={`flex size-9 items-center justify-center rounded-[10px] text-sm font-medium transition-all ${
+                    days.includes(day)
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-surface-secondary text-muted-foreground hover:bg-divider'
+                  }`}
+                >
+                  {t(key)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Time range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('availability.startTime')}</Label>
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('availability.endTime')}</Label>
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Visit type + duration */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('availability.visitType')}</Label>
+              <Select value={visitType} onValueChange={(v: any) => setVisitType(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="IN_PERSON">{t('booking.inPerson')}</SelectItem>
+                  <SelectItem value="ONLINE">{t('booking.online')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('availability.slotDuration')}</Label>
+              <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30</SelectItem>
+                  <SelectItem value="45">45</SelectItem>
+                  <SelectItem value="60">60</SelectItem>
+                  <SelectItem value="90">90</SelectItem>
+                  <SelectItem value="120">120</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>{t('common.cancel')}</Button>
+          <Button onClick={handleSubmit} disabled={busy || !startDate || !endDate || days.length === 0} className="gap-1.5">
+            {busy ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="event_repeat" size={16} />}
+            {t('availability.generate')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -1229,31 +1461,98 @@ function ReviewsSection() {
           {/* List */}
           <div className="flex flex-col gap-3">
             {data.reviews.map((r) => (
-              <Card key={r.id} className="gap-0">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="size-10">
-                      {r.author?.avatarUrl ? <AvatarImage src={r.author.avatarUrl} alt="" /> : null}
-                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">{initials(r.author?.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-foreground">{r.author?.name || '—'}</p>
-                        <StarRating rating={r.rating} size={14} />
-                        <span className="text-xs text-muted-foreground">· {relativeTime(r.createdAt, locale)}</span>
-                      </div>
-                      {r.comment && (
-                        <p className="mt-2 text-sm text-foreground">{r.comment}</p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <ReviewCard key={r.id} review={r} onReplied={refetch} />
             ))}
           </div>
         </>
       )}
     </div>
+  )
+}
+
+function ReviewCard({ review, onReplied }: { review: Review; onReplied: () => void }) {
+  const { t, locale } = useT()
+  const [showReply, setShowReply] = useState(false)
+  const [replyText, setReplyText] = useState(review.reply || '')
+  const [busy, setBusy] = useState(false)
+
+  async function submitReply() {
+    if (replyText.trim().length < 2) return
+    setBusy(true)
+    try {
+      await apiPost('/api/reviews/reply', { reviewId: review.id, reply: replyText.trim() })
+      toast.success(t('review.replySubmitted'))
+      setShowReply(false)
+      onReplied()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
+  return (
+    <Card className="gap-0">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-3">
+          <Avatar className="size-10">
+            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">{initials(review.author?.name)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">{review.author?.name || '—'}</p>
+              <StarRating rating={review.rating} size={14} />
+              <span className="text-xs text-muted-foreground">· {relativeTime(review.createdAt, locale)}</span>
+            </div>
+            {review.comment && (
+              <p className="mt-2 text-sm text-foreground">{review.comment}</p>
+            )}
+
+            {/* Provider reply */}
+            {review.reply && !showReply && (
+              <div className="mt-3 rounded-[14px] border-s-2 border-primary bg-accent/30 p-3">
+                <div className="flex items-center gap-1.5">
+                  <Icon name="reply" size={14} className="text-primary" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-primary">{t('review.replyTitle')}</span>
+                  {review.repliedAt && <span className="text-xs text-muted-foreground">· {relativeTime(review.repliedAt, locale)}</span>}
+                </div>
+                <p className="mt-1.5 text-sm text-foreground">{review.reply}</p>
+                <button
+                  onClick={() => { setShowReply(true); setReplyText(review.reply) }}
+                  className="mt-1.5 text-xs font-medium text-primary hover:underline"
+                >
+                  {t('review.editReply')}
+                </button>
+              </div>
+            )}
+
+            {/* Reply form */}
+            {showReply ? (
+              <div className="mt-3 space-y-2">
+                <Textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={t('review.replyPlaceholder')}
+                  rows={3}
+                  className="resize-none"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={submitReply} disabled={busy || replyText.trim().length < 2} className="gap-1.5">
+                    {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="send" size={14} />}
+                    {t('common.save')}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setShowReply(false); setReplyText(review.reply || '') }}>{t('common.cancel')}</Button>
+                </div>
+              </div>
+            ) : !review.reply && (
+              <button
+                onClick={() => setShowReply(true)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+              >
+                <Icon name="reply" size={14} />
+                {t('review.reply')}
+              </button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

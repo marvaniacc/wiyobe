@@ -384,6 +384,8 @@ model Review {
   rating        Int
   comment       String
   language      String   @default("en")
+  reply         String?
+  repliedAt     DateTime?
   createdAt     DateTime @default(now())
 }
 

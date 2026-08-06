@@ -1530,6 +1530,8 @@ function BookingsSection() {
   const [reviewKey, setReviewKey] = useState(0)
   const [detailTarget, setDetailTarget] = useState<Booking | null>(null)
   const [detailKey, setDetailKey] = useState(0)
+  const [rescheduleTarget, setRescheduleTarget] = useState<Booking | null>(null)
+  const [rescheduleKey, setRescheduleKey] = useState(0)
   const [tick, setTick] = useState(0)
 
   const statusParam = tab === 'upcoming' ? 'CONFIRMED' : tab === 'completed' ? 'COMPLETED' : tab === 'cancelled' ? 'CANCELLED' : ''
@@ -1554,6 +1556,11 @@ function BookingsSection() {
   function openDetail(b: Booking) {
     setDetailTarget(b)
     setDetailKey((k) => k + 1)
+  }
+
+  function openReschedule(b: Booking) {
+    setRescheduleTarget(b)
+    setRescheduleKey((k) => k + 1)
   }
 
   const tabs: { key: typeof tab; label: string; icon: string }[] = [
@@ -1653,6 +1660,7 @@ function BookingsSection() {
                               booking={b}
                               onCancel={() => openCancel(b)}
                               onReview={() => openReview(b)}
+                              onReschedule={() => openReschedule(b)}
                             />
                           </TableCell>
                         </TableRow>
@@ -1688,6 +1696,7 @@ function BookingsSection() {
                               booking={b}
                               onCancel={() => openCancel(b)}
                               onReview={() => openReview(b)}
+                              onReschedule={() => openReschedule(b)}
                             />
                           </div>
                         </div>
@@ -1721,14 +1730,22 @@ function BookingsSection() {
         open={!!detailTarget}
         onOpenChange={(o) => !o && setDetailTarget(null)}
       />
+      <RescheduleDialog
+        key={rescheduleKey}
+        booking={rescheduleTarget}
+        open={!!rescheduleTarget}
+        onOpenChange={(o) => !o && setRescheduleTarget(null)}
+        onDone={refresh}
+      />
     </div>
   )
 }
 
-function BookingActions({ booking, onCancel, onReview }: {
+function BookingActions({ booking, onCancel, onReview, onReschedule }: {
   booking: Booking
   onCancel: () => void
   onReview: () => void
+  onReschedule: () => void
 }) {
   const { t, locale } = useT()
 
@@ -1743,6 +1760,10 @@ function BookingActions({ booking, onCancel, onReview }: {
             </a>
           </Button>
         )}
+        <Button size="sm" variant="outline" onClick={onReschedule} title={t('booking.reschedule')}>
+          <Icon name="event_repeat" size={14} />
+          <span className="hidden lg:inline">{t('booking.reschedule')}</span>
+        </Button>
         <Button size="sm" variant="outline" onClick={onCancel}>
           <Icon name="close" size={14} />
           <span className="hidden sm:inline">{t('common.cancel')}</span>
@@ -2373,6 +2394,130 @@ function FavoritesSection() {
 /* =========================================================================
  * Section: Booking Detail Dialog — full timeline
  * ======================================================================= */
+
+/* =========================================================================
+ * Reschedule Dialog — pick a new slot
+ * ======================================================================= */
+
+function RescheduleDialog({ booking, open, onOpenChange, onDone }: {
+  booking: Booking | null
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onDone: () => void
+}) {
+  const { t, locale } = useT()
+  const [slots, setSlots] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!booking) return
+    setLoading(true)
+    setSelected(null)
+    // Build provider query based on provider type
+    const params = new URLSearchParams()
+    if (booking.doctorId) params.set('doctorId', booking.doctorId)
+    if (booking.hospitalId) params.set('hospitalId', booking.hospitalId)
+    if (booking.translatorId) params.set('translatorId', booking.translatorId)
+    fetch(`/api/providers/slots?${params}`)
+      .then(r => r.json())
+      .then(d => setSlots(d.slots || []))
+      .catch(() => setSlots([]))
+      .finally(() => setLoading(false))
+  }, [booking?.id])
+
+  // Group slots by date
+  const grouped: Record<string, any[]> = {}
+  for (const s of slots) {
+    const key = new Date(s.startTime).toISOString().slice(0, 10)
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(s)
+  }
+  const sortedDates = Object.keys(grouped).sort()
+
+  async function handleReschedule() {
+    if (!booking || !selected) return
+    setSubmitting(true)
+    try {
+      await apiPost('/api/bookings/reschedule', { bookingId: booking.id, newSlotId: selected })
+      toast.success(t('booking.rescheduleSuccess'))
+      onOpenChange(false)
+      onDone()
+    } catch (e: any) { toast.error(e.message) } finally { setSubmitting(false) }
+  }
+
+  if (!booking) return null
+  const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="event_repeat" size={20} className="text-primary" />
+            {t('booking.rescheduleTitle')}
+          </DialogTitle>
+          <DialogDescription>
+            {providerName} · {t('booking.rescheduleDesc')}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+          {loading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={`resched-skel-${i}`} className="h-14 w-full rounded-[14px]" />)}
+            </div>
+          ) : slots.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <Icon name="event_busy" size={32} className="text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{t('booking.noSlots')}</p>
+            </div>
+          ) : (
+            sortedDates.map((dateKey) => {
+              const daySlots = grouped[dateKey]
+              const date = new Date(dateKey)
+              return (
+                <div key={dateKey}>
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {new Intl.DateTimeFormat(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(date)}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {daySlots.map((s) => {
+                      const time = new Intl.DateTimeFormat(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date(s.startTime))
+                      const isSel = selected === s.id
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setSelected(s.id)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all',
+                            isSel ? 'border-primary bg-primary text-primary-foreground' : 'border-divider bg-surface text-foreground hover:border-primary/40'
+                          )}
+                        >
+                          <Icon name={s.visitType === 'ONLINE' ? 'videocam' : 'person'} size={12} />
+                          {time}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>{t('common.cancel')}</Button>
+          <Button onClick={handleReschedule} disabled={submitting || !selected} className="gap-1.5">
+            {submitting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="check_circle" size={16} />}
+            {t('booking.rescheduleConfirm')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 function BookingDetailDialog({ booking, open, onOpenChange }: {
   booking: any

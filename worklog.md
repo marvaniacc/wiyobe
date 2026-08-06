@@ -365,3 +365,72 @@ Platform is stable and functional. All core flows (patient booking, provider man
 6. Add real-time notifications via WebSocket (currently requires page refresh)
 7. Add provider response to reviews
 8. Add booking rescheduling feature
+
+---
+Task ID: 9
+Agent: main (orchestrator) — scheduled cron review round 2
+Task: QA assessment + fix 402 missing i18n keys + add recurring availability calendar, booking reschedule, review reply features.
+
+## Current Project Status Assessment
+Platform was stable but had a major i18n issue: 402 keys used in dashboard code were never added to the i18n dictionary, causing raw keys like "admin.commission" to display as visible text in the UI. The subagents that built the dashboards used their own key names but didn't sync them to i18n.ts. Also fixed a stale compile error in otp-input.tsx.
+
+## Completed Modifications
+
+### Bug Fixes
+1. **402 missing i18n keys** — THE MAJOR FIX. Wrote a Python script to extract all `t('key')` usages from all components, compare against defined keys, and auto-generate human-readable English values for all missing keys. Synced all 4 locales (en/tr/fa/ar) so every locale now has all 893 keys. The admin reports page previously showed raw "admin.commission" text — now correctly shows "Commission".
+2. **otp-input.tsx stale `setLocal` reference** — Removed a leftover `setLocal(next)` call in `handlePaste` that referenced a removed state variable, causing a persistent "Ecmascript file had an error" in the browser console.
+
+### New Features
+
+#### 1. Recurring Availability Calendar (Provider)
+- **API**: `POST /api/slots/bulk` — generates multiple slots at once from a date range, days-of-week selection, time range, visit type, and slot duration. Validates max 200 slots per batch.
+- **UI**: Completely redesigned the provider Availability section:
+  - **Calendar-style grouped view**: Slots are grouped by date into cards, each showing the weekday, date, slot count, and color-coded time chips (green=booked, blue=available). Today's date is highlighted with a primary-colored calendar icon.
+  - **SlotChip component**: Each slot is a pill showing time, visit type icon (person/videocam), and status badge. Hover reveals a delete button for unbooked slots. Booked slots can't be deleted.
+  - **RecurringSlotsDialog**: Full form with date range pickers, day-of-week selector buttons (Sun-Sat toggle pills), time range inputs, visit type select, and slot duration select (30/45/60/90/120 min). Defaults to Mon-Fri, 09:00-17:00, 60min slots for the next 30 days.
+  - Both "Add slot" (single) and "Recurring availability" (bulk) buttons in the header.
+
+#### 2. Booking Reschedule (Patient)
+- **API**: `POST /api/bookings/reschedule` — patient selects a new available slot for an existing confirmed booking. Frees the old slot, books the new one, updates booking dates, notifies the provider.
+- **Schema**: No schema change needed — reuses existing slot/booking fields.
+- **UI**: 
+  - "Reschedule" button (event_repeat icon) added to confirmed booking actions in the bookings table.
+  - **RescheduleDialog**: Shows available slots for the same provider, grouped by date with time pills. Patient selects a slot and confirms. Toast notification on success.
+
+#### 3. Provider Reply to Reviews
+- **Schema**: Added `reply` (String?) and `repliedAt` (DateTime?) fields to the Review model.
+- **API**: `POST /api/reviews/reply` — provider submits a reply to a review they received. Validates ownership, saves reply, notifies the patient.
+- **UI**: 
+  - **ReviewCard component** (refactored from inline): Shows patient avatar, name, rating stars, relative time, and comment.
+  - "Reply" button appears on reviews without a reply. Clicking opens a textarea form.
+  - Once replied, the reply is shown in a highlighted blue-accented box with "PROVIDER RESPONSE" label, reply text, and timestamp. "Edit reply" button allows updating.
+  - Reply form has validation (min 2 chars), loading state, and toast feedback.
+
+### Styling Improvements
+- Availability section: complete redesign from flat table to calendar-grouped card layout with color-coded slot chips
+- Review cards: refactored with proper reply display using left-border accent
+- Reschedule dialog: date-grouped slot picker with visual selection state
+
+## Verification Results
+- **Lint**: 0 errors, 6 warnings (all cosmetic)
+- **i18n**: All 4 locales now have 893 keys each (was 491/397/397/397 — now synced)
+- **Agent-browser QA**:
+  - Recurring availability dialog: ✓ opens with date range, day selector, time inputs, generates slots
+  - Review reply: ✓ "Reply" button opens form, submits successfully, reply shows in UI with "PROVIDER RESPONSE" label
+  - Booking reschedule: ✓ "Reschedule" button opens slot picker, selecting a slot and confirming changes the booking date
+  - Admin reports: ✓ "admin.commission" now shows as "Commission" (i18n fix verified)
+  - All existing flows still working
+
+## Unresolved Issues / Risks
+- Stripe still mocked — expected for MVP
+- 6 cosmetic lint warnings — non-blocking
+- Non-English locales (tr/fa/ar) use English text as fallback for the 402 newly-added keys — functional but not properly translated. A proper translation pass would improve UX for non-English users.
+
+## Priority Recommendations for Next Phase
+1. **Translate the 402 new i18n keys** to tr/fa/ar properly (currently English fallback)
+2. Add email notification sending (SMTP integration)
+3. Add CSV/PDF financial report exports
+4. Add multi-currency support
+5. Add real-time notifications via WebSocket
+6. Add admin dispute resolution workflow UI
+7. Add provider profile public page (shareable link)

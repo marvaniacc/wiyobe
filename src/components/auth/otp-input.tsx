@@ -68,7 +68,6 @@ export function OtpInput({ length = 6, value, onChange, onComplete, disabled, er
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length)
     const next = Array(length).fill('')
     pasted.split('').forEach((d, idx) => { next[idx] = d })
-    setLocal(next)
     const joined = next.join('')
     onChange(joined)
     if (joined.length === length) onComplete?.(joined)
