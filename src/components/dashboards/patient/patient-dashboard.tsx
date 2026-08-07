@@ -1736,35 +1736,35 @@ function BookingsSection() {
       </Tabs>
 
       <CancelBookingDialog
-        key={cancelKey}
+        key={`cancel-${cancelKey}`}
         booking={cancelTarget}
         open={!!cancelTarget}
         onOpenChange={(o) => !o && setCancelTarget(null)}
         onDone={refresh}
       />
       <ReviewDialog
-        key={reviewKey}
+        key={`review-${reviewKey}`}
         booking={reviewTarget}
         open={!!reviewTarget}
         onOpenChange={(o) => !o && setReviewTarget(null)}
         onDone={refresh}
       />
       <BookingDetailDialog
-        key={detailKey}
+        key={`detail-${detailKey}`}
         booking={detailTarget}
         open={!!detailTarget}
         onOpenChange={(o) => !o && setDetailTarget(null)}
         onOpenDispute={openDispute}
       />
       <RescheduleDialog
-        key={rescheduleKey}
+        key={`resched-${rescheduleKey}`}
         booking={rescheduleTarget}
         open={!!rescheduleTarget}
         onOpenChange={(o) => !o && setRescheduleTarget(null)}
         onDone={refresh}
       />
       <DisputeDialog
-        key={disputeKey}
+        key={`dispute-${disputeKey}`}
         booking={disputeTarget}
         open={!!disputeTarget}
         onOpenChange={(o) => !o && setDisputeTarget(null)}
