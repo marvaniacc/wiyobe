@@ -129,6 +129,7 @@ export async function POST(req: Request) {
     // Check if the provider was referred by an affiliate
     let affiliateUserId: string | null = null
     let affiliateClickId: string | null = null
+    let affiliateRecord: any = null
 
     // Check provider's referral
     const providerAffClick = await db.affiliateClick.findFirst({
@@ -140,6 +141,7 @@ export async function POST(req: Request) {
     if (providerAffClick?.affiliate) {
       affiliateUserId = providerAffClick.affiliate.userId
       affiliateClickId = providerAffClick.id
+      affiliateRecord = providerAffClick.affiliate
     } else {
       // Check patient's referral
       const patientAffClick = await db.affiliateClick.findFirst({
@@ -150,19 +152,25 @@ export async function POST(req: Request) {
       if (patientAffClick?.affiliate) {
         affiliateUserId = patientAffClick.affiliate.userId
         affiliateClickId = patientAffClick.id
+        affiliateRecord = patientAffClick.affiliate
       }
     }
 
     // Calculate commissions
-    // If affiliate exists: platform gets platformRate%, affiliate gets affiliateRate%
-    // If no affiliate: platform gets (platformRate + affiliateRate)%
+    // Base affiliate rate from CommissionRate + tier bonus rate from Affiliate.tierBonusRate
+    const tierBonus = affiliateRecord ? parseFloat(affiliateRecord.tierBonusRate || '0') : 0
+    const effectiveAffiliateRate = affiliateUserId
+      ? parseFloat(affiliateRate) + tierBonus
+      : parseFloat(affiliateRate) // no affiliate → platform keeps base + tier bonus
+    const totalAffiliateRate = affiliateUserId ? effectiveAffiliateRate : parseFloat(affiliateRate) + tierBonus
+
+    // Platform gets platformRate%. Affiliate gets effectiveAffiliateRate% (base + tier bonus).
+    // If no affiliate: platform gets platformRate% + base affiliateRate% + tier bonus% (everything)
     const platformCommission = (parseFloat(amount) * (parseFloat(platformRate) / 100)).toFixed(2)
-    const affiliateCommission = affiliateUserId
-      ? (parseFloat(amount) * (parseFloat(affiliateRate) / 100)).toFixed(2)
-      : (parseFloat(amount) * (parseFloat(affiliateRate) / 100)).toFixed(2) // still calculated but goes to platform
+    const affiliateCommission = (parseFloat(amount) * (effectiveAffiliateRate / 100)).toFixed(2)
     const totalPlatformCut = affiliateUserId
-      ? platformCommission                          // affiliate exists: platform only gets its own rate
-      : (parseFloat(platformCommission) + parseFloat(affiliateCommission)).toFixed(2) // no affiliate: platform gets both
+      ? platformCommission
+      : (parseFloat(platformCommission) + parseFloat(affiliateCommission)).toFixed(2)
     const providerNet = subDec(amount, affiliateUserId
       ? (parseFloat(platformCommission) + parseFloat(affiliateCommission)).toFixed(2)
       : totalPlatformCut
@@ -190,7 +198,7 @@ export async function POST(req: Request) {
         amount: toDec(amount),
         commissionRate: platformRate,
         commissionAmount: affiliateUserId ? platformCommission : totalPlatformCut,
-        affiliateRate,
+        affiliateRate: String(effectiveAffiliateRate),
         affiliateAmount: affiliateUserId ? affiliateCommission : '0',
         affiliateId: affiliateUserId,
         providerNetAmount: providerNet,
@@ -265,6 +273,13 @@ export async function POST(req: Request) {
           )).toFixed(2),
         },
       })
+
+      // Auto-promote tier if the affiliate qualifies for a higher tier
+      const { checkAndPromoteTier } = await import('@/lib/affiliate-tiers')
+      const affiliateRec = await db.affiliate.findUnique({ where: { userId: affiliateUserId } })
+      if (affiliateRec) {
+        await checkAndPromoteTier(affiliateRec.id)
+      }
     }
 
     // Provider credit (net amount after both commissions)

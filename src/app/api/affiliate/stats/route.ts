@@ -57,7 +57,7 @@ export async function GET() {
         pendingBalance: affiliate.pendingBalance,
         paidOut: affiliate.paidOut,
         tier: affiliate.tier,
-        commissionRate: affiliate.commissionRate,
+        tierBonusRate: affiliate.tierBonusRate,
         conversionRate,
         bookingRate,
         verified: affiliate.verified,

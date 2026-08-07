@@ -247,7 +247,7 @@ function OverviewSection() {
           </CardContent>
         </Card>
 
-        {/* Tier card */}
+        {/* Tier card with progress */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -261,8 +261,42 @@ function OverviewSection() {
             </div>
             <div className="text-center">
               <p className="text-lg font-bold text-foreground">{t(tierCfg.label)}</p>
-              <p className="text-sm text-muted-foreground">{t('affiliate.commissionRate')}: <span className="font-semibold text-foreground">{s.commissionRate}%</span></p>
+              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <span>{t('affiliate.tierBonus')}: <span className="font-semibold text-foreground">+{s.tierBonusRate || '0'}%</span></span>
+              </div>
             </div>
+
+            {/* Tier progress to next tier */}
+            {(() => {
+              const tierOrder = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
+              const currentIdx = tierOrder.indexOf(s.tier)
+              const nextTierKey = currentIdx < tierOrder.length - 1 ? tierOrder[currentIdx + 1] : null
+              if (!nextTierKey) {
+                return (
+                  <div className="w-full rounded-[14px] bg-success/5 p-3 text-center">
+                    <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-success">
+                      <Icon name="emoji_events" size={16} fill />
+                      {t('affiliate.maxTier')}
+                    </p>
+                  </div>
+                )
+              }
+              const nextTierCfg = TIER_CONFIG[nextTierKey] || TIER_CONFIG.BRONZE
+              return (
+                <div className="w-full space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{t('affiliate.tierProgress')}</span>
+                    <span className="font-medium text-foreground">{t(nextTierCfg.label)}</span>
+                  </div>
+                  <Progress value={Math.min(100, Math.round((s.totalSignups / Math.max(1, [0, 5, 20, 50][currentIdx + 1])) * 100))} className="h-2" />
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{s.totalSignups} {t('affiliate.signups').toLowerCase()}</span>
+                    <span>{[0, 5, 20, 50][currentIdx + 1]} {t('affiliate.referralsToNext')}</span>
+                  </div>
+                  <p className="text-[11px] text-center text-muted-foreground">{t('affiliate.tierAutoPromotion')}</p>
+                </div>
+              )
+            })()}
           </CardContent>
         </Card>
       </div>

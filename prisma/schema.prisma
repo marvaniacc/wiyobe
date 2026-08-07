@@ -495,7 +495,8 @@ model Affiliate {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   referralCode    String   @unique
   tier            AffiliateTier @default(BRONZE)
-  commissionRate  String   @default("10") // percentage of platform commission
+  tierBonusRate   String   @default("0") // bonus % on top of base affiliate rate from CommissionRate
+  commissionRate  String   @default("10") // legacy field, not used in new system
   website         String?
   socialMedia     String?
   description     String?
@@ -545,8 +546,10 @@ model AffiliatePayout {
 }
 
 model AffiliateSetting {
-  id           String         @id @default(cuid())
-  tier         AffiliateTier  @unique
-  commissionRate String       @default("10") // default commission % per tier
-  updatedAt    DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  tier            AffiliateTier  @unique
+  minReferrals    Int            @default(0)   // minimum total referrals to reach this tier
+  minEarnings     String         @default("0") // minimum total earnings to reach this tier
+  bonusRate       String         @default("0") // bonus % added on top of base affiliate rate
+  updatedAt       DateTime       @updatedAt
 }

@@ -2211,8 +2211,19 @@ const AFFILIATE_TIER_CLS: Record<string, string> = {
 
 function AffiliatesSection() {
   const { t, locale } = useT()
-  const { data, loading, error, refetch } = useApi<{ affiliates: any[] }>('/api/admin/affiliates')
+  const { data, loading, error, refetch } = useApi<{ affiliates: any[]; tierSettings: any[] }>('/api/admin/affiliates')
   const [busy, setBusy] = React.useState<string | null>(null)
+  const [tierForm, setTierForm] = React.useState<Record<string, { minReferrals: string; minEarnings: string; bonusRate: string }>>({})
+
+  React.useEffect(() => {
+    if (data?.tierSettings) {
+      const map: Record<string, { minReferrals: string; minEarnings: string; bonusRate: string }> = {}
+      data.tierSettings.forEach((s: any) => {
+        map[s.tier] = { minReferrals: String(s.minReferrals), minEarnings: s.minEarnings, bonusRate: s.bonusRate }
+      })
+      setTierForm(map)
+    }
+  }, [data?.tierSettings])
 
   async function handleAction(affiliateId: string, action: string, extra?: any) {
     setBusy(affiliateId + action)
@@ -2223,26 +2234,107 @@ function AffiliatesSection() {
     } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
   }
 
+  async function saveTierSettings() {
+    setBusy('tierSettings')
+    try {
+      const tierSettings = Object.entries(tierForm).map(([tier, v]) => ({
+        tier,
+        minReferrals: parseInt(v.minReferrals) || 0,
+        minEarnings: v.minEarnings || '0',
+        bonusRate: v.bonusRate || '0',
+      }))
+      await apiPut('/api/admin/affiliates', { tierSettings })
+      toast.success(t('admin.tierSettingsSaved'))
+      refetch()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
+  }
+
   if (loading) return <div className="flex flex-col gap-6"><PageHeader title={t('admin.affiliateManagement')} icon="campaign" /><LoadingCard lines={4} /></div>
   if (error) return <ErrorState message={error} onRetry={refetch} />
 
   const affiliates = data?.affiliates || []
   const pending = affiliates.filter((a: any) => !a.verified)
   const active = affiliates.filter((a: any) => a.verified)
+  const tierSettings = data?.tierSettings || []
+  const tiers = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t('admin.affiliateManagement')} description={t('admin.affiliateManagementDesc')} icon="campaign" />
 
-      {/* Info banner: affiliate commission is set in Commission rates section */}
+      {/* Info banner */}
       <Card className="border-primary/20 bg-primary/[0.02]">
         <CardContent className="flex items-center gap-3 p-4">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
             <Icon name="info" size={20} fill />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">Affiliate commission rates are configured per provider type</p>
-            <p className="text-xs text-muted-foreground">Go to <span className="font-medium text-primary">Commission rates</span> to set the platform % and affiliate % for each provider type. Tiers (Bronze/Silver/Gold/Platinum) are status badges only.</p>
+            <p className="text-sm font-medium text-foreground">Affiliate commission = base rate (per provider type) + tier bonus</p>
+            <p className="text-xs text-muted-foreground">Base rates are set in <span className="font-medium text-primary">Commission rates</span>. Tier bonuses are configured below and auto-applied based on affiliate performance.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tier threshold & bonus settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="workspace_premium" size={18} className="text-primary" />
+            {t('admin.tierSettings')}
+          </CardTitle>
+          <CardDescription>{t('admin.tierSettingsDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="hidden grid-cols-[100px_1fr_1fr_1fr] items-center gap-3 px-1 sm:grid">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tier</span>
+            <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.minReferrals')}</span>
+            <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.minEarnings')}</span>
+            <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.bonusRate')}</span>
+          </div>
+          <div className="mt-2 space-y-3">
+            {tiers.map((tier) => {
+              const cfg = tierForm[tier] || { minReferrals: '', minEarnings: '', bonusRate: '' }
+              return (
+                <div key={tier} className="grid grid-cols-1 items-center gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:grid-cols-[100px_1fr_1fr_1fr]">
+                  <div className="flex items-center gap-2">
+                    <div className={cn('flex size-8 items-center justify-center rounded-[8px]', AFFILIATE_TIER_CLS[tier])}>
+                      <Icon name="workspace_premium" size={16} fill />
+                    </div>
+                    <span className="text-sm font-medium capitalize text-foreground">{tier.toLowerCase()}</span>
+                  </div>
+                  <Input
+                    type="number" min="0"
+                    value={cfg.minReferrals}
+                    onChange={(e) => setTierForm((prev) => ({ ...prev, [tier]: { ...prev[tier], minReferrals: e.target.value } }))}
+                    className="h-10 text-center"
+                    placeholder="0"
+                  />
+                  <Input
+                    type="number" min="0" step="0.01"
+                    value={cfg.minEarnings}
+                    onChange={(e) => setTierForm((prev) => ({ ...prev, [tier]: { ...prev[tier], minEarnings: e.target.value } }))}
+                    className="h-10 text-center"
+                    placeholder="0"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" min="0" step="0.5"
+                      value={cfg.bonusRate}
+                      onChange={(e) => setTierForm((prev) => ({ ...prev, [tier]: { ...prev[tier], bonusRate: e.target.value } }))}
+                      className="h-10 text-center"
+                      placeholder="0"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={saveTierSettings} disabled={busy === 'tierSettings'} className="gap-1.5">
+              {busy === 'tierSettings' ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+              {t('common.save')}
+            </Button>
           </div>
         </CardContent>
       </Card>

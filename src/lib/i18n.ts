@@ -753,6 +753,25 @@ const en: Dict = {
   'admin.pendingAffiliates': 'Pending affiliates',
   'admin.affiliateRevenue': 'Affiliate revenue',
   'landing.affiliateDesc': 'Earn commissions by referring patients to MedTravel',
+
+  'affiliate.tierProgress': 'Tier progress',
+  'affiliate.nextTier': 'Next tier',
+  'affiliate.referralsToNext': 'referrals to next tier',
+  'affiliate.earningsToNext': 'earnings to next tier',
+  'affiliate.tierBonus': 'Tier bonus',
+  'affiliate.tierBonusDesc': 'Bonus commission added on top of base affiliate rate',
+  'affiliate.maxTier': 'Highest tier achieved!',
+  'affiliate.tierAutoPromotion': 'Tiers auto-promote based on referrals and earnings',
+  'admin.tierSettings': 'Tier thresholds & bonuses',
+  'admin.tierSettingsDesc': 'Set referral/earnings thresholds and commission bonus for each tier',
+  'admin.minReferrals': 'Min referrals',
+  'admin.minEarnings': 'Min earnings ($)',
+  'admin.bonusRate': 'Bonus rate (%)',
+  'admin.tierSettingsSaved': 'Tier settings saved — all affiliates re-evaluated',
+  'admin.recalculateTier': 'Recalculate tier',
+  'affiliate.effectiveRate': 'Effective affiliate rate',
+  'affiliate.baseRate': 'Base rate',
+  'affiliate.bonus': 'Bonus',
 }
 
 const tr: Dict = {
@@ -1474,6 +1493,25 @@ const tr: Dict = {
   'admin.pendingAffiliates': 'Pending affiliates',
   'admin.affiliateRevenue': 'Affiliate revenue',
   'landing.affiliateDesc': 'Earn commissions by referring patients to MedTravel',
+
+  'affiliate.tierProgress': 'Tier progress',
+  'affiliate.nextTier': 'Next tier',
+  'affiliate.referralsToNext': 'referrals to next tier',
+  'affiliate.earningsToNext': 'earnings to next tier',
+  'affiliate.tierBonus': 'Tier bonus',
+  'affiliate.tierBonusDesc': 'Bonus commission added on top of base affiliate rate',
+  'affiliate.maxTier': 'Highest tier achieved!',
+  'affiliate.tierAutoPromotion': 'Tiers auto-promote based on referrals and earnings',
+  'admin.tierSettings': 'Tier thresholds & bonuses',
+  'admin.tierSettingsDesc': 'Set referral/earnings thresholds and commission bonus for each tier',
+  'admin.minReferrals': 'Min referrals',
+  'admin.minEarnings': 'Min earnings ($)',
+  'admin.bonusRate': 'Bonus rate (%)',
+  'admin.tierSettingsSaved': 'Tier settings saved — all affiliates re-evaluated',
+  'admin.recalculateTier': 'Recalculate tier',
+  'affiliate.effectiveRate': 'Effective affiliate rate',
+  'affiliate.baseRate': 'Base rate',
+  'affiliate.bonus': 'Bonus',
 }
 
 const fa: Dict = {
@@ -2195,6 +2233,25 @@ const fa: Dict = {
   'admin.pendingAffiliates': 'Pending affiliates',
   'admin.affiliateRevenue': 'Affiliate revenue',
   'landing.affiliateDesc': 'Earn commissions by referring patients to MedTravel',
+
+  'affiliate.tierProgress': 'Tier progress',
+  'affiliate.nextTier': 'Next tier',
+  'affiliate.referralsToNext': 'referrals to next tier',
+  'affiliate.earningsToNext': 'earnings to next tier',
+  'affiliate.tierBonus': 'Tier bonus',
+  'affiliate.tierBonusDesc': 'Bonus commission added on top of base affiliate rate',
+  'affiliate.maxTier': 'Highest tier achieved!',
+  'affiliate.tierAutoPromotion': 'Tiers auto-promote based on referrals and earnings',
+  'admin.tierSettings': 'Tier thresholds & bonuses',
+  'admin.tierSettingsDesc': 'Set referral/earnings thresholds and commission bonus for each tier',
+  'admin.minReferrals': 'Min referrals',
+  'admin.minEarnings': 'Min earnings ($)',
+  'admin.bonusRate': 'Bonus rate (%)',
+  'admin.tierSettingsSaved': 'Tier settings saved — all affiliates re-evaluated',
+  'admin.recalculateTier': 'Recalculate tier',
+  'affiliate.effectiveRate': 'Effective affiliate rate',
+  'affiliate.baseRate': 'Base rate',
+  'affiliate.bonus': 'Bonus',
 }
 
 const ar: Dict = {
@@ -2916,6 +2973,25 @@ const ar: Dict = {
   'admin.pendingAffiliates': 'Pending affiliates',
   'admin.affiliateRevenue': 'Affiliate revenue',
   'landing.affiliateDesc': 'Earn commissions by referring patients to MedTravel',
+
+  'affiliate.tierProgress': 'Tier progress',
+  'affiliate.nextTier': 'Next tier',
+  'affiliate.referralsToNext': 'referrals to next tier',
+  'affiliate.earningsToNext': 'earnings to next tier',
+  'affiliate.tierBonus': 'Tier bonus',
+  'affiliate.tierBonusDesc': 'Bonus commission added on top of base affiliate rate',
+  'affiliate.maxTier': 'Highest tier achieved!',
+  'affiliate.tierAutoPromotion': 'Tiers auto-promote based on referrals and earnings',
+  'admin.tierSettings': 'Tier thresholds & bonuses',
+  'admin.tierSettingsDesc': 'Set referral/earnings thresholds and commission bonus for each tier',
+  'admin.minReferrals': 'Min referrals',
+  'admin.minEarnings': 'Min earnings ($)',
+  'admin.bonusRate': 'Bonus rate (%)',
+  'admin.tierSettingsSaved': 'Tier settings saved — all affiliates re-evaluated',
+  'admin.recalculateTier': 'Recalculate tier',
+  'affiliate.effectiveRate': 'Effective affiliate rate',
+  'affiliate.baseRate': 'Base rate',
+  'affiliate.bonus': 'Bonus',
 }
 
 export const DICTS: Record<Locale, Dict> = { en, tr, fa, ar }
