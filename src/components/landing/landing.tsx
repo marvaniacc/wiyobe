@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { AuthModal } from '@/components/landing/role-landing-page'
+import { AuthModal } from '@/components/landing/auth-modal'
 
 const ROLE_PAGES = [
   { href: '/patients', icon: 'personal_injury', color: 'bg-blue-50 text-primary', label: 'Patient', desc: 'Find and book trusted medical care abroad' },
