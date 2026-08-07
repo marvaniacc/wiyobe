@@ -109,9 +109,155 @@ export function AffiliateDashboard({ section }: { section: string }) {
     case 'referrals': return <ReferralsSection />
     case 'analytics': return <AnalyticsSection />
     case 'payouts': return <PayoutsSection />
+    case 'materials': return <MaterialsSection />
     case 'profile': return <ProfileSection />
     default: return <OverviewSection />
   }
+}
+
+/* =========================================================================
+ * Section: Promo Materials — banners, copy templates, QR code
+ * ======================================================================= */
+
+function MaterialsSection() {
+  const { t } = useT()
+  const { data } = useApi<StatsData>('/api/affiliate/stats')
+  const referralCode = data?.stats.referralCode || ''
+  const referralLink = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${referralCode}` : ''
+
+  const copyTemplates = [
+    {
+      title: 'Social media post',
+      icon: 'share',
+      content: `🏥 Looking for affordable, world-class medical care abroad?\n\nMedTravel connects you with verified doctors, hospitals, and translators across Turkey, Iran, and beyond. Compare prices, read reviews, and book online!\n\n👉 Start here: ${referralLink}`,
+    },
+    {
+      title: 'WhatsApp message',
+      icon: 'chat',
+      content: `Hi! I found this platform that helps you find trusted medical care abroad — doctors, hospitals, hotels, and translators, all in one place. Check it out: ${referralLink}`,
+    },
+    {
+      title: 'Email template',
+      icon: 'mail',
+      content: `Subject: Trusted Medical Care Abroad — MedTravel\n\nHi [Name],\n\nI wanted to share a platform I've been using called MedTravel. It connects patients with verified doctors, hospitals, and translators for medical tourism.\n\nYou can compare prices, read reviews, and book appointments online. Here's my referral link:\n${referralLink}\n\nBest regards,`,
+    },
+    {
+      title: 'Blog/website embed',
+      icon: 'code',
+      content: `<a href="${referralLink}" target="_blank" rel="noopener">MedTravel — Global Medical Tourism Marketplace</a>`,
+    },
+  ]
+
+  function copyTemplate(text: string) {
+    navigator.clipboard.writeText(text).then(() => toast.success('Copied to clipboard'))
+  }
+
+  // Generate QR code URL using a public QR code API
+  const qrCodeUrl = referralLink ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(referralLink)}` : ''
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Promo materials</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Ready-to-use marketing materials to help you refer more patients</p>
+      </div>
+
+      {/* QR Code card */}
+      <Card className="gap-0">
+        <CardContent className="flex flex-col items-center gap-4 p-6 sm:flex-row sm:gap-8">
+          {qrCodeUrl && (
+            <div className="shrink-0 rounded-[16px] border border-divider bg-white p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrCodeUrl} alt="QR Code" width={160} height={160} className="rounded-[8px]" />
+            </div>
+          )}
+          <div className="flex-1 text-center sm:text-start">
+            <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Icon name="qr_code" size={20} className="text-primary" />
+              Your QR code
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">Print this QR code on flyers, business cards, or posters. When scanned, it opens your referral link directly.</p>
+            {qrCodeUrl && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3 gap-1.5"
+                onClick={() => {
+                  const a = document.createElement('a')
+                  a.href = qrCodeUrl
+                  a.download = `medtravel-qr-${referralCode}.png`
+                  a.target = '_blank'
+                  a.click()
+                }}
+              >
+                <Icon name="download" size={14} />
+                Download QR
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Copy-paste templates */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {copyTemplates.map((tpl) => (
+          <Card key={tpl.title} className="gap-0">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-8 items-center justify-center rounded-[8px] bg-primary/10 text-primary">
+                    <Icon name={tpl.icon} size={16} fill />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">{tpl.title}</h3>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => copyTemplate(tpl.content)} className="gap-1.5">
+                  <Icon name="content_copy" size={14} />
+                  Copy
+                </Button>
+              </div>
+              <div className="mt-3 rounded-[12px] bg-surface-secondary p-3">
+                <pre className="whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-foreground">{tpl.content}</pre>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Banner preview */}
+      <Card className="gap-0">
+        <CardHeader>
+          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Icon name="view_carousel" size={18} className="text-primary" />
+            Banner preview
+          </h3>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-hidden rounded-[16px] border border-divider">
+            <div className="flex flex-col items-center gap-3 bg-primary p-6 text-center text-primary-foreground sm:flex-row sm:gap-6 sm:text-start">
+              <div className="flex size-16 shrink-0 items-center justify-center rounded-[16px] bg-primary-foreground/15">
+                <Icon name="monitor_heart" size={36} fill />
+              </div>
+              <div className="flex-1">
+                <p className="text-lg font-bold">MedTravel</p>
+                <p className="text-sm text-primary-foreground/80">World-class healthcare, anywhere in the world. Compare verified providers and book online.</p>
+              </div>
+              {referralLink && (
+                <a
+                  href={referralLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded-full bg-primary-foreground px-5 py-2 text-sm font-semibold text-primary transition-all hover:scale-105"
+                >
+                  Find care now
+                </a>
+              )}
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">This is how your referral link appears when shared on social media with link previews.</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 /* =========================================================================

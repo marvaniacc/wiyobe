@@ -772,6 +772,8 @@ const en: Dict = {
   'affiliate.effectiveRate': 'Effective affiliate rate',
   'affiliate.baseRate': 'Base rate',
   'affiliate.bonus': 'Bonus',
+
+  'dash.affiliateMaterials': 'Promo materials',
 }
 
 const tr: Dict = {
@@ -1512,6 +1514,8 @@ const tr: Dict = {
   'affiliate.effectiveRate': 'Effective affiliate rate',
   'affiliate.baseRate': 'Base rate',
   'affiliate.bonus': 'Bonus',
+
+  'dash.affiliateMaterials': 'Promo materials',
 }
 
 const fa: Dict = {
@@ -2252,6 +2256,8 @@ const fa: Dict = {
   'affiliate.effectiveRate': 'Effective affiliate rate',
   'affiliate.baseRate': 'Base rate',
   'affiliate.bonus': 'Bonus',
+
+  'dash.affiliateMaterials': 'Promo materials',
 }
 
 const ar: Dict = {
@@ -2992,6 +2998,8 @@ const ar: Dict = {
   'affiliate.effectiveRate': 'Effective affiliate rate',
   'affiliate.baseRate': 'Base rate',
   'affiliate.bonus': 'Bonus',
+
+  'dash.affiliateMaterials': 'Promo materials',
 }
 
 export const DICTS: Record<Locale, Dict> = { en, tr, fa, ar }

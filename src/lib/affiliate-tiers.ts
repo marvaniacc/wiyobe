@@ -50,7 +50,7 @@ export function calculateTier(
 }
 
 // Check and auto-promote an affiliate's tier based on their current stats
-// Returns the new tier (or null if no change)
+// Returns the new tier (or null if no change). Sends a notification on promotion.
 export async function checkAndPromoteTier(affiliateId: string): Promise<AffiliateTier | null> {
   const affiliate = await db.affiliate.findUnique({ where: { id: affiliateId } })
   if (!affiliate) return null
@@ -67,6 +67,21 @@ export async function checkAndPromoteTier(affiliateId: string): Promise<Affiliat
         tierBonusRate: newConfig.bonusRate,
       },
     })
+
+    // Send notification to the affiliate about their promotion
+    const tierName = newTier.charAt(0) + newTier.slice(1).toLowerCase()
+    const oldTierName = affiliate.tier.charAt(0) + affiliate.tier.slice(1).toLowerCase()
+    await db.notification.create({
+      data: {
+        userId: affiliate.userId,
+        type: 'system',
+        title: `Tier promoted: ${tierName}! 🎉`,
+        body: `Congratulations! You've been promoted from ${oldTierName} to ${tierName} tier. Your affiliate bonus rate is now +${newConfig.bonusRate}%.`,
+        link: 'overview',
+        meta: { oldTier: affiliate.tier, newTier, bonusRate: newConfig.bonusRate },
+      },
+    })
+
     return newTier
   }
 

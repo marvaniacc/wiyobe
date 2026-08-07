@@ -92,6 +92,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'overview', labelKey: 'dash.affiliateOverview', icon: 'space_dashboard' },
     { key: 'referrals', labelKey: 'dash.referrals', icon: 'ads_click' },
     { key: 'analytics', labelKey: 'dash.affiliateAnalytics', icon: 'analytics' },
+    { key: 'materials', labelKey: 'dash.affiliateMaterials', icon: 'campaign' },
     { key: 'payouts', labelKey: 'dash.affiliatePayouts', icon: 'account_balance' },
     { key: 'profile', labelKey: 'dash.affiliateProfile', icon: 'account_circle' },
   ],
