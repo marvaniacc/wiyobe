@@ -157,24 +157,33 @@ export async function POST(req: Request) {
     }
 
     // Calculate commissions
-    // Base affiliate rate from CommissionRate + tier bonus rate from Affiliate.tierBonusRate
+    // The provider ALWAYS pays: platformRate% + affiliateRate% (fixed, regardless of tier)
+    // The tier bonus comes OUT OF the platform's share (platform gives part of its cut to the affiliate)
+    //
+    // Example: amount=$100, platform=12%, affiliate base=3%, Gold tier bonus=+2%
+    //   Provider pays: 12% + 3% = 15% → Provider gets $85
+    //   Affiliate gets: 3% + 2% = 5% → $5
+    //   Platform gets: 12% - 2% = 10% → $10 (gives 2% bonus to affiliate from its share)
+    //
+    // If no affiliate: Provider pays 12% + 3% = 15%, Platform keeps all 15%
     const tierBonus = affiliateRecord ? parseFloat(affiliateRecord.tierBonusRate || '0') : 0
-    const effectiveAffiliateRate = affiliateUserId
-      ? parseFloat(affiliateRate) + tierBonus
-      : parseFloat(affiliateRate) // no affiliate → platform keeps base + tier bonus
-    const totalAffiliateRate = affiliateUserId ? effectiveAffiliateRate : parseFloat(affiliateRate) + tierBonus
+    const baseAffiliateRate = parseFloat(affiliateRate)
 
-    // Platform gets platformRate%. Affiliate gets effectiveAffiliateRate% (base + tier bonus).
-    // If no affiliate: platform gets platformRate% + base affiliateRate% + tier bonus% (everything)
-    const platformCommission = (parseFloat(amount) * (parseFloat(platformRate) / 100)).toFixed(2)
-    const affiliateCommission = (parseFloat(amount) * (effectiveAffiliateRate / 100)).toFixed(2)
-    const totalPlatformCut = affiliateUserId
-      ? platformCommission
-      : (parseFloat(platformCommission) + parseFloat(affiliateCommission)).toFixed(2)
-    const providerNet = subDec(amount, affiliateUserId
-      ? (parseFloat(platformCommission) + parseFloat(affiliateCommission)).toFixed(2)
-      : totalPlatformCut
-    )
+    // Affiliate gets base rate + tier bonus
+    const effectiveAffiliateRate = baseAffiliateRate + tierBonus
+    const affiliateCommission = affiliateUserId
+      ? (parseFloat(amount) * (effectiveAffiliateRate / 100)).toFixed(2)
+      : '0'
+
+    // Platform gets its rate MINUS the tier bonus (bonus comes from platform's pocket)
+    // If no affiliate: platform gets its rate + the full affiliate base rate
+    const platformCut = affiliateUserId
+      ? (parseFloat(amount) * ((parseFloat(platformRate) - tierBonus) / 100)).toFixed(2)
+      : (parseFloat(amount) * ((parseFloat(platformRate) + baseAffiliateRate) / 100)).toFixed(2)
+
+    // Provider always gets: amount - platformRate% - affiliateBaseRate% (tier doesn't affect provider)
+    const totalCommissionFromProvider = (parseFloat(amount) * ((parseFloat(platformRate) + baseAffiliateRate) / 100)).toFixed(2)
+    const providerNet = subDec(amount, totalCommissionFromProvider)
 
     // video session URL for online visits — third-party embed/redirect (mock link)
     const videoSessionUrl = body.visitType === 'ONLINE'
@@ -197,7 +206,7 @@ export async function POST(req: Request) {
         endDate: body.endDate ? new Date(body.endDate) : null,
         amount: toDec(amount),
         commissionRate: platformRate,
-        commissionAmount: affiliateUserId ? platformCommission : totalPlatformCut,
+        commissionAmount: platformCut,
         affiliateRate: String(effectiveAffiliateRate),
         affiliateAmount: affiliateUserId ? affiliateCommission : '0',
         affiliateId: affiliateUserId,
@@ -237,8 +246,8 @@ export async function POST(req: Request) {
         type: 'COMMISSION',
         bookingId: booking.id,
         paymentId: payment.id,
-        amount: affiliateUserId ? platformCommission : totalPlatformCut,
-        description: `Platform commission (${platformRate}%${affiliateUserId ? '' : ` + ${affiliateRate}% affiliate (no referrer)`})`,
+        amount: platformCut,
+        description: `Platform commission (${platformRate}%${affiliateUserId ? ` - ${tierBonus}% tier bonus to affiliate` : ` + ${affiliateRate}% (no referrer)`})`,
       },
     ]
 
