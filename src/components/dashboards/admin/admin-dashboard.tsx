@@ -2211,17 +2211,8 @@ const AFFILIATE_TIER_CLS: Record<string, string> = {
 
 function AffiliatesSection() {
   const { t, locale } = useT()
-  const { data, loading, error, refetch } = useApi<{ affiliates: any[]; settings: any[] }>('/api/admin/affiliates')
+  const { data, loading, error, refetch } = useApi<{ affiliates: any[] }>('/api/admin/affiliates')
   const [busy, setBusy] = React.useState<string | null>(null)
-  const [tierRates, setTierRates] = React.useState<Record<string, string>>({})
-
-  React.useEffect(() => {
-    if (data?.settings) {
-      const map: Record<string, string> = {}
-      data.settings.forEach((s: any) => { map[s.tier] = s.commissionRate })
-      setTierRates(map)
-    }
-  }, [data?.settings])
 
   async function handleAction(affiliateId: string, action: string, extra?: any) {
     setBusy(affiliateId + action)
@@ -2232,69 +2223,26 @@ function AffiliatesSection() {
     } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
   }
 
-  async function saveSettings() {
-    setBusy('settings')
-    try {
-      const settings = Object.entries(tierRates).map(([tier, rate]) => ({ tier, commissionRate: rate }))
-      await apiPut('/api/admin/affiliates', { settings })
-      toast.success(t('admin.commissionSaved'))
-      refetch()
-    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
-  }
-
   if (loading) return <div className="flex flex-col gap-6"><PageHeader title={t('admin.affiliateManagement')} icon="campaign" /><LoadingCard lines={4} /></div>
   if (error) return <ErrorState message={error} onRetry={refetch} />
 
   const affiliates = data?.affiliates || []
   const pending = affiliates.filter((a: any) => !a.verified)
   const active = affiliates.filter((a: any) => a.verified)
-  const settings = data?.settings || []
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t('admin.affiliateManagement')} description={t('admin.affiliateManagementDesc')} icon="campaign" />
 
-      {/* Commission tier settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Icon name="percent" size={18} className="text-primary" />
-            {t('admin.affiliateSettings')}
-          </CardTitle>
-          <CardDescription>{t('admin.affiliateSettingsDesc')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'].map((tier) => {
-              const s = settings.find((x: any) => x.tier === tier)
-              return (
-                <div key={tier} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className={cn('flex size-8 items-center justify-center rounded-[8px]', AFFILIATE_TIER_CLS[tier])}>
-                      <Icon name="workspace_premium" size={16} fill />
-                    </div>
-                    <Label className="text-sm font-medium capitalize">{tier.toLowerCase()}</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      value={tierRates[tier] || s?.commissionRate || ''}
-                      onChange={(e) => setTierRates((prev) => ({ ...prev, [tier]: e.target.value }))}
-                      className="h-10"
-                      placeholder="10"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">Commission of platform fee</p>
-                </div>
-              )
-            })}
+      {/* Info banner: affiliate commission is set in Commission rates section */}
+      <Card className="border-primary/20 bg-primary/[0.02]">
+        <CardContent className="flex items-center gap-3 p-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+            <Icon name="info" size={20} fill />
           </div>
-          <div className="mt-4 flex justify-end">
-            <Button onClick={saveSettings} disabled={busy === 'settings'} className="gap-1.5">
-              {busy === 'settings' ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
-              {t('common.save')}
-            </Button>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground">Affiliate commission rates are configured per provider type</p>
+            <p className="text-xs text-muted-foreground">Go to <span className="font-medium text-primary">Commission rates</span> to set the platform % and affiliate % for each provider type. Tiers (Bronze/Silver/Gold/Platinum) are status badges only.</p>
           </div>
         </CardContent>
       </Card>
