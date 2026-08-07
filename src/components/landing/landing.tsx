@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { useApp } from '@/stores/app-store'
 import { Icon } from '@/components/shared/icon'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { AuthModal } from '@/components/landing/role-landing-page'
 
 const ROLE_PAGES = [
   { href: '/patients', icon: 'personal_injury', color: 'bg-blue-50 text-primary', label: 'Patient', desc: 'Find and book trusted medical care abroad' },
@@ -31,7 +33,16 @@ export function LandingPage() {
   const setLocale = useApp((s) => s.setLocale)
   const theme = useApp((s) => s.theme)
   const toggleTheme = useApp((s) => s.toggleTheme)
+  const setSession = useApp((s) => s.setSession)
+  const goDashboard = useApp((s) => s.goDashboard)
   const { t, dir } = useT()
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup')
+
+  function openAuth(m: 'signin' | 'signup') {
+    setAuthMode(m)
+    setAuthOpen(true)
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background" dir={dir}>
@@ -58,8 +69,8 @@ export function LandingPage() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button size="icon" variant="ghost" onClick={toggleTheme}><Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} size={20} /></Button>
-            <a href="/patients"><Button size="sm" variant="outline">{t('common.signin')}</Button></a>
-            <a href="/patients"><Button size="sm">{t('common.signup')}</Button></a>
+            <Button size="sm" variant="ghost" onClick={() => openAuth('signin')}>{t('common.signin')}</Button>
+            <Button size="sm" onClick={() => openAuth('signup')}>{t('common.signup')}</Button>
           </div>
         </div>
       </header>
@@ -80,8 +91,12 @@ export function LandingPage() {
               {t('landing.hero.subtitle')}
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <a href="/patients"><Button size="lg" className="w-full sm:w-auto"><Icon name="search" size={20} /> {t('landing.hero.cta')}</Button></a>
-              <a href="/doctors"><Button size="lg" variant="outline" className="w-full sm:w-auto">{t('common.signin')}</Button></a>
+              <Button size="lg" onClick={() => openAuth('signup')} className="w-full sm:w-auto">
+                <Icon name="search" size={20} /> {t('landing.hero.cta')}
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => openAuth('signin')} className="w-full sm:w-auto">
+                {t('common.signin')}
+              </Button>
             </div>
           </div>
 
@@ -126,7 +141,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* CTA strip */}
+      {/* CTA */}
       <section className="border-b border-divider">
         <div className="mx-auto max-w-7xl px-4 py-14 md:px-8">
           <div className="flex flex-col items-center justify-between gap-6 rounded-[24px] border border-divider bg-accent/40 p-8 md:flex-row md:p-10">
@@ -134,7 +149,9 @@ export function LandingPage() {
               <h2 className="text-2xl font-semibold text-foreground">{t('landing.hero.title')}</h2>
               <p className="mt-2 text-muted-foreground">{t('landing.hero.subtitle')}</p>
             </div>
-            <a href="/patients"><Button size="lg" className="shrink-0">{t('common.signup')} <Icon name="arrow_forward" size={18} className="rtl:rotate-180" /></Button></a>
+            <Button size="lg" onClick={() => openAuth('signup')} className="shrink-0">
+              {t('common.signup')} <Icon name="arrow_forward" size={18} className="rtl:rotate-180" />
+            </Button>
           </div>
         </div>
       </section>
@@ -163,6 +180,19 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Auth Popup Modal — patient signup/login from home page */}
+      <AuthModal
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        mode={authMode}
+        setMode={setAuthMode}
+        role="PATIENT"
+        onSuccess={(user) => {
+          setSession(user)
+          goDashboard('overview')
+        }}
+      />
     </div>
   )
 }

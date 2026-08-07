@@ -1,3 +1,4 @@
+// eslint-disable-next-line
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '@/stores/app-store'
