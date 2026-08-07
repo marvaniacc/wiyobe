@@ -2214,6 +2214,9 @@ function AffiliatesSection() {
   const { data, loading, error, refetch } = useApi<{ affiliates: any[]; tierSettings: any[] }>('/api/admin/affiliates')
   const [busy, setBusy] = React.useState<string | null>(null)
   const [tierForm, setTierForm] = React.useState<Record<string, { minReferrals: string; minEarnings: string; bonusRate: string }>>({})
+  const { data: payoutData, refetch: refetchPayouts } = useApi<{ balances: any[]; payouts: any[] }>('/api/admin/affiliate-payouts')
+  const [payDialog, setPayDialog] = React.useState<any | null>(null)
+  const [payRef, setPayRef] = React.useState('')
 
   React.useEffect(() => {
     if (data?.tierSettings) {
@@ -2246,6 +2249,27 @@ function AffiliatesSection() {
       await apiPut('/api/admin/affiliates', { tierSettings })
       toast.success(t('admin.tierSettingsSaved'))
       refetch()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
+  }
+
+  async function runAffiliatePayouts() {
+    setBusy('affPayouts')
+    try {
+      const res = await apiPost('/api/admin/affiliate-payouts', {})
+      toast.success(`Created ${res.count} affiliate payouts`)
+      refetchPayouts()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
+  }
+
+  async function markAffPayoutPaid() {
+    if (!payDialog) return
+    setBusy('payAff_' + payDialog.id)
+    try {
+      await apiPost('/api/admin/affiliate-payouts/pay', { payoutId: payDialog.id, reference: payRef || undefined })
+      toast.success('Payout marked as paid')
+      setPayDialog(null)
+      setPayRef('')
+      refetchPayouts()
     } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
   }
 
@@ -2458,6 +2482,110 @@ function AffiliatesSection() {
           )}
         </CardContent>
       </Card>
+
+      {/* Affiliate payouts section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="account_balance" size={18} className="text-primary" />
+              Affiliate payouts
+            </CardTitle>
+            <Button size="sm" variant="outline" onClick={runAffiliatePayouts} disabled={busy === 'affPayouts'} className="gap-1.5">
+              {busy === 'affPayouts' ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="playlist_add" size={14} />}
+              Run settlement batch
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {/* Affiliate balances */}
+          {payoutData?.balances && payoutData.balances.length > 0 && (
+            <div className="border-b border-divider p-4">
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Available balances</p>
+              <div className="space-y-2">
+                {payoutData.balances.map((b: any) => (
+                  <div key={b.id} className="flex items-center justify-between rounded-[12px] bg-surface-secondary/60 px-4 py-2.5">
+                    <div>
+                      <span className="text-sm font-medium text-foreground">{b.name}</span>
+                      <span className={cn('ms-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize', AFFILIATE_TIER_CLS[b.tier] || AFFILIATE_TIER_CLS.BRONZE)}>{b.tier.toLowerCase()}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-muted-foreground">Pending: <span className="font-medium text-foreground">{formatCurrency(b.pendingBalance, 'USD', locale)}</span></span>
+                      <span className="font-semibold text-success">{formatCurrency(b.availableBalance, 'USD', locale)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Payout history */}
+          {payoutData?.payouts && payoutData.payouts.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="ps-4 text-xs uppercase tracking-wide text-muted-foreground">Date</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Affiliate</TableHead>
+                  <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">Amount</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Status</TableHead>
+                  <TableHead className="pe-4 text-end text-xs uppercase tracking-wide text-muted-foreground">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payoutData.payouts.map((p: any) => (
+                  <TableRow key={p.id} className="border-divider">
+                    <TableCell className="ps-4 text-sm text-muted-foreground">{formatDate(p.createdAt, locale)}</TableCell>
+                    <TableCell className="text-sm font-medium text-foreground">{p.affiliate?.user?.name || '—'}</TableCell>
+                    <TableCell className="text-end text-sm font-semibold text-foreground tabular-nums">{formatCurrency(p.amount, 'USD', locale)}</TableCell>
+                    <TableCell>
+                      <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', p.status === 'COMPLETED' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning')}>
+                        {p.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="pe-4 text-end">
+                      {p.status === 'PENDING' && (
+                        <Button size="sm" variant="outline" onClick={() => { setPayDialog(p); setPayRef('') }} className="gap-1.5">
+                          <Icon name="payments" size={14} />
+                          Mark paid
+                        </Button>
+                      )}
+                      {p.reference && <span className="text-xs text-muted-foreground">{p.reference}</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="py-8 text-center text-sm text-muted-foreground">No affiliate payouts yet</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Mark payout paid dialog */}
+      <Dialog open={!!payDialog} onOpenChange={(o) => !o && setPayDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="payments" size={20} className="text-primary" />
+              Mark payout as paid
+            </DialogTitle>
+            <DialogDescription>
+              {payDialog?.affiliate?.user?.name} · {payDialog && formatCurrency(payDialog.amount, 'USD', locale)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Reference (optional)</Label>
+            <Input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="Bank transfer ref..." />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialog(null)}>Cancel</Button>
+            <Button onClick={markAffPayoutPaid} disabled={busy?.startsWith('payAff')} className="gap-1.5">
+              {busy?.startsWith('payAff') ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="check_circle" size={14} fill />}
+              Confirm paid
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
