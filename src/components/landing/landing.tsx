@@ -1,36 +1,32 @@
 'use client'
-import { useState } from 'react'
 import { useApp } from '@/stores/app-store'
 import { Icon } from '@/components/shared/icon'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useT } from '@/hooks/use-t'
 import { LOCALES, LOCALE_META, type Locale } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
-import { apiPost } from '@/hooks/use-api'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const ROLES = [
-  { role: 'PATIENT', icon: 'personal_injury', color: 'bg-blue-50 text-primary', labelKey: 'role.patient', descKey: 'landing.patientDesc' },
-  { role: 'DOCTOR', icon: 'medical_services', color: 'bg-green-50 text-success', labelKey: 'role.doctor', descKey: 'landing.doctorDesc' },
-  { role: 'HOSPITAL', icon: 'local_hospital', color: 'bg-amber-50 text-warning', labelKey: 'role.hospital', descKey: 'landing.hospitalDesc' },
-  { role: 'HOTEL', icon: 'hotel', color: 'bg-purple-50 text-[#9334E6]', labelKey: 'role.hotel', descKey: 'landing.hotelDesc' },
-  { role: 'TRANSLATOR', icon: 'translate', color: 'bg-red-50 text-error', labelKey: 'role.translator', descKey: 'landing.translatorDesc' },
-  { role: 'AFFILIATE', icon: 'campaign', color: 'bg-teal-50 text-[#007B83]', labelKey: 'role.affiliate', descKey: 'landing.affiliateDesc' },
+const ROLE_PAGES = [
+  { href: '/patients', icon: 'personal_injury', color: 'bg-blue-50 text-primary', label: 'Patient', desc: 'Find and book trusted medical care abroad' },
+  { href: '/doctors', icon: 'medical_services', color: 'bg-green-50 text-success', label: 'Doctor', desc: 'Reach international patients and grow your practice' },
+  { href: '/hospitals', icon: 'local_hospital', color: 'bg-amber-50 text-warning', label: 'Hospital', desc: 'Showcase your facility to a global audience' },
+  { href: '/hotels', icon: 'hotel', color: 'bg-purple-50 text-[#9334E6]', label: 'Hotel / Suite', desc: 'Host recovering patients and medical travelers' },
+  { href: '/translators', icon: 'translate', color: 'bg-red-50 text-error', label: 'Translator', desc: 'Bridge the language gap for medical travelers' },
+  { href: '/affiliates', icon: 'campaign', color: 'bg-teal-50 text-[#007B83]', label: 'Affiliate', desc: 'Earn commissions by referring patients' },
 ]
 
 const FEATURES = [
-  { icon: 'compare', titleKey: 'landing.feature.compare.title', descKey: 'landing.feature.compare.desc' },
-  { icon: 'lock', titleKey: 'landing.feature.secure.title', descKey: 'landing.feature.secure.desc' },
-  { icon: 'verified_user', titleKey: 'landing.feature.verified.title', descKey: 'landing.feature.verified.desc' },
-  { icon: 'language', titleKey: 'landing.feature.languages.title', descKey: 'landing.feature.languages.desc' },
+  { icon: 'compare', title: 'Compare prices & reviews', desc: 'See doctors, hospitals, hotels and translators side by side before you decide.' },
+  { icon: 'lock', title: 'Secure platform payments', desc: 'Every payment goes through us. Your money is protected until your service is complete.' },
+  { icon: 'verified_user', title: 'Verified providers', desc: 'Every doctor, hospital, hotel and translator is reviewed by our team.' },
+  { icon: 'language', title: 'Speak your language', desc: 'Full support in English, Turkish, Persian and Arabic — including right-to-left layouts.' },
 ]
 
 export function LandingPage() {
-  const goAuth = useApp((s) => s.goAuth)
+  const goLanding = useApp((s) => s.goLanding)
   const locale = useApp((s) => s.locale)
   const setLocale = useApp((s) => s.setLocale)
   const theme = useApp((s) => s.theme)
@@ -42,12 +38,12 @@ export function LandingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-30 border-b border-divider bg-surface/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
-          <div className="flex items-center gap-2.5">
+          <button onClick={goLanding} className="flex items-center gap-2.5">
             <div className="flex size-9 items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
               <Icon name="monitor_heart" size={22} fill />
             </div>
             <span className="text-lg font-semibold">{t('brand.name')}</span>
-          </div>
+          </button>
           <div className="flex items-center gap-1.5">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -62,8 +58,8 @@ export function LandingPage() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button size="icon" variant="ghost" onClick={toggleTheme}><Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} size={20} /></Button>
-            <Button variant="outline" onClick={() => goAuth('signin', 'PATIENT')} className="hidden sm:inline-flex">{t('common.signin')}</Button>
-            <Button onClick={() => goAuth('signup', 'PATIENT')}>{t('common.signup')}</Button>
+            <a href="/patients"><Button size="sm" variant="outline">{t('common.signin')}</Button></a>
+            <a href="/patients"><Button size="sm">{t('common.signup')}</Button></a>
           </div>
         </div>
       </header>
@@ -84,33 +80,29 @@ export function LandingPage() {
               {t('landing.hero.subtitle')}
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button size="lg" onClick={() => goAuth('signup', 'PATIENT')} className="w-full sm:w-auto">
-                <Icon name="search" size={20} /> {t('landing.hero.cta')}
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => goAuth('signin', 'PATIENT')} className="w-full sm:w-auto">
-                {t('common.signin')}
-              </Button>
+              <a href="/patients"><Button size="lg" className="w-full sm:w-auto"><Icon name="search" size={20} /> {t('landing.hero.cta')}</Button></a>
+              <a href="/doctors"><Button size="lg" variant="outline" className="w-full sm:w-auto">{t('common.signin')}</Button></a>
             </div>
           </div>
 
-          {/* Role chooser */}
+          {/* Role pages */}
           <div className="mx-auto mt-16 max-w-5xl">
-            <p className="mb-6 text-center text-sm font-medium uppercase tracking-wide text-muted-foreground">{t('landing.chooseRole')}</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {ROLES.map((r) => (
-                <button
-                  key={r.role}
-                  onClick={() => goAuth('signup', r.role)}
+            <p className="mb-6 text-center text-sm font-medium uppercase tracking-wide text-muted-foreground">Choose your role to get started</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {ROLE_PAGES.map((r) => (
+                <a
+                  key={r.href}
+                  href={r.href}
                   className="group flex flex-col items-center gap-3 rounded-[16px] border border-divider bg-surface p-5 text-center shadow-[0_1px_2px_rgba(60,64,67,0.06)] transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_4px_12px_rgba(26,115,232,0.12)]"
                 >
                   <div className={cn('flex size-12 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105', r.color)}>
                     <Icon name={r.icon} size={26} fill />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-foreground">{t(r.labelKey)}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{t(r.descKey)}</div>
+                    <div className="text-sm font-semibold text-foreground">{r.label}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{r.desc}</div>
                   </div>
-                </button>
+                </a>
               ))}
             </div>
           </div>
@@ -126,8 +118,8 @@ export function LandingPage() {
                 <div className="mb-4 flex size-11 items-center justify-center rounded-[12px] bg-primary/10 text-primary">
                   <Icon name={f.icon} size={24} fill />
                 </div>
-                <h3 className="text-base font-semibold text-foreground">{t(f.titleKey)}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{t(f.descKey)}</p>
+                <h3 className="text-base font-semibold text-foreground">{f.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -142,9 +134,7 @@ export function LandingPage() {
               <h2 className="text-2xl font-semibold text-foreground">{t('landing.hero.title')}</h2>
               <p className="mt-2 text-muted-foreground">{t('landing.hero.subtitle')}</p>
             </div>
-            <Button size="lg" onClick={() => goAuth('signup', 'PATIENT')} className="shrink-0">
-              {t('common.signup')} <Icon name="arrow_forward" size={18} className="rtl:rotate-180" />
-            </Button>
+            <a href="/patients"><Button size="lg" className="shrink-0">{t('common.signup')} <Icon name="arrow_forward" size={18} className="rtl:rotate-180" /></Button></a>
           </div>
         </div>
       </section>
@@ -161,9 +151,11 @@ export function LandingPage() {
               <span className="text-sm text-muted-foreground">· {t('brand.tagline')}</span>
             </div>
             <div className="flex gap-5 text-sm text-muted-foreground">
-              <span className="hover:text-foreground cursor-pointer">{t('footer.privacy')}</span>
-              <span className="hover:text-foreground cursor-pointer">{t('footer.terms')}</span>
-              <span className="hover:text-foreground cursor-pointer">{t('footer.support')}</span>
+              <a href="/patients" className="hover:text-foreground">Patients</a>
+              <a href="/doctors" className="hover:text-foreground">Doctors</a>
+              <a href="/hospitals" className="hover:text-foreground">Hospitals</a>
+              <a href="/hotels" className="hover:text-foreground">Hotels</a>
+              <a href="/affiliates" className="hover:text-foreground">Affiliates</a>
             </div>
           </div>
           <div className="mt-6 border-t border-divider pt-6 text-center text-xs text-muted-foreground">

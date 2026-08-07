@@ -106,6 +106,10 @@ model User {
   disputesResolved  Dispute[]    @relation("disputesResolved")
   affiliate         Affiliate?
   affiliateReferrals AffiliateClick[] @relation("affiliateReferrals")
+  kycDocuments      KycDocument[] @relation("kycDocuments")
+  kycReviewed       KycDocument[] @relation("kycReviewed")
+  ticketsRaised     Ticket[]    @relation("ticketsRaised")
+  ticketMessages    TicketMessage[] @relation("ticketMessages")
 }
 
 model OtpCode {
@@ -552,4 +556,77 @@ model AffiliateSetting {
   minEarnings     String         @default("0") // minimum total earnings to reach this tier
   bonusRate       String         @default("0") // bonus % added on top of base affiliate rate
   updatedAt       DateTime       @updatedAt
+}
+
+// ============================================================================
+// KYC (Know Your Customer) — Doctor document verification
+// ============================================================================
+
+enum KycStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model KycDocument {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("kycDocuments", fields: [userId], references: [id], onDelete: Cascade)
+  docType     String    // "medical_license" | "id_card" | "diploma" | "passport" | "other"
+  fileName    String
+  fileType    String
+  fileSize    Int
+  dataUrl     String    // base64 data URL
+  notes       String?
+  status      KycStatus @default(NOT_SUBMITTED)
+  adminNote   String?
+  reviewedById String?
+  reviewedBy  User?     @relation("kycReviewed", fields: [reviewedById], references: [id])
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ============================================================================
+// Support Tickets — users ↔ admin communication
+// ============================================================================
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation("ticketsRaised", fields: [userId], references: [id], onDelete: Cascade)
+  subject     String
+  description String
+  category    String         // "booking" | "payment" | "account" | "technical" | "other"
+  priority    TicketPriority @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+  messages    TicketMessage[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation("ticketMessages", fields: [senderId], references: [id])
+  message   String
+  isFromAdmin Boolean @default(false)
+  createdAt DateTime @default(now())
 }

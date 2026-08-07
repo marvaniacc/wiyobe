@@ -30,6 +30,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'documents', labelKey: 'dash.documents', icon: 'folder_shared' },
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
+    { key: 'tickets', labelKey: 'dash.tickets', icon: 'support_agent' },
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
   ],
   DOCTOR: [
@@ -37,6 +38,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'appointments', labelKey: 'dash.appointments', icon: 'event' },
     { key: 'services', labelKey: 'dash.services', icon: 'medical_services' },
     { key: 'availability', labelKey: 'dash.availability', icon: 'calendar_month' },
+    { key: 'kyc', labelKey: 'dash.kyc', icon: 'badge' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
     { key: 'analytics', labelKey: 'dash.analytics', icon: 'analytics' },
@@ -87,6 +89,8 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'ledger', labelKey: 'dash.ledger', icon: 'receipt_long' },
     { key: 'reports', labelKey: 'dash.reports', icon: 'analytics' },
     { key: 'affiliates', labelKey: 'admin.affiliates', icon: 'campaign' },
+    { key: 'kyc', labelKey: 'admin.kyc', icon: 'badge' },
+    { key: 'tickets', labelKey: 'admin.tickets', icon: 'support_agent' },
   ],
   AFFILIATE: [
     { key: 'overview', labelKey: 'dash.affiliateOverview', icon: 'space_dashboard' },
