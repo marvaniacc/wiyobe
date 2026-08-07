@@ -109,6 +109,21 @@ export async function POST(req: Request) {
       })
     }
 
+    // Send cancellation emails
+    const { sendEmail, bookingCancelledEmail } = await import('@/lib/email')
+    const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
+    const patientUser = await db.user.findUnique({ where: { id: booking.patientId }, select: { name: true, email: true } })
+    const providerUser = providerUserId ? await db.user.findUnique({ where: { id: providerUserId }, select: { name: true, email: true } }) : null
+
+    if (patientUser) {
+      const tpl = bookingCancelledEmail(patientUser.name || 'Patient', providerName, refundAmount)
+      await sendEmail({ to: patientUser.email, subject: tpl.subject, html: tpl.html })
+    }
+    if (providerUser) {
+      const tpl = bookingCancelledEmail(providerUser.name || 'Provider', patientUser?.name || 'Patient', refundAmount)
+      await sendEmail({ to: providerUser.email, subject: tpl.subject, html: tpl.html })
+    }
+
     return json({ booking: updated, refundAmount, feeRetained, withinFreeWindow })
   } catch (e) { return handleError(e) }
 }

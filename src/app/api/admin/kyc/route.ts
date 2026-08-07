@@ -59,7 +59,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Notify doctor
+    // Notify doctor (in-app + email)
     await db.notification.create({
       data: {
         userId: doc.userId,
@@ -71,6 +71,14 @@ export async function POST(req: Request) {
         link: 'kyc',
       },
     })
+
+    // Send email
+    const { sendEmail, kycStatusEmail } = await import('@/lib/email')
+    const doctorUser = await db.user.findUnique({ where: { id: doc.userId }, select: { name: true, email: true } })
+    if (doctorUser?.email) {
+      const tpl = kycStatusEmail(doctorUser.name || 'Doctor', doc.docType, body.action === 'approve', body.adminNote)
+      await sendEmail({ to: doctorUser.email, subject: tpl.subject, html: tpl.html })
+    }
 
     return json({ ok: true })
   } catch (e) { return handleError(e) }

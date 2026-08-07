@@ -339,6 +339,18 @@ export async function POST(req: Request) {
       meta: { bookingId: booking.id, amount: toDec(amount) },
     })
 
+    // Send confirmation emails
+    const { sendEmail, bookingConfirmationEmail } = await import('@/lib/email')
+    const bookingDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(booking.startDate))
+    const patientEmailTemplate = bookingConfirmationEmail(patientName, providerName, bookingDate, toDec(amount), body.visitType)
+    await sendEmail({ to: session.email, subject: patientEmailTemplate.subject, html: patientEmailTemplate.html })
+
+    const providerUser = await db.user.findUnique({ where: { id: providerUserId }, select: { email: true } })
+    if (providerUser) {
+      const providerEmailTemplate = bookingConfirmationEmail(providerName, patientName, bookingDate, toDec(amount), body.visitType)
+      await sendEmail({ to: providerUser.email, subject: providerEmailTemplate.subject, html: providerEmailTemplate.html })
+    }
+
     return json({ booking, payment }, 201)
   } catch (e) { return handleError(e) }
 }

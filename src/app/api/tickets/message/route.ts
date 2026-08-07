@@ -51,6 +51,17 @@ export async function POST(req: Request) {
       })
     }
 
+    // Send email notification
+    const { sendEmail, ticketReplyEmail } = await import('@/lib/email')
+    const recipientUser = isAdmin
+      ? await db.user.findUnique({ where: { id: ticket.userId }, select: { name: true, email: true } })
+      : await db.user.findFirst({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { name: true, email: true } })
+
+    if (recipientUser?.email) {
+      const tpl = ticketReplyEmail(recipientUser.name || 'User', ticket.subject, body.message)
+      await sendEmail({ to: recipientUser.email, subject: tpl.subject, html: tpl.html })
+    }
+
     return json({ message: msg }, 201)
   } catch (e) { return handleError(e) }
 }

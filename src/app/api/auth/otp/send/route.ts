@@ -74,14 +74,14 @@ export async function POST(req: Request) {
       },
     })
 
-    // Send email — uses SMTP if configured, otherwise logs to console
+    // Send email — uses SMTP if configured, otherwise logs to console (dev mode)
     const isDev = !process.env.SMTP_HOST
     if (isDev) {
       console.log(`\n🔐 OTP for ${body.email} (${body.purpose}): ${code}\n   Expires at ${expiresAt.toISOString()}\n`)
     } else {
-      // TODO: Send real email via SMTP when configured
-      // await sendEmail(body.email, 'Your MedTravel verification code', `Your code is: ${code}`)
-      console.log(`OTP email sent to ${body.email}`)
+      const { sendEmail, otpEmailTemplate } = await import('@/lib/email')
+      const template = otpEmailTemplate(code, body.purpose)
+      await sendEmail({ to: body.email, subject: template.subject, html: template.html })
     }
 
     // Only return devCode in development mode (no SMTP configured)

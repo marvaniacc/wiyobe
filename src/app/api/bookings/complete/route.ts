@@ -101,6 +101,15 @@ export async function POST(req: Request) {
       })
     }
 
+    // Send completion email to patient (prompt to review)
+    const { sendEmail, bookingCompletedEmail } = await import('@/lib/email')
+    const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
+    const patientUser = await db.user.findUnique({ where: { id: booking.patientId }, select: { name: true, email: true } })
+    if (patientUser) {
+      const tpl = bookingCompletedEmail(patientUser.name || 'Patient', providerName)
+      await sendEmail({ to: patientUser.email, subject: tpl.subject, html: tpl.html })
+    }
+
     return json({ booking: updated })
   } catch (e) { return handleError(e) }
 }

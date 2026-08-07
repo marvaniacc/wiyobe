@@ -82,6 +82,14 @@ export async function checkAndPromoteTier(affiliateId: string): Promise<Affiliat
       },
     })
 
+    // Send email
+    const { sendEmail, tierPromotionEmail } = await import('@/lib/email')
+    const affUser = await db.user.findUnique({ where: { id: affiliate.userId }, select: { name: true, email: true } })
+    if (affUser?.email) {
+      const tpl = tierPromotionEmail(affUser.name || 'Affiliate', oldTierName, tierName, newConfig.bonusRate)
+      await sendEmail({ to: affUser.email, subject: tpl.subject, html: tpl.html })
+    }
+
     return newTier
   }
 
