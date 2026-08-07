@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Icon } from '@/components/shared/icon'
 import { useT } from '@/hooks/use-t'
 import { useApi, apiPost, apiPut } from '@/hooks/use-api'
+import { TicketsSection } from '@/components/shared/tickets-section'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -1802,6 +1803,8 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'reports': return <ReportsSection />
     case 'disputes': return <DisputesSection />
     case 'affiliates': return <AffiliatesSection />
+    case 'kyc': return <AdminKycSection />
+    case 'tickets': return <AdminTicketsSection />
     default: return <OverviewSection />
   }
 }
@@ -2591,4 +2594,109 @@ function AffiliatesSection() {
       </Dialog>
     </div>
   )
+}
+
+// ============================================================================
+// Admin KYC section — review doctor identity documents
+// ============================================================================
+
+const KYC_DOC_TYPES: Record<string, { icon: string; cls: string; label: string }> = {
+  medical_license: { icon: 'medical_information', cls: 'bg-primary/10 text-primary', label: 'Medical License' },
+  id_card: { icon: 'badge', cls: 'bg-warning/10 text-warning', label: 'ID Card' },
+  diploma: { icon: 'school', cls: 'bg-success/10 text-success', label: 'Diploma' },
+  passport: { icon: 'passport', cls: 'bg-info/10 text-info', label: 'Passport' },
+  other: { icon: 'description', cls: 'bg-muted text-muted-foreground', label: 'Other' },
+}
+
+function AdminKycSection() {
+  const { t, locale } = useT()
+  const [tick, setTick] = React.useState(0)
+  const { data, loading, error, refetch } = useApi<{ documents: any[] }>('/api/admin/kyc', { deps: [tick] })
+  const [busy, setBusy] = React.useState<string | null>(null)
+
+  async function handleReview(docId: string, action: 'approve' | 'reject') {
+    setBusy(docId + action)
+    try {
+      await apiPost('/api/admin/kyc', { documentId: docId, action })
+      toast.success(action === 'approve' ? 'Document approved' : 'Document rejected')
+      setTick(x => x + 1); refetch()
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
+  }
+
+  if (loading) return <div className="flex flex-col gap-6"><PageHeader title={t('kyc.adminTitle')} icon="badge" /><LoadingCard lines={4} /></div>
+  if (error) return <ErrorState message={error} onRetry={refetch} />
+
+  const docs = data?.documents || []
+  const pending = docs.filter((d: any) => d.status === 'PENDING')
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t('kyc.adminTitle')} description={t('kyc.adminDesc')} icon="badge" />
+
+      {pending.length > 0 && (
+        <Card className="border-warning/20 bg-warning/[0.02]">
+          <CardContent className="flex items-center gap-3 p-4">
+            <Icon name="hourglass_top" size={20} className="text-warning" fill />
+            <p className="text-sm font-medium text-foreground">{pending.length} document{pending.length === 1 ? '' : 's'} pending review</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {docs.length === 0 ? (
+        <EmptyState icon="badge" title="No KYC documents" description="No doctors have submitted verification documents yet." />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {docs.map((doc: any) => {
+            const cfg = KYC_DOC_TYPES[doc.docType] || KYC_DOC_TYPES.other
+            return (
+              <Card key={doc.id} className="gap-0">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px]', cfg.cls)}>
+                      <Icon name={cfg.icon} size={20} fill />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{doc.user?.name || '—'}</p>
+                      <p className="text-xs text-muted-foreground">{doc.user?.email}</p>
+                      {doc.user?.doctor?.specialty && <p className="text-xs text-muted-foreground">{doc.user.doctor.specialty}</p>}
+                      <p className="mt-1 text-xs font-medium text-foreground">{cfg.label}</p>
+                      <p className="truncate text-xs text-muted-foreground">{doc.fileName} · {relativeTime(doc.createdAt, locale)}</p>
+                      {doc.adminNote && <p className="mt-1 text-xs text-error">{doc.adminNote}</p>}
+                    </div>
+                    <span className={cn('inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                      doc.status === 'APPROVED' ? 'bg-success/10 text-success border-success/20' :
+                      doc.status === 'PENDING' ? 'bg-warning/10 text-warning border-warning/20' :
+                      doc.status === 'REJECTED' ? 'bg-error/10 text-error border-error/20' :
+                      'bg-muted text-muted-foreground border-divider')}>
+                      {doc.status}
+                    </span>
+                  </div>
+                  {doc.status === 'PENDING' && (
+                    <div className="mt-3 flex gap-2">
+                      <Button size="sm" variant="success" onClick={() => handleReview(doc.id, 'approve')} disabled={!!busy} className="gap-1.5 flex-1">
+                        <Icon name="check_circle" size={14} fill />
+                        Approve
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleReview(doc.id, 'reject')} disabled={!!busy} className="gap-1.5 flex-1 text-error hover:bg-error/5">
+                        <Icon name="cancel" size={14} />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Admin Tickets section — uses shared TicketsSection with isAdmin=true
+// ============================================================================
+
+function AdminTicketsSection() {
+  return <TicketsSection isAdmin={true} />
 }

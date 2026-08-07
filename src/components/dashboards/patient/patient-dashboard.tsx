@@ -35,6 +35,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { downloadICal } from '@/lib/ical'
+import { TicketsSection } from '@/components/shared/tickets-section'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
 import { Progress } from '@/components/ui/progress'
 
@@ -3291,6 +3292,7 @@ export function PatientDashboard({ section }: { section: string }) {
     case 'documents': return <DocumentsSection />
     case 'disputes': return <PatientDisputesSection />
     case 'reviews': return <ReviewsSection />
+    case 'tickets': return <TicketsSection />
     case 'profile': return <ProfileSection />
     default: return <OverviewSection />
   }
