@@ -59,6 +59,18 @@ export async function POST(req: Request) {
       await db.slot.update({ where: { id: booking.slotId }, data: { isBooked: false } })
     }
 
+    // Process refund through Stripe if configured
+    if (booking.payment?.stripeChargeId && !booking.payment.stripeChargeId.startsWith('ch_mock_')) {
+      const { refundPayment } = await import('@/lib/stripe')
+      const refund = await refundPayment(
+        booking.payment.stripeChargeId,
+        parseFloat(refundAmount)
+      )
+      if (refund) {
+        console.log(`Refund processed: ${refund.id} for $${refund.amount}`)
+      }
+    }
+
     const updated = await db.booking.update({
       where: { id: booking.id },
       data: {

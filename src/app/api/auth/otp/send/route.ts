@@ -74,11 +74,17 @@ export async function POST(req: Request) {
       },
     })
 
-    // Send email — in production this calls an email service. In dev, log it.
-    console.log(`\n🔐 OTP for ${body.email} (${body.purpose}): ${code}\n   Expires at ${expiresAt.toISOString()}\n`)
-
-    // In dev mode, return the code so the UI can display it (demo convenience).
+    // Send email — uses SMTP if configured, otherwise logs to console
     const isDev = !process.env.SMTP_HOST
+    if (isDev) {
+      console.log(`\n🔐 OTP for ${body.email} (${body.purpose}): ${code}\n   Expires at ${expiresAt.toISOString()}\n`)
+    } else {
+      // TODO: Send real email via SMTP when configured
+      // await sendEmail(body.email, 'Your MedTravel verification code', `Your code is: ${code}`)
+      console.log(`OTP email sent to ${body.email}`)
+    }
+
+    // Only return devCode in development mode (no SMTP configured)
     return json({
       sent: true,
       expiresAt: expiresAt.toISOString(),

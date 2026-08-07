@@ -147,15 +147,6 @@ export function AuthModal({ open, onOpenChange, mode, setMode, role, onSuccess }
             {mode === 'signin' ? t('common.signup') : t('common.signin')}
           </button>
         </div>
-
-        {mode === 'signin' && (
-          <div className="rounded-[14px] border border-divider bg-surface-secondary/50 p-3 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">Demo accounts</p>
-            <p>admin@medtravel.com / admin123</p>
-            <p>patient@medtravel.com / patient123</p>
-            <p>doctor@medtravel.com / doctor123</p>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   )

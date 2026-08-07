@@ -222,14 +222,30 @@ export async function POST(req: Request) {
       await db.slot.update({ where: { id: slot.id }, data: { isBooked: true } })
     }
 
-    // Payment — platform's own Stripe account charge (mock for MVP; real Stripe keys absent)
-    // In production this is where stripe.paymentIntents.create / charges.create runs.
+    // Payment — real Stripe charge if configured, otherwise mock for dev
+    const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
+    let stripeChargeId = `ch_mock_${booking.id.slice(-8)}`
+    let paymentStatus = 'SUCCEEDED'
+
+    if (isStripeConfigured()) {
+      const charge = await createCharge(
+        parseFloat(amount),
+        'usd',
+        `MedTravel booking - ${providerName} - ${body.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`,
+        { bookingId: booking.id, patientId: session.id, providerType: pt }
+      )
+      if (charge) {
+        stripeChargeId = charge.id
+        paymentStatus = charge.status === 'succeeded' ? 'SUCCEEDED' : 'PENDING'
+      }
+    }
+
     const payment = await db.payment.create({
       data: {
         bookingId: booking.id,
-        stripeChargeId: `ch_mock_${booking.id.slice(-8)}`,
+        stripeChargeId,
         amount: toDec(amount),
-        status: 'SUCCEEDED',
+        status: paymentStatus as any,
       },
     })
 
