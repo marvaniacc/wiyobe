@@ -78,7 +78,7 @@ interface AdminStats {
   dailyRevenue: Array<{ date: string; amount: number }>
 }
 
-interface CommissionRate { id: string; providerType: ProviderType; rate: string }
+interface CommissionRate { id: string; providerType: ProviderType; rate: string; affiliateRate: string }
 interface CancellationPolicy {
   id: string
   providerType: ProviderType
@@ -873,20 +873,23 @@ function CommissionSection() {
   const { t, locale } = useT()
   const { data, loading, error, refetch } = useApi<{ rates: CommissionRate[] }>('/api/admin/commission')
   const [rates, setRates] = React.useState<Record<ProviderType, string>>({ DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' })
+  const [affRates, setAffRates] = React.useState<Record<ProviderType, string>>({ DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' })
   const [saving, setSaving] = React.useState(false)
 
   React.useEffect(() => {
     if (data?.rates) {
       const map: Record<ProviderType, string> = { DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' }
-      data.rates.forEach((r) => { map[r.providerType] = r.rate })
+      const affMap: Record<ProviderType, string> = { DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' }
+      data.rates.forEach((r) => { map[r.providerType] = r.rate; affMap[r.providerType] = r.affiliateRate })
       setRates(map)
+      setAffRates(affMap)
     }
   }, [data])
 
   async function save() {
     setSaving(true)
     try {
-      const payload = { rates: (Object.keys(rates) as ProviderType[]).map((pt) => ({ providerType: pt, rate: rates[pt] || '0' })) }
+      const payload = { rates: (Object.keys(rates) as ProviderType[]).map((pt) => ({ providerType: pt, rate: rates[pt] || '0', affiliateRate: affRates[pt] || '0' })) }
       await apiPut('/api/admin/commission', payload)
       toast.success(t('admin.commissionUpdated'))
       refetch()
@@ -919,32 +922,54 @@ function CommissionSection() {
             <CardTitle className="text-base">{t('admin.commissionTitle')}</CardTitle>
             <CardDescription>{t('admin.commissionDesc')}</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {types.map((pt) => (
-              <div key={pt} className="flex flex-col gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
-                    <Icon name={iconFor(pt)} size={22} fill />
+          <CardContent className="flex flex-col gap-4">
+            {/* Header row */}
+            <div className="hidden grid-cols-[1fr_120px_120px_60px] items-center gap-3 px-1 sm:grid">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Provider type</span>
+              <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Platform %</span>
+              <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Affiliate %</span>
+              <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</span>
+            </div>
+
+            {types.map((pt) => {
+              const platform = parseFloat(rates[pt]) || 0
+              const affiliate = parseFloat(affRates[pt]) || 0
+              const total = platform + affiliate
+              return (
+                <div key={pt} className="grid grid-cols-1 items-center gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:grid-cols-[1fr_120px_120px_60px]">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+                      <Icon name={iconFor(pt)} size={22} fill />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</p>
+                      <p className="text-xs text-muted-foreground">Total: {total}%</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</p>
-                    <p className="text-xs text-muted-foreground">{t('admin.currentRate')}: {rates[pt] || '0'}%</p>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" min="0" max="100" step="0.5"
+                      value={rates[pt]}
+                      onChange={(e) => setRates((s) => ({ ...s, [pt]: e.target.value }))}
+                      className="h-10 text-end"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" min="0" max="100" step="0.5"
+                      value={affRates[pt]}
+                      onChange={(e) => setAffRates((s) => ({ ...s, [pt]: e.target.value }))}
+                      className="h-10 text-end"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-lg font-bold text-foreground tabular-nums">{total}%</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.5"
-                    value={rates[pt]}
-                    onChange={(e) => setRates((s) => ({ ...s, [pt]: e.target.value }))}
-                    className="h-10 w-32 text-end"
-                  />
-                  <span className="text-sm font-medium text-muted-foreground">%</span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
             <div className="flex justify-end pt-2">
               <Button onClick={save} disabled={saving} className="gap-1.5">
                 <Icon name="save" size={16} /> {t('admin.saveRates')}
@@ -953,20 +978,39 @@ function CommissionSection() {
           </CardContent>
         </Card>
 
+        {/* Info card explaining the commission system */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{t('admin.currentRate')}</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="info" size={18} className="text-primary" />
+              How it works
+            </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {types.map((pt) => (
-              <div key={pt} className="flex items-center justify-between rounded-[12px] bg-surface-secondary/60 px-4 py-3">
-                <span className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</span>
-                <span className="text-lg font-semibold text-primary">{rates[pt] || '0'}%</span>
-              </div>
-            ))}
-            <p className="pt-1 text-xs text-muted-foreground">
-              {formatCurrency('0', 'USD', locale).replace(/[\d.,]+$/, '')} — {t('admin.commissionDesc')}
-            </p>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex items-start gap-2">
+              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
+              <span>Platform % goes to the platform from each booking.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
+              <span>Affiliate % goes to the affiliate who referred the patient or provider.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
+              <span>If no affiliate referred the user, the affiliate share goes to the platform.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
+              <span>Total % is deducted from the booking amount; the provider receives the rest.</span>
+            </div>
+            <Separator className="my-2" />
+            <div className="rounded-[12px] bg-surface-secondary p-3">
+              <p className="text-xs font-medium text-foreground">Example</p>
+              <p className="mt-1 text-xs">Booking: $100, Platform: 12%, Affiliate: 3%</p>
+              <p className="text-xs">Platform gets: $12 · Affiliate gets: $3</p>
+              <p className="text-xs">Provider receives: $85</p>
+              <p className="mt-1 text-xs text-muted-foreground">If no affiliate: Platform gets $15, Provider gets $85</p>
+            </div>
           </CardContent>
         </Card>
       </div>

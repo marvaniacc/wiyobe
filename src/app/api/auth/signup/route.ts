@@ -27,6 +27,7 @@ const signupSchema = z.object({
   languages: z.string().optional(),
   website: z.string().optional(),
   socialMedia: z.string().optional(),
+  referralCode: z.string().optional(),
 })
 
 export async function POST(req: Request) {
@@ -97,6 +98,30 @@ export async function POST(req: Request) {
           socialMedia: body.socialMedia,
         },
       })
+    }
+
+    // Process referral code — link new user to the affiliate who referred them
+    if (body.referralCode && body.role !== 'AFFILIATE' && body.role !== 'ADMIN') {
+      const affiliate = await db.affiliate.findUnique({
+        where: { referralCode: body.referralCode },
+      })
+      if (affiliate && affiliate.verified) {
+        const latestClick = await db.affiliateClick.findFirst({
+          where: { affiliateId: affiliate.id, status: 'CLICKED' },
+          orderBy: { clickedAt: 'desc' },
+        })
+        if (latestClick) {
+          await db.affiliateClick.update({
+            where: { id: latestClick.id },
+            data: { referredUserId: user.id, status: 'SIGNED_UP', convertedAt: new Date() },
+          })
+        } else {
+          await db.affiliateClick.create({
+            data: { affiliateId: affiliate.id, referredUserId: user.id, status: 'SIGNED_UP', convertedAt: new Date() },
+          })
+        }
+        await db.affiliate.update({ where: { id: affiliate.id }, data: { totalSignups: { increment: 1 } } })
+      }
     }
 
     if (status === 'ACTIVE') {

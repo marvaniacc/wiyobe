@@ -135,10 +135,12 @@ export function AuthScreen() {
     try {
       const payload: any = { email, purpose }
       if (purpose === 'signup') {
+        const refCode = typeof window !== 'undefined' ? localStorage.getItem('mt_ref_code') : null
         payload.signupData = {
           role, name, password, preferredLanguage: locale, country, city,
           ...(role === 'DOCTOR' || role === 'TRANSLATOR' ? { languages: languages || locale } : {}),
           ...(role === 'DOCTOR' ? { specialty } : {}),
+          ...(refCode ? { referralCode: refCode } : {}),
         }
       }
       const res = await apiPost('/api/auth/otp/send', payload)

@@ -56,6 +56,7 @@ enum PaymentStatus {
 enum LedgerType {
   PATIENT_CHARGE
   COMMISSION
+  AFFILIATE_COMMISSION
   PROVIDER_CREDIT
   PROVIDER_DEBIT
   REFUND_PATIENT
@@ -313,9 +314,12 @@ model Booking {
   endDate            DateTime?
   amount             String        @default("0")
   currency           String        @default("USD")
-  commissionRate     String        @default("0")
-  commissionAmount   String        @default("0")
-  providerNetAmount  String        @default("0")
+  commissionRate     String        @default("0")       // platform commission %
+  commissionAmount   String        @default("0")       // platform commission $
+  affiliateRate      String        @default("0")       // affiliate commission %
+  affiliateAmount    String        @default("0")       // affiliate commission $
+  affiliateId        String?       // affiliate user id who earns (null = no affiliate, platform keeps both)
+  providerNetAmount  String        @default("0")       // provider receives = amount - platform - affiliate
   videoSessionUrl    String?
   notes              String?
   cancellationReason String?
@@ -400,7 +404,8 @@ model Review {
 model CommissionRate {
   id           String       @id @default(cuid())
   providerType ProviderType @unique
-  rate         String       @default("15") // percentage
+  rate         String       @default("12") // platform commission percentage
+  affiliateRate String      @default("3")  // affiliate commission percentage (from provider revenue, not platform share)
   updatedAt    DateTime     @updatedAt
 }
 

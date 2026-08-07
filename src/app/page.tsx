@@ -53,6 +53,25 @@ export default function Home() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Handle ?ref=CODE affiliate referral tracking
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const refCode = params.get('ref')
+    if (refCode) {
+      // Store referral code for signup
+      localStorage.setItem('mt_ref_code', refCode)
+      // Track the click (fire and forget)
+      fetch('/api/affiliate/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referralCode: refCode }),
+      }).catch(() => {})
+      // Clean URL (remove ref param)
+      const newUrl = window.location.pathname + window.location.hash
+      window.history.replaceState({}, document.title, newUrl)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // sync locale from session once
   useEffect(() => {
     if (session?.preferredLanguage) setLocale(session.preferredLanguage as Locale)

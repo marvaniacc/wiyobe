@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
-import { getCommissionRate, resolveProviderUser, recordPaymentLedger } from '@/lib/ledger'
+import { resolveProviderUser } from '@/lib/ledger'
 import { notify } from '@/lib/notify'
 import { toDec, mulDec, subDec } from '@/lib/money'
 import { z } from 'zod'
@@ -121,9 +121,52 @@ export async function POST(req: Request) {
       if (!slot || slot.isBooked) return error(409, 'This slot is no longer available')
     }
 
-    const commissionRate = await getCommissionRate(pt)
-    const commissionAmount = (parseFloat(amount) * (parseFloat(commissionRate) / 100)).toFixed(2)
-    const providerNet = subDec(amount, commissionAmount)
+    // Get commission rates (platform + affiliate) for this provider type
+    const commissionRateRow = await db.commissionRate.findUnique({ where: { providerType: pt } })
+    const platformRate = commissionRateRow?.rate || '12'
+    const affiliateRate = commissionRateRow?.affiliateRate || '3'
+
+    // Check if the provider was referred by an affiliate
+    let affiliateUserId: string | null = null
+    let affiliateClickId: string | null = null
+
+    // Check provider's referral
+    const providerAffClick = await db.affiliateClick.findFirst({
+      where: { referredUserId: providerUserId, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
+      include: { affiliate: true },
+      orderBy: { clickedAt: 'desc' },
+    })
+
+    if (providerAffClick?.affiliate) {
+      affiliateUserId = providerAffClick.affiliate.userId
+      affiliateClickId = providerAffClick.id
+    } else {
+      // Check patient's referral
+      const patientAffClick = await db.affiliateClick.findFirst({
+        where: { referredUserId: session.id, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
+        include: { affiliate: true },
+        orderBy: { clickedAt: 'desc' },
+      })
+      if (patientAffClick?.affiliate) {
+        affiliateUserId = patientAffClick.affiliate.userId
+        affiliateClickId = patientAffClick.id
+      }
+    }
+
+    // Calculate commissions
+    // If affiliate exists: platform gets platformRate%, affiliate gets affiliateRate%
+    // If no affiliate: platform gets (platformRate + affiliateRate)%
+    const platformCommission = (parseFloat(amount) * (parseFloat(platformRate) / 100)).toFixed(2)
+    const affiliateCommission = affiliateUserId
+      ? (parseFloat(amount) * (parseFloat(affiliateRate) / 100)).toFixed(2)
+      : (parseFloat(amount) * (parseFloat(affiliateRate) / 100)).toFixed(2) // still calculated but goes to platform
+    const totalPlatformCut = affiliateUserId
+      ? platformCommission                          // affiliate exists: platform only gets its own rate
+      : (parseFloat(platformCommission) + parseFloat(affiliateCommission)).toFixed(2) // no affiliate: platform gets both
+    const providerNet = subDec(amount, affiliateUserId
+      ? (parseFloat(platformCommission) + parseFloat(affiliateCommission)).toFixed(2)
+      : totalPlatformCut
+    )
 
     // video session URL for online visits — third-party embed/redirect (mock link)
     const videoSessionUrl = body.visitType === 'ONLINE'
@@ -145,8 +188,11 @@ export async function POST(req: Request) {
         startDate: new Date(body.startDate),
         endDate: body.endDate ? new Date(body.endDate) : null,
         amount: toDec(amount),
-        commissionRate,
-        commissionAmount,
+        commissionRate: platformRate,
+        commissionAmount: affiliateUserId ? platformCommission : totalPlatformCut,
+        affiliateRate,
+        affiliateAmount: affiliateUserId ? affiliateCommission : '0',
+        affiliateId: affiliateUserId,
         providerNetAmount: providerNet,
         videoSessionUrl,
         notes: body.notes,
@@ -170,15 +216,68 @@ export async function POST(req: Request) {
       },
     })
 
-    // Ledger entries
-    await recordPaymentLedger({
+    // Ledger entries — PATIENT_CHARGE, COMMISSION (platform), AFFILIATE_COMMISSION (if affiliate), PROVIDER_CREDIT
+    const ledgerEntries: any[] = [
+      {
+        type: 'PATIENT_CHARGE',
+        bookingId: booking.id,
+        paymentId: payment.id,
+        amount: toDec(amount),
+        description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}`,
+      },
+      {
+        type: 'COMMISSION',
+        bookingId: booking.id,
+        paymentId: payment.id,
+        amount: affiliateUserId ? platformCommission : totalPlatformCut,
+        description: `Platform commission (${platformRate}%${affiliateUserId ? '' : ` + ${affiliateRate}% affiliate (no referrer)`})`,
+      },
+    ]
+
+    // Affiliate commission entry (only if affiliate exists)
+    if (affiliateUserId) {
+      ledgerEntries.push({
+        type: 'AFFILIATE_COMMISSION',
+        bookingId: booking.id,
+        paymentId: payment.id,
+        userId: affiliateUserId,
+        amount: affiliateCommission,
+        description: `Affiliate commission (${affiliateRate}%) for referral`,
+      })
+
+      // Update affiliate click status and earnings
+      if (affiliateClickId) {
+        await db.affiliateClick.update({
+          where: { id: affiliateClickId },
+          data: { status: 'BOOKED', bookingId: booking.id, commissionAmount: affiliateCommission, convertedAt: new Date() },
+        })
+      }
+      // Update affiliate aggregate stats
+      await db.affiliate.update({
+        where: { userId: affiliateUserId },
+        data: {
+          totalBookings: { increment: 1 },
+          totalEarnings: (parseFloat(affiliateCommission) + parseFloat(
+            (await db.affiliate.findUnique({ where: { userId: affiliateUserId }, select: { totalEarnings: true } }))?.totalEarnings || '0'
+          )).toFixed(2),
+          pendingBalance: (parseFloat(affiliateCommission) + parseFloat(
+            (await db.affiliate.findUnique({ where: { userId: affiliateUserId }, select: { pendingBalance: true } }))?.pendingBalance || '0'
+          )).toFixed(2),
+        },
+      })
+    }
+
+    // Provider credit (net amount after both commissions)
+    ledgerEntries.push({
+      type: 'PROVIDER_CREDIT',
       bookingId: booking.id,
       paymentId: payment.id,
-      amount: toDec(amount),
-      commissionRate,
-      providerUserId,
-      description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}`,
+      userId: providerUserId,
+      amount: providerNet,
+      description: 'Provider credit (pending until service completion)',
     })
+
+    await db.ledgerEntry.createMany({ data: ledgerEntries })
 
     // Notifications — notify both patient and provider
     const patientUser = await db.user.findUnique({ where: { id: session.id }, select: { name: true } })

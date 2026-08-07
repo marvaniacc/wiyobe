@@ -22,6 +22,7 @@ const schema = z.object({
     city: z.string().optional(),
     specialty: z.string().optional(),
     languages: z.string().optional(),
+    referralCode: z.string().optional(),
   }).optional(),
 })
 

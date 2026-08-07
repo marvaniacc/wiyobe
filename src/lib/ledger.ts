@@ -2,10 +2,13 @@ import { db } from '@/lib/db'
 import { addDec, mulDec, subDec } from '@/lib/money'
 import type { ProviderType } from '@prisma/client'
 
-// Get commission rate for a provider type
-export async function getCommissionRate(pt: ProviderType): Promise<string> {
+// Get commission rates (platform + affiliate) for a provider type
+export async function getCommissionRate(pt: ProviderType): Promise<{ platformRate: string; affiliateRate: string }> {
   const cr = await db.commissionRate.findUnique({ where: { providerType: pt } })
-  return cr?.rate ?? '15'
+  return {
+    platformRate: cr?.rate ?? '12',
+    affiliateRate: cr?.affiliateRate ?? '3',
+  }
 }
 
 export async function getCancellationPolicy(pt: ProviderType) {

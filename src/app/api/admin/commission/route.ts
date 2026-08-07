@@ -15,7 +15,11 @@ export async function GET() {
 }
 
 const updateSchema = z.object({
-  rates: z.array(z.object({ providerType: z.enum(['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']), rate: z.string() })),
+  rates: z.array(z.object({
+    providerType: z.enum(['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']),
+    rate: z.string(),
+    affiliateRate: z.string(),
+  })),
 })
 
 export async function PUT(req: Request) {
@@ -26,8 +30,8 @@ export async function PUT(req: Request) {
     for (const r of body.rates) {
       await db.commissionRate.upsert({
         where: { providerType: r.providerType },
-        update: { rate: r.rate },
-        create: { providerType: r.providerType, rate: r.rate },
+        update: { rate: r.rate, affiliateRate: r.affiliateRate },
+        create: { providerType: r.providerType, rate: r.rate, affiliateRate: r.affiliateRate },
       })
     }
     const rates = await db.commissionRate.findMany()

@@ -121,6 +121,42 @@ export async function POST(req: Request) {
         })
       }
 
+      // Process referral code — link new user to the affiliate who referred them
+      if (data.referralCode && data.role !== 'AFFILIATE' && data.role !== 'ADMIN') {
+        const affiliate = await db.affiliate.findUnique({
+          where: { referralCode: data.referralCode },
+        })
+        if (affiliate && affiliate.verified) {
+          // Find the latest CLICKED click from this affiliate and update it
+          const latestClick = await db.affiliateClick.findFirst({
+            where: { affiliateId: affiliate.id, status: 'CLICKED' },
+            orderBy: { clickedAt: 'desc' },
+          })
+          if (latestClick) {
+            await db.affiliateClick.update({
+              where: { id: latestClick.id },
+              data: { referredUserId: user.id, status: 'SIGNED_UP', convertedAt: new Date() },
+            })
+          } else {
+            // Create a new click record if none exists (direct signup with code)
+            await db.affiliateClick.create({
+              data: {
+                affiliateId: affiliate.id,
+                referredUserId: user.id,
+                status: 'SIGNED_UP',
+                convertedAt: new Date(),
+              },
+            })
+          }
+          // Increment affiliate signup count
+          await db.affiliate.update({
+            where: { id: affiliate.id },
+            data: { totalSignups: { increment: 1 } },
+          })
+        }
+        // Clear the referral code from storage (client-side, but we can't do that here)
+      }
+
       if (status === 'ACTIVE') {
         await setSessionCookie(user.id, user.role)
       }
