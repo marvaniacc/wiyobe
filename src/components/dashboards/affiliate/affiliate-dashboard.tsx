@@ -187,6 +187,50 @@ function OverviewSection() {
                 <Icon name="ticket" size={12} />
                 {t('affiliate.referralCode')}: <span className="font-mono font-semibold text-foreground">{s.referralCode}</span>
               </div>
+
+              {/* Social share buttons */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">Share:</span>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`Find trusted medical care abroad with MedTravel! ${referralLink}`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex size-8 items-center justify-center rounded-full bg-[#25D366]/10 text-[#25D366] transition-all hover:scale-110"
+                  title="WhatsApp"
+                >
+                  <Icon name="chat" size={16} fill />
+                </a>
+                <a
+                  href={`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent('Find trusted medical care abroad with MedTravel!')}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex size-8 items-center justify-center rounded-full bg-[#0088cc]/10 text-[#0088cc] transition-all hover:scale-110"
+                  title="Telegram"
+                >
+                  <Icon name="send" size={16} fill />
+                </a>
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('Find trusted medical care abroad with MedTravel!')}&url=${encodeURIComponent(referralLink)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex size-8 items-center justify-center rounded-full bg-black/5 text-foreground transition-all hover:scale-110"
+                  title="X (Twitter)"
+                >
+                  <Icon name="close" size={16} fill />
+                </a>
+                <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex size-8 items-center justify-center rounded-full bg-[#1877F2]/10 text-[#1877F2] transition-all hover:scale-110"
+                  title="Facebook"
+                >
+                  <Icon name="public" size={16} fill />
+                </a>
+                <a
+                  href={`mailto:?subject=${encodeURIComponent('MedTravel - Medical Tourism')}&body=${encodeURIComponent(`Find trusted medical care abroad with MedTravel! ${referralLink}`)}`}
+                  className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary transition-all hover:scale-110"
+                  title="Email"
+                >
+                  <Icon name="mail" size={16} fill />
+                </a>
+              </div>
             </div>
           </div>
         </CardContent>

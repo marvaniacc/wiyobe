@@ -1424,7 +1424,7 @@ function PayoutsSection() {
 // ============================================================================
 
 const LEDGER_TYPES: LedgerType[] = [
-  'PATIENT_CHARGE', 'COMMISSION', 'PROVIDER_CREDIT', 'PROVIDER_DEBIT',
+  'PATIENT_CHARGE', 'COMMISSION', 'AFFILIATE_COMMISSION', 'PROVIDER_CREDIT', 'PROVIDER_DEBIT',
   'REFUND_PATIENT', 'REFUND_COMMISSION_REVERSAL', 'REFUND_PROVIDER_DEBIT', 'PAYOUT',
 ]
 const PAGE_SIZE = 25
@@ -1624,7 +1624,7 @@ function ReportsSection() {
 
   const report = React.useMemo(() => {
     if (!data?.entries) return null
-    let commission = 0, commissionReversal = 0, patientCharge = 0, refundPatient = 0, payout = 0
+    let commission = 0, commissionReversal = 0, patientCharge = 0, refundPatient = 0, payout = 0, affiliateCommission = 0
     const byTypeMap: Record<string, number> = {}
     const dailyMap: Record<string, number> = {}
 
@@ -1634,6 +1634,8 @@ function ReportsSection() {
         commission += amt
         const day = new Date(e.createdAt).toISOString().slice(0, 10)
         dailyMap[day] = (dailyMap[day] || 0) + amt
+      } else if (e.type === 'AFFILIATE_COMMISSION') {
+        affiliateCommission += amt
       } else if (e.type === 'REFUND_COMMISSION_REVERSAL') {
         commissionReversal += Math.abs(amt)
         const day = new Date(e.createdAt).toISOString().slice(0, 10)
@@ -1653,7 +1655,7 @@ function ReportsSection() {
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-14)
 
-    return { platformRevenue, commission, commissionReversal, patientCharge, refundPatient, payout, dailyRevenue }
+    return { platformRevenue, commission, commissionReversal, affiliateCommission, patientCharge, refundPatient, payout, dailyRevenue }
   }, [data])
 
   function exportReport(name: string, headers: string[], rows: (string | number)[][]) {
@@ -1688,8 +1690,9 @@ function ReportsSection() {
       />
 
       {/* Big stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard icon="payments" label={t('admin.platformRevenue')} value={formatCurrency(report.platformRevenue.toFixed(2), 'USD', locale)} tone="success" subtitle={t('admin.commission')} />
+        <StatCard icon="campaign" label="Affiliate commissions" value={formatCurrency(report.affiliateCommission.toFixed(2), 'USD', locale)} tone="info" subtitle="Paid to affiliates" />
         <StatCard icon="receipt_long" label={t('admin.totalProcessed')} value={formatCurrency(report.patientCharge.toFixed(2), 'USD', locale)} tone="primary" />
         <StatCard icon="undo" label={t('admin.totalRefunded')} value={formatCurrency(report.refundPatient.toFixed(2), 'USD', locale)} tone="warning" />
         <StatCard icon="account_balance" label={t('admin.totalPayouts')} value={formatCurrency(report.payout.toFixed(2), 'USD', locale)} tone="info" />

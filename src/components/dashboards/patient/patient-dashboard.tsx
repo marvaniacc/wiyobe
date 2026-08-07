@@ -2694,6 +2694,12 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
                 <span className="text-muted-foreground">{t('booking.platformCommission')} ({booking.commissionRate}%)</span>
                 <span className="font-medium text-foreground">-{formatCurrency(booking.commissionAmount, 'USD', locale)}</span>
               </div>
+              {booking.affiliateId && parseFloat(booking.affiliateAmount || '0') > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Affiliate commission ({booking.affiliateRate}%)</span>
+                  <span className="font-medium text-info">-{formatCurrency(booking.affiliateAmount, 'USD', locale)}</span>
+                </div>
+              )}
               <Separator className="my-2" />
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('booking.providerReceives')}</span>
