@@ -185,10 +185,15 @@ export async function POST(req: Request) {
     const totalCommissionFromProvider = (parseFloat(amount) * ((parseFloat(platformRate) + baseAffiliateRate) / 100)).toFixed(2)
     const providerNet = subDec(amount, totalCommissionFromProvider)
 
-    // video session URL for online visits — third-party embed/redirect (mock link)
-    const videoSessionUrl = body.visitType === 'ONLINE'
-      ? `https://meet.jit.si/medtravel-${session.id.slice(-6)}-${Date.now().toString(36)}`
-      : null
+    // Video session URL for online visits — uses configured video provider
+    // Generate with a temp ID (booking ID not yet created); the URL is room-based, not ID-dependent
+    let videoSessionUrl: string | null = null
+    if (body.visitType === 'ONLINE') {
+      const { createVideoSession } = await import('@/lib/video')
+      const tempId = `${session.id.slice(-4)}-${Date.now().toString(36)}`
+      const videoSession = await createVideoSession(tempId, session.name || 'Patient', providerName)
+      videoSessionUrl = videoSession.url
+    }
 
     const booking = await db.booking.create({
       data: {

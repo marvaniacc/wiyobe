@@ -37,6 +37,8 @@ import {
 import { downloadICal } from '@/lib/ical'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
+import { ChatWidget } from '@/components/shared/chat-widget'
+import { TicketsSection } from '@/components/shared/tickets-section'
 import { Progress } from '@/components/ui/progress'
 
 /* =========================================================================
@@ -2717,6 +2719,20 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
                 {t('booking.videoJoin')}
               </a>
             </Button>
+          )}
+
+          {/* Chat with provider */}
+          {booking.status === 'CONFIRMED' && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Chat with {providerName}</p>
+              <ChatWidget
+                bookingId={booking.id}
+                currentUserId={booking.patientId}
+                currentUserName={booking.patient?.name || 'Patient'}
+                currentUserRole="PATIENT"
+                otherUserName={providerName}
+              />
+            </div>
           )}
 
           {/* Notes */}
