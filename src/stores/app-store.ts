@@ -32,6 +32,12 @@ interface AppState {
   goDashboard: (section?: string) => void
   goPublicProfile: (providerId: string, providerType: string) => void
 
+  // Dedicated chat page — bookingId of the conversation to auto-open on the
+  // Messages section. Cleared after the conversation is selected.
+  activeChatBookingId: string | null
+  goMessages: (bookingId?: string) => void
+  setActiveChatBookingId: (id: string | null) => void
+
   locale: Locale
   setLocale: (l: Locale) => void
 
@@ -59,6 +65,10 @@ export const useApp = create<AppState>()(
       goAuth: (mode, role) => set({ view: { name: 'auth', mode, role } }),
       goDashboard: (section = 'overview') => set({ view: { name: 'dashboard', section } }),
       goPublicProfile: (providerId, providerType) => set({ view: { name: 'public-profile', providerId, providerType } }),
+
+      activeChatBookingId: null,
+      setActiveChatBookingId: (id) => set({ activeChatBookingId: id }),
+      goMessages: (bookingId) => set({ view: { name: 'dashboard', section: 'messages' }, activeChatBookingId: bookingId ?? null }),
 
       locale: 'en',
       setLocale: (l) => set({ locale: l }),
