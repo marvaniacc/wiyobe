@@ -105,6 +105,7 @@ model User {
   disputesResolved  Dispute[]    @relation("disputesResolved")
   affiliate         Affiliate?
   affiliateReferrals AffiliateClick[] @relation("affiliateReferrals")
+  chatMessages      ChatMessage[] @relation("chatSender")
 }
 
 model OtpCode {
@@ -329,6 +330,7 @@ model Booking {
   ledgerEntries      LedgerEntry[]
   review             Review?
   disputes           Dispute[]
+  chatMessages       ChatMessage[]
 }
 
 model Payment {
@@ -544,4 +546,54 @@ model AffiliateSetting {
   tier         AffiliateTier  @unique
   commissionRate String       @default("10") // default commission % per tier
   updatedAt    DateTime       @updatedAt
+}
+
+// ============================================================================
+// Booking Chat — patient ↔ provider messaging tied to a booking
+// ============================================================================
+
+model ChatMessage {
+  id           String   @id @default(cuid())
+  bookingId    String
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  senderId     String
+  sender       User     @relation("chatSender", fields: [senderId], references: [id])
+  message      String?
+  read         Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  translations MessageTranslation[]
+  attachments  ChatAttachment[]
+
+  @@index([bookingId, createdAt])
+  @@index([senderId])
+}
+
+model MessageTranslation {
+  id              String   @id @default(cuid())
+  messageId       String
+  message         ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  targetLanguage  String   // e.g. "en", "tr", "fa", "ar"
+  translatedText  String
+  provider        String   @default("zai")
+  createdAt       DateTime @default(now())
+
+  @@unique([messageId, targetLanguage])
+  @@index([messageId])
+}
+
+// File / image / PDF attachments on chat messages.
+// Stored as base64 data URLs (same pattern as MedicalDocument / KycDocument).
+// Served through /api/chat/attachment?id=... which authorizes per-booking access.
+model ChatAttachment {
+  id          String   @id @default(cuid())
+  messageId   String
+  message     ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName    String
+  fileType    String   // MIME type, e.g. "image/png", "application/pdf"
+  fileSize    Int      // bytes
+  dataUrl     String   // base64 data URL
+  createdAt   DateTime @default(now())
+
+  @@index([messageId])
 }
