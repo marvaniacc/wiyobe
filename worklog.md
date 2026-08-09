@@ -1034,3 +1034,50 @@ New "Affiliates" section (campaign icon) in admin sidebar:
 - Referral click tracking on the landing page (`?ref=CODE` query param) not yet wired into `page.tsx` to call the track API
 - Affiliate payout batch processing not yet implemented (similar to provider payouts)
 - Non-English locales use English fallback for the 72 new keys
+
+---
+Task ID: chat-restoration
+Agent: main (orchestrator)
+Task: Restore the lost chat implementation (dedicated Messages page, backend, attachments, translation, booking UX changes) that was wiped from the working tree
+
+Work Log:
+- Created git checkpoint commit (18cf969) of current pre-restoration state before any changes
+- Restored Prisma schema: ChatMessage (message nullable for attachment-only), MessageTranslation (@@unique [messageId, targetLanguage]), ChatAttachment models + back-relations on User.chatMessages and Booking.chatMessages. db:push succeeded.
+- Restored src/lib/chat-auth.ts: authorizeBookingChat() + getOtherParticipant() — strict patient/provider/admin only
+- Restored src/lib/translation.ts: dedicated medical-translation service with ZAI SDK (ZAI.create() + zai.chat.completions.create), 16 supported languages, strict medical prompt, config fallback to /etc/.z-ai-config
+- Restored 5 API routes: /api/chat (GET+POST with attachments), /api/chat/conversations, /api/chat/attachment (authorized download), /api/chat/translate (cached), /api/chat/unread
+- Restored store: activeChatBookingId, goMessages(bookingId?), setActiveChatBookingId
+- Restored i18n: 40+ chat.* + dash.messages keys × 4 locales (en/tr/fa/ar)
+- Restored 4 chat components: messages-section (two-column desktop, mobile toggle, search, 15s poll), conversation-view (header, 5s poll, messages stay mounted during refetch), message-bubble (text+attachments, translate on other-party only, read receipts), message-composer (drag-drop, preview, validation ≤5MB/≤6 files)
+- Restored dashboard nav: added messages item (icon forum) to PATIENT/DOCTOR/HOSPITAL/HOTEL/TRANSLATOR/ADMIN
+- Restored patient BookingDetailDialog: removed commission block (now shows only Amount), removed embedded ChatWidget, added Open Chat button calling goMessages(booking.id)
+- Restored provider BookingRow: added Open Chat button calling goMessages(booking.id)
+- Restored admin dashboard: added messages section case
+- Fixed translation SDK import (createChatCompletion → ZAI.create + chat.completions.create) — SDK export name had changed
+- Committed after each major step (7 commits total)
+
+End-to-end verification (agent-browser):
+1. ✅ Patient booking detail: NO commission shown, only Amount; Open Chat button present
+2. ✅ Patient Open Chat → navigates to Messages page, correct conversation auto-selected
+3. ✅ Patient sends text message → appears
+4. ✅ Patient attaches .txt file → pending preview shows, send works, attachment appears
+5. ✅ Mobile (390×844): conversation full-screen, back button returns to list
+6. ✅ Provider logs in → sees patient's message with unread badge "1"
+7. ✅ Provider sees Translate button on patient's message (not on own) 
+8. ✅ Provider clicks Translate → translation box appears with "English" label + translated text
+9. ✅ Provider sends reply with attachment → both appear
+10. ✅ Admin access: 200 on messages + attachment
+11. ✅ Unauthorized doctor: 403 on messages, attachment, translate
+12. ✅ Unauthenticated: 401 on messages, conversations
+13. ✅ No console errors, no React key warnings
+14. ✅ Lint: 0 errors, 9 warnings (pre-existing)
+
+Files restored (new): prisma/schema.prisma, src/lib/chat-auth.ts, src/lib/translation.ts, src/app/api/chat/{route,conversations/route,attachment/route,translate/route,unread/route}.ts, src/components/chat/{messages-section,conversation-view,message-bubble,message-composer}.tsx
+Files modified: src/stores/app-store.ts, src/lib/i18n.ts, src/components/shell/dashboard-shell.tsx, src/components/dashboards/{patient,provider,admin}-dashboard.tsx, src/components/dashboards/patient/patient-dashboard.tsx (React key fix + commission removal + Open Chat)
+
+Stage Summary:
+- The entire chat feature set is fully restored and verified working end-to-end
+- All restored work is committed to git (7 commits: ab4287e schema, 218a96a backend, d898bfe store+i18n, 006cd56 components, 655d27b dashboard wiring, e92eca9 translation fix, plus the initial 18cf969 checkpoint)
+- Strict authorization enforced on every chat endpoint via shared authorizeBookingChat()
+- Translation SDK issue fixed (export name changed from createChatCompletion to ZAI.create + chat.completions.create)
+- The implementation will NOT disappear on the next task because it is now committed to git
