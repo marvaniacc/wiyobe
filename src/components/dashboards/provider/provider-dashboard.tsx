@@ -6,6 +6,7 @@ import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
 import { Icon } from '@/components/shared/icon'
 import { StarRating } from '@/components/shared/star-rating'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
+import { MessagesSection } from '@/components/chat/messages-section'
 import { downloadICal } from '@/lib/ical'
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
@@ -561,6 +562,7 @@ function AppointmentsSection({ role }: { role: string }) {
 }
 
 function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: string, fb?: string) => string; locale: string; onDone: () => void }) {
+  const goMessages = useApp((s) => s.goMessages)
   const [completeOpen, setCompleteOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
@@ -669,6 +671,19 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
       <TableCell><StatusBadge status={booking.status} /></TableCell>
       <TableCell className="pe-4">
         <div className="flex items-center justify-end gap-1.5">
+          {/* Open the dedicated chat page */}
+          {(booking.status === 'PENDING' || booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => goMessages(booking.id)}
+              title={t('chat.openChat')}
+            >
+              <Icon name="forum" size={14} fill />
+              <span className="hidden sm:inline">{t('chat.openChat')}</span>
+            </Button>
+          )}
           {isConfirmed && isOnline && booking.videoSessionUrl && (
             <Button
               variant="outline"
@@ -2358,6 +2373,8 @@ export function ProviderDashboard({ section, role }: { section: string; role: st
     case 'appointments':
     case 'bookings':
       return <AppointmentsSection role={role} />
+    case 'messages':
+      return <MessagesSection />
     case 'services':
       return <ServicesSection role={role} />
     case 'availability':

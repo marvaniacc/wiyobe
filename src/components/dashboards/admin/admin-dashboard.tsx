@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { Icon } from '@/components/shared/icon'
+import { MessagesSection } from '@/components/chat/messages-section'
 import { useT } from '@/hooks/use-t'
 import { useApi, apiPost, apiPut } from '@/hooks/use-api'
 import { useApp } from '@/stores/app-store'
@@ -1745,6 +1746,7 @@ export function AdminDashboard({ section }: { section: string }) {
   switch (section) {
     case 'overview': return <OverviewSection />
     case 'analytics': return <AdminAnalyticsSection />
+    case 'messages': return <MessagesSection />
     case 'providers': return <ProvidersSection />
     case 'users': return <UsersSection />
     case 'moderation': return <ModerationSection />

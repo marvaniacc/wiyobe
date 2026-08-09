@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/table'
 import { downloadICal } from '@/lib/ical'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
+import { MessagesSection } from '@/components/chat/messages-section'
 import { Progress } from '@/components/ui/progress'
 
 /* =========================================================================
@@ -2622,6 +2623,7 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
   onOpenDispute?: (booking: any) => void
 }) {
   const { t, locale } = useT()
+  const goMessages = useApp((s) => s.goMessages)
   if (!booking) return null
 
   const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
@@ -2682,23 +2684,12 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
             </div>
           </div>
 
-          {/* Payment info */}
+          {/* Payment info — patient only sees the amount they paid (internal commission is never exposed) */}
           <div className="rounded-[14px] border border-divider bg-surface-secondary/50 p-4">
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('booking.paymentInfo')}</p>
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('common.amount')}</span>
-                <span className="font-medium text-foreground">{formatCurrency(booking.amount, 'USD', locale)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('booking.platformCommission')} ({booking.commissionRate}%)</span>
-                <span className="font-medium text-foreground">-{formatCurrency(booking.commissionAmount, 'USD', locale)}</span>
-              </div>
-              <Separator className="my-2" />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('booking.providerReceives')}</span>
-                <span className="font-medium text-success">{formatCurrency(booking.providerNetAmount, 'USD', locale)}</span>
-              </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t('common.amount')}</span>
+              <span className="font-medium text-foreground">{formatCurrency(booking.amount, 'USD', locale)}</span>
             </div>
           </div>
 
@@ -2718,6 +2709,18 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('common.notes')}</p>
               <p className="rounded-[14px] border border-divider bg-surface p-3 text-sm text-foreground">{booking.notes}</p>
             </div>
+          )}
+
+          {/* Open the dedicated chat page — only for active/completed bookings */}
+          {(booking.status === 'CONFIRMED' || booking.status === 'COMPLETED' || booking.status === 'PENDING') && (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => goMessages(booking.id)}
+            >
+              <Icon name="forum" size={18} fill />
+              {t('chat.openChat')}
+            </Button>
           )}
         </div>
 
@@ -3282,6 +3285,7 @@ export function PatientDashboard({ section }: { section: string }) {
     case 'compare': return <CompareSection />
     case 'favorites': return <FavoritesSection />
     case 'bookings': return <BookingsSection />
+    case 'messages': return <MessagesSection />
     case 'documents': return <DocumentsSection />
     case 'disputes': return <PatientDisputesSection />
     case 'reviews': return <ReviewsSection />
