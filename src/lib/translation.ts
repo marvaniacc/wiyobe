@@ -1,4 +1,4 @@
-import { createChatCompletion } from 'z-ai-web-dev-sdk'
+import ZAI from 'z-ai-web-dev-sdk'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -133,7 +133,8 @@ export async function translateMessage(
   }
 
   try {
-    const completion = await createChatCompletion({
+    const zai = await ZAI.create()
+    const completion = await zai.chat.completions.create({
       messages: [
         { role: 'system', content: buildTranslationSystemPrompt(targetLangName) },
         { role: 'user', content: messageText },
@@ -141,6 +142,8 @@ export async function translateMessage(
       model: 'glm-4-flash',
       temperature: 0.1,
       maxTokens: 2000,
+      stream: false,
+      thinking: { type: 'disabled' },
     })
 
     const translated = (completion.choices?.[0]?.message?.content || '').trim()
