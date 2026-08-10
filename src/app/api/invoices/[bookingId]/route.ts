@@ -3,23 +3,18 @@ import { getSession } from '@/lib/auth'
 import { error, handleError } from '@/lib/api'
 import { resolveProviderUser } from '@/lib/ledger'
 import { formatCurrency, formatDate } from '@/lib/money'
-import PDFDocument from 'pdfkit'
+import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/invoices/[bookingId]
  *
- * Generates a professional PDF invoice for a booking. The invoice includes:
- * - Wishubest branding
- * - Invoice number (derived from booking ID)
- * - Patient and provider details
- * - Service description, amount, payment status
+ * Generates a professional PDF invoice for a booking using pdf-lib
+ * (pure JavaScript, no filesystem font access needed).
  *
  * Authorization: Only the booking's patient, provider, or an admin can
  * download the invoice. Returns 403 otherwise.
- *
- * The PDF is streamed directly to the client.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ bookingId: string }> }) {
   try {
@@ -72,9 +67,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ bookingI
       booking.translator?.user?.phone ||
       'N/A'
 
-    const providerLocation =
-      booking.hospital?.city || booking.hotel?.city || booking.doctor?.user?.name ? 'N/A' : 'N/A'
-
     const serviceName = booking.service?.name || (booking.visitType === 'ONLINE' ? 'Online Consultation' : 'In-person Visit')
     const invoiceNumber = `INV-${booking.id.slice(-8).toUpperCase()}`
     const invoiceDate = new Date().toISOString().split('T')[0]
@@ -91,45 +83,92 @@ export async function GET(req: Request, { params }: { params: Promise<{ bookingI
       ? paymentStatusMap[booking.payment.status] || booking.payment.status
       : 'N/A'
 
-    // Generate PDF
-    const doc = new PDFDocument({ size: 'A4', margin: 50 })
-    const chunks: Buffer[] = []
+    // === Generate PDF using pdf-lib ===
+    const pdfDoc = await PDFDocument.create()
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk))
+    const page = pdfDoc.addPage([595.28, 841.89]) // A4
+    const { width, height } = page.getSize()
+    const margin = 50
+    const contentWidth = width - margin * 2
+
+    // Colors
+    const blue = rgb(0.102, 0.451, 0.910) // #1A73E8
+    const darkGray = rgb(0.2, 0.2, 0.2)
+    const medGray = rgb(0.4, 0.4, 0.4)
+    const lightGray = rgb(0.6, 0.6, 0.6)
+    const veryLightGray = rgb(0.85, 0.85, 0.85)
+    const white = rgb(1, 1, 1)
+
+    let y = height - margin
+
+    // Helper functions
+    const drawText = (text: string, x: number, size: number, f: PDFFont, color: any = darkGray) => {
+      page.drawText(text, { x, y, size, font: f, color })
+    }
+    const drawTextRight = (text: string, x: number, size: number, f: PDFFont, color: any = darkGray) => {
+      const textWidth = f.widthOfTextAtSize(text, size)
+      page.drawText(text, { x: x - textWidth, y, size, font: f, color })
+    }
+    const drawLine = (x1: number, y1: number, x2: number, y2: number, color = veryLightGray, thickness = 1) => {
+      page.drawLine({ start: { x: x1, y: height - y1 }, end: { x: x2, y: height - y2 }, thickness, color })
+    }
+    const drawRect = (x: number, yPos: number, w: number, h: number, color: any) => {
+      page.drawRectangle({ x, y: height - yPos, width: w, height: h, color })
+    }
+    const newY = (delta: number) => { y -= delta }
 
     // === Header ===
-    doc.fontSize(24).font('Helvetica-Bold').fillColor('#1A73E8').text('Wishubest', 50, 50)
-    doc.fontSize(10).font('Helvetica').fillColor('#666666').text('Global Medical Tourism Marketplace', 50, 78)
-    doc.fontSize(10).fillColor('#666666').text('support@wishubest.com', 50, 92)
+    drawText('Wishubest', margin, 24, fontBold, blue)
+    newY(28)
+    drawText('Global Medical Tourism Marketplace', margin, 10, font, lightGray)
+    newY(14)
+    drawText('support@wishubest.com', margin, 10, font, lightGray)
 
     // Invoice title (right-aligned)
-    doc.fontSize(20).font('Helvetica-Bold').fillColor('#333333').text('INVOICE', 400, 50, { align: 'right' })
-    doc.fontSize(10).font('Helvetica').fillColor('#666666').text(`Invoice #: ${invoiceNumber}`, 400, 78, { align: 'right' })
-    doc.text(`Date: ${invoiceDate}`, 400, 92, { align: 'right' })
+    y = height - margin
+    drawTextRight('INVOICE', width - margin, 20, fontBold, darkGray)
+    newY(24)
+    drawTextRight(`Invoice #: ${invoiceNumber}`, width - margin, 10, font, lightGray)
+    newY(14)
+    drawTextRight(`Date: ${invoiceDate}`, width - margin, 10, font, lightGray)
 
     // Separator line
-    doc.moveTo(50, 120).lineTo(545, 120).strokeColor('#DADCE0').lineWidth(1).stroke()
+    newY(20)
+    drawLine(margin, height - y, width - margin, height - y)
 
-    // === Bill To ===
-    doc.fontSize(9).font('Helvetica-Bold').fillColor('#999999').text('BILLED TO', 50, 140)
-    doc.fontSize(11).font('Helvetica').fillColor('#333333').text(booking.patient?.name || 'Patient', 50, 156)
-    doc.fontSize(9).fillColor('#666666').text(booking.patient?.email || '', 50, 172)
-    if (booking.patient?.phone) doc.text(booking.patient.phone, 50, 186)
-    if (booking.patient?.city) doc.text(`${booking.patient.city}, ${booking.patient?.country || ''}`, 50, 200)
+    // === Bill To / Provider ===
+    newY(25)
+    drawText('BILLED TO', margin, 9, fontBold, lightGray)
+    newY(16)
+    drawText(booking.patient?.name || 'Patient', margin, 11, font, darkGray)
+    newY(16)
+    if (booking.patient?.email) { drawText(booking.patient.email, margin, 9, font, medGray); newY(14) }
+    if (booking.patient?.phone) { drawText(booking.patient.phone, margin, 9, font, medGray); newY(14) }
+    if (booking.patient?.city) { drawText(`${booking.patient.city}, ${booking.patient?.country || ''}`, margin, 9, font, medGray); newY(14) }
 
-    // === Provider ===
-    doc.fontSize(9).font('Helvetica-Bold').fillColor('#999999').text('PROVIDER', 300, 140)
-    doc.fontSize(11).font('Helvetica').fillColor('#333333').text(providerName, 300, 156)
-    doc.fontSize(9).fillColor('#666666').text(providerEmail, 300, 172)
-    doc.text(providerPhone, 300, 186)
+    // Provider (right column)
+    const provX = 300
+    y = height - margin - 45
+    drawText('PROVIDER', provX, 9, fontBold, lightGray)
+    newY(16)
+    drawText(providerName, provX, 11, font, darkGray)
+    newY(16)
+    drawText(providerEmail, provX, 9, font, medGray)
+    newY(14)
+    drawText(providerPhone, provX, 9, font, medGray)
+
+    // === Separator ===
+    newY(30)
+    drawLine(margin, height - y, width - margin, height - y)
 
     // === Booking Details ===
-    doc.moveTo(50, 225).lineTo(545, 225).strokeColor('#DADCE0').lineWidth(1).stroke()
+    newY(20)
+    drawText('BOOKING DETAILS', margin, 9, fontBold, lightGray)
+    newY(20)
 
-    doc.fontSize(9).font('Helvetica-Bold').fillColor('#999999').text('BOOKING DETAILS', 50, 240)
-
-    const detailsY = 260
-    const detailLines = [
+    const detailLines: [string, string][] = [
       ['Booking ID', booking.id],
       ['Service', serviceName],
       ['Visit Type', booking.visitType === 'ONLINE' ? 'Online Consultation' : 'In-person Visit'],
@@ -138,68 +177,65 @@ export async function GET(req: Request, { params }: { params: Promise<{ bookingI
       ['Payment Status', paymentStatus],
     ]
 
-    detailLines.forEach((line, i) => {
-      const y = detailsY + i * 18
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#666666').text(line[0] + ':', 50, y)
-      doc.font('Helvetica').fillColor('#333333').text(line[1], 160, y)
-    })
+    for (const [label, value] of detailLines) {
+      drawText(`${label}:`, margin, 9, fontBold, medGray)
+      drawText(value, 160, 9, font, darkGray)
+      newY(18)
+    }
 
-    // === Amount Summary ===
-    const summaryY = detailsY + detailLines.length * 18 + 20
-    doc.moveTo(50, summaryY).lineTo(545, summaryY).strokeColor('#DADCE0').lineWidth(1).stroke()
+    // === Separator ===
+    newY(10)
+    drawLine(margin, height - y, width - margin, height - y)
 
-    doc.fontSize(9).font('Helvetica-Bold').fillColor('#999999').text('PAYMENT SUMMARY', 50, summaryY + 15)
+    // === Payment Summary ===
+    newY(20)
+    drawText('PAYMENT SUMMARY', margin, 9, fontBold, lightGray)
+    newY(25)
 
-    const amountY = summaryY + 35
     const amountLines: [string, string][] = [
       ['Service Amount', formatCurrency(booking.amount, booking.currency || 'USD', 'en')],
     ]
 
-    if (isPatient) {
-      // Patient sees only what they paid
-    } else {
-      // Provider/admin sees commission breakdown
+    if (!isPatient) {
       amountLines.push(['Platform Commission', `-${formatCurrency(booking.commissionAmount, booking.currency || 'USD', 'en')}`])
       amountLines.push(['Provider Net', formatCurrency(booking.providerNetAmount, booking.currency || 'USD', 'en')])
     }
 
-    amountLines.forEach((line, i) => {
-      const y = amountY + i * 20
-      doc.fontSize(10).font('Helvetica').fillColor('#333333').text(line[0], 50, y)
-      doc.font('Helvetica-Bold').text(line[1], 400, y, { align: 'right' })
-    })
+    for (const [label, value] of amountLines) {
+      drawText(label, margin, 10, font, darkGray)
+      drawTextRight(value, width - margin, 10, fontBold, darkGray)
+      newY(20)
+    }
 
     // Total box
-    const totalY = amountY + amountLines.length * 20 + 10
-    doc.rect(350, totalY, 195, 30).fillColor('#1A73E8').fill()
-    doc.fontSize(11).font('Helvetica-Bold').fillColor('#FFFFFF').text('TOTAL PAID', 360, totalY + 9)
-    doc.text(formatCurrency(booking.amount, booking.currency || 'USD', 'en'), 530, totalY + 9, { align: 'right' })
+    newY(5)
+    const boxY = y
+    drawRect(350, height - boxY, 195, 28, blue)
+    drawText('TOTAL PAID', 360, boxY + 9, 11, fontBold, white)
+    drawTextRight(formatCurrency(booking.amount, booking.currency || 'USD', 'en'), width - margin - 5, boxY + 9, 11, fontBold, white)
+    newY(45)
 
     // === Footer ===
-    const footerY = totalY + 60
-    doc.moveTo(50, footerY).lineTo(545, footerY).strokeColor('#DADCE0').lineWidth(1).stroke()
-    doc.fontSize(8).font('Helvetica').fillColor('#999999').text(
-      'This invoice is generated electronically by Wishubest and is valid without signature.',
-      50, footerY + 15, { align: 'center', width: 495 }
-    )
-    doc.text(
-      'Wishubest is a medical tourism marketplace platform. Service providers are independently verified.',
-      50, footerY + 30, { align: 'center', width: 495 }
-    )
+    newY(30)
+    drawLine(margin, height - y, width - margin, height - y)
+    newY(20)
+    const footerText1 = 'This invoice is generated electronically by Wishubest and is valid without signature.'
+    const footerText2 = 'Wishubest is a medical tourism marketplace platform. Service providers are independently verified.'
+    const fw1 = font.widthOfTextAtSize(footerText1, 8)
+    const fw2 = font.widthOfTextAtSize(footerText2, 8)
+    page.drawText(footerText1, { x: (width - fw1) / 2, y, size: 8, font, color: lightGray })
+    newY(14)
+    page.drawText(footerText2, { x: (width - fw2) / 2, y, size: 8, font, color: lightGray })
 
-    doc.end()
+    // Serialize
+    const pdfBytes = await pdfDoc.save()
 
-    // Wait for PDF generation to complete
-    const pdfBuffer = await new Promise<Buffer>((resolve) => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)))
-    })
-
-    return new Response(pdfBuffer, {
+    return new Response(pdfBytes, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="${invoiceNumber}.pdf"`,
-        'Content-Length': String(pdfBuffer.length),
+        'Content-Length': String(pdfBytes.length),
         'Cache-Control': 'private, no-store',
       },
     })
