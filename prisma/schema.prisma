@@ -115,6 +115,7 @@ model User {
   ticketsRaised     Ticket[]    @relation("ticketsRaised")
   ticketMessages    TicketMessage[] @relation("ticketMessages")
   chatMessages      ChatMessage[] @relation("chatSender")
+  itineraries       Itinerary[]  @relation("PatientItineraries")
 }
 
 model OtpCode {
@@ -343,6 +344,8 @@ model Booking {
   review             Review?
   disputes           Dispute[]
   chatMessages       ChatMessage[]
+  itineraryId        String?
+  itinerary          Itinerary?  @relation(fields: [itineraryId], references: [id])
 }
 
 model Payment {
@@ -672,4 +675,45 @@ model ChatAttachment {
   createdAt   DateTime @default(now())
 
   @@index([messageId])
+}
+
+// ============================================================================
+// Itineraries — Draft medical trip packages (Doctor + Hotel + Translator)
+// ============================================================================
+
+enum ItineraryStatus {
+  DRAFT
+  PENDING_BOOKING
+  BOOKED
+  EXPIRED
+}
+
+model Itinerary {
+  id                 String          @id @default(cuid())
+  patientId          String
+  patient            User            @relation("PatientItineraries", fields: [patientId], references: [id])
+  status             ItineraryStatus @default(DRAFT)
+  isAiGenerated      Boolean         @default(false)
+  totalEstimatedCost Int             @default(0) // stored in cents
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  items     ItineraryItem[]
+  bookings  Booking[]
+
+  @@index([patientId])
+}
+
+model ItineraryItem {
+  id           String       @id @default(cuid())
+  itineraryId  String
+  itinerary    Itinerary    @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  providerType ProviderType
+  providerId   String
+  serviceId    String?
+  estimatedCost Int         // stored in cents
+  notes        String?
+  createdAt    DateTime     @default(now())
+
+  @@index([itineraryId])
 }
