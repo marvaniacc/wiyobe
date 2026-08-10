@@ -124,66 +124,63 @@ export async function POST(req: Request) {
     // Get commission rates (platform + affiliate) for this provider type
     const commissionRateRow = await db.commissionRate.findUnique({ where: { providerType: pt } })
     const platformRate = commissionRateRow?.rate || '12'
-    const affiliateRate = commissionRateRow?.affiliateRate || '3'
+    const affiliateRate = commissionRateRow?.affiliateRate || '25' // % of platform commission
 
     // Check if the provider was referred by an affiliate
     let affiliateUserId: string | null = null
     let affiliateClickId: string | null = null
-    let affiliateRecord: any = null
 
-    // Check provider's referral
-    const providerAffClick = await db.affiliateClick.findFirst({
-      where: { referredUserId: providerUserId, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
-      include: { affiliate: true },
-      orderBy: { clickedAt: 'desc' },
+    // Check provider's referral via referredByAffiliateId on User (new system)
+    const providerUser = await db.user.findUnique({
+      where: { id: providerUserId },
+      select: { referredByAffiliateId: true },
     })
 
-    if (providerAffClick?.affiliate && providerAffClick.affiliate.verified) {
-      affiliateUserId = providerAffClick.affiliate.userId
-      affiliateClickId = providerAffClick.id
-      affiliateRecord = providerAffClick.affiliate
-    } else {
-      // Check patient's referral
+    if (providerUser?.referredByAffiliateId) {
+      const providerAff = await db.affiliate.findUnique({
+        where: { id: providerUser.referredByAffiliateId },
+      })
+      // Self-referral prevention: if the provider IS the affiliate, skip
+      if (providerAff && providerAff.verified && providerAff.userId !== session.id) {
+        affiliateUserId = providerAff.userId
+        // Find the affiliate click for this provider
+        const providerAffClick = await db.affiliateClick.findFirst({
+          where: { affiliateId: providerAff.id, referredUserId: providerUserId, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
+          orderBy: { clickedAt: 'desc' },
+        })
+        affiliateClickId = providerAffClick?.id || null
+      }
+    }
+
+    // If no provider referral, check patient's referral via AffiliateClick
+    if (!affiliateUserId) {
       const patientAffClick = await db.affiliateClick.findFirst({
         where: { referredUserId: session.id, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
         include: { affiliate: true },
         orderBy: { clickedAt: 'desc' },
       })
-      if (patientAffClick?.affiliate && patientAffClick.affiliate.verified) {
+      // Self-referral prevention: if the patient IS the affiliate, skip
+      if (patientAffClick?.affiliate && patientAffClick.affiliate.verified && patientAffClick.affiliate.userId !== session.id) {
         affiliateUserId = patientAffClick.affiliate.userId
         affiliateClickId = patientAffClick.id
-        affiliateRecord = patientAffClick.affiliate
       }
     }
 
-    // Calculate commissions
-    // The provider ALWAYS pays: platformRate% + affiliateRate% (fixed, regardless of tier)
-    // The tier bonus comes OUT OF the platform's share (platform gives part of its cut to the affiliate)
+    // Calculate commissions — new model:
+    // Platform takes platformRate% of the booking amount.
+    // Affiliate gets affiliateRate% of the PLATFORM'S COMMISSION (not the booking amount).
+    // Provider pays only platformRate% (affiliate commission comes out of platform's pocket).
     //
-    // Example: amount=$100, platform=12%, affiliate base=3%, Gold tier bonus=+2%
-    //   Provider pays: 12% + 3% = 15% → Provider gets $85
-    //   Affiliate gets: 3% + 2% = 5% → $5
-    //   Platform gets: 12% - 2% = 10% → $10 (gives 2% bonus to affiliate from its share)
-    //
-    // If no affiliate: Provider pays 12% + 3% = 15%, Platform keeps all 15%
-    const tierBonus = affiliateRecord ? parseFloat(affiliateRecord.tierBonusRate || '0') : 0
-    const baseAffiliateRate = parseFloat(affiliateRate)
-
-    // Affiliate gets base rate + tier bonus
-    const effectiveAffiliateRate = baseAffiliateRate + tierBonus
+    // Example: amount=$100, platform=12%, affiliate=25%
+    //   Platform commission = $100 * 12% = $12
+    //   Affiliate commission = $12 * 25% = $3.00
+    //   Platform keeps = $12 - $3 = $9.00
+    //   Provider gets = $100 - $12 = $88.00
+    const platformCut = (parseFloat(amount) * (parseFloat(platformRate) / 100)).toFixed(2)
     const affiliateCommission = affiliateUserId
-      ? (parseFloat(amount) * (effectiveAffiliateRate / 100)).toFixed(2)
+      ? (parseFloat(platformCut) * (parseFloat(affiliateRate) / 100)).toFixed(2)
       : '0'
-
-    // Platform gets its rate MINUS the tier bonus (bonus comes from platform's pocket)
-    // If no affiliate: platform gets its rate + the full affiliate base rate
-    const platformCut = affiliateUserId
-      ? (parseFloat(amount) * ((parseFloat(platformRate) - tierBonus) / 100)).toFixed(2)
-      : (parseFloat(amount) * ((parseFloat(platformRate) + baseAffiliateRate) / 100)).toFixed(2)
-
-    // Provider always gets: amount - platformRate% - affiliateBaseRate% (tier doesn't affect provider)
-    const totalCommissionFromProvider = (parseFloat(amount) * ((parseFloat(platformRate) + baseAffiliateRate) / 100)).toFixed(2)
-    const providerNet = subDec(amount, totalCommissionFromProvider)
+    const providerNet = subDec(amount, platformCut)
 
     // Video session URL for online visits — uses configured video provider
     // Generate with a temp ID (booking ID not yet created); the URL is room-based, not ID-dependent
@@ -212,7 +209,7 @@ export async function POST(req: Request) {
         amount: toDec(amount),
         commissionRate: platformRate,
         commissionAmount: platformCut,
-        affiliateRate: String(effectiveAffiliateRate),
+        affiliateRate: affiliateRate,
         affiliateAmount: affiliateUserId ? affiliateCommission : '0',
         affiliateId: affiliateUserId,
         providerNetAmount: providerNet,
@@ -268,7 +265,7 @@ export async function POST(req: Request) {
         bookingId: booking.id,
         paymentId: payment.id,
         amount: platformCut,
-        description: `Platform commission (${platformRate}%${affiliateUserId ? ` - ${tierBonus}% tier bonus to affiliate` : ` + ${affiliateRate}% (no referrer)`})`,
+        description: `Platform commission (${platformRate}%)`,
       },
     ]
 
@@ -291,24 +288,16 @@ export async function POST(req: Request) {
         })
       }
       // Update affiliate aggregate stats
-      await db.affiliate.update({
-        where: { userId: affiliateUserId },
-        data: {
-          totalBookings: { increment: 1 },
-          totalEarnings: (parseFloat(affiliateCommission) + parseFloat(
-            (await db.affiliate.findUnique({ where: { userId: affiliateUserId }, select: { totalEarnings: true } }))?.totalEarnings || '0'
-          )).toFixed(2),
-          pendingBalance: (parseFloat(affiliateCommission) + parseFloat(
-            (await db.affiliate.findUnique({ where: { userId: affiliateUserId }, select: { pendingBalance: true } }))?.pendingBalance || '0'
-          )).toFixed(2),
-        },
-      })
-
-      // Auto-promote tier if the affiliate qualifies for a higher tier
-      const { checkAndPromoteTier } = await import('@/lib/affiliate-tiers')
-      const affiliateRec = await db.affiliate.findUnique({ where: { userId: affiliateUserId } })
-      if (affiliateRec) {
-        await checkAndPromoteTier(affiliateRec.id)
+      const affRec = await db.affiliate.findUnique({ where: { userId: affiliateUserId } })
+      if (affRec) {
+        await db.affiliate.update({
+          where: { userId: affiliateUserId },
+          data: {
+            totalBookings: { increment: 1 },
+            totalEarnings: (parseFloat(affiliateCommission) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
+            pendingBalance: (parseFloat(affiliateCommission) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
+          },
+        })
       }
     }
 
