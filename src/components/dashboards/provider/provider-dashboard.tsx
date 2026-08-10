@@ -637,6 +637,19 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
     }
   }
 
+  async function handleNoShow() {
+    setBusy(true)
+    try {
+      await apiPost('/api/bookings/no-show', { bookingId: booking.id })
+      toast.success('Marked as no-show')
+      onDone()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleDispute() {
     if (disputeTitle.trim().length < 3 || disputeDesc.trim().length < 10) return
     setBusy(true)
@@ -856,6 +869,19 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+
+              {/* No-Show button */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-warning hover:bg-warning/5 hover:text-warning"
+                onClick={handleNoShow}
+                disabled={busy}
+                title="Mark as no-show"
+              >
+                <Icon name="person_off" size={14} />
+                <span className="hidden lg:inline">No-show</span>
+              </Button>
 
               {/* Open dispute button + dialog */}
               <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
