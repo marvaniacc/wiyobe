@@ -5,6 +5,7 @@ import { Icon } from '@/components/shared/icon'
 import { MessagesSection } from '@/components/chat/messages-section'
 import { useT } from '@/hooks/use-t'
 import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
+import { TiptapEditor, type TiptapJSON } from '@/components/admin/tiptap-editor'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
@@ -2233,6 +2234,335 @@ function CreatePromoCodeDialog({ open, onOpenChange, onCreated }: {
 }
 
 // ============================================================================
+// Section: Blog Posts — in-app CMS with TipTap editor
+// ============================================================================
+
+type BlogPost = {
+  id: string
+  title: string
+  slug: string
+  excerpt: string
+  content: any
+  coverImage: string | null
+  authorId: string
+  status: 'DRAFT' | 'PUBLISHED'
+  createdAt: string
+  updatedAt: string
+  author?: { id: string; name: string | null; email: string }
+}
+
+function BlogSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ posts: BlogPost[] }>('/api/admin/blog')
+  const [editing, setEditing] = React.useState<BlogPost | null>(null)
+  const [creating, setCreating] = React.useState(false)
+  const [deleteTarget, setDeleteTarget] = React.useState<BlogPost | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
+
+  const posts = data?.posts || []
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await apiDelete(`/api/admin/blog/${deleteTarget.id}`)
+      toast.success(t('blog.deleted', 'Post deleted'))
+      setDeleteTarget(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title={t('admin.blogPosts', 'Blog Posts')} icon="article" />
+        <LoadingCard lines={4} />
+      </div>
+    )
+  }
+  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={t('admin.blogPosts', 'Blog Posts')}
+        description={t('admin.blogDesc', 'Write and publish blog posts and marketing pages')}
+        icon="article"
+        action={
+          <Button onClick={() => setCreating(true)} className="gap-1.5">
+            <Icon name="add" size={18} />
+            {t('admin.newPost', 'New Post')}
+          </Button>
+        }
+      />
+
+      {posts.length === 0 ? (
+        <Card className="mt-6">
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <Icon name="article" size={32} className="text-muted-foreground/50" />
+            <p className="text-sm font-medium text-foreground">{t('blog.noPosts', 'No posts yet')}</p>
+            <p className="max-w-sm text-xs text-muted-foreground">{t('blog.noPostsDesc', 'Create your first blog post to start publishing content.')}</p>
+            <Button onClick={() => setCreating(true)} className="mt-2 gap-1.5">
+              <Icon name="add" size={16} />
+              {t('admin.newPost', 'New Post')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="mt-6 overflow-hidden rounded-[16px] border border-divider">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('admin.title', 'Title')}</TableHead>
+                <TableHead>{t('blog.slug', 'Slug')}</TableHead>
+                <TableHead>{t('blog.author', 'Author')}</TableHead>
+                <TableHead className="text-center">{t('common.status', 'Status')}</TableHead>
+                <TableHead>{t('blog.updated', 'Updated')}</TableHead>
+                <TableHead className="text-end">{t('common.actions', 'Actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {posts.map((post) => (
+                <TableRow key={post.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {post.coverImage && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={post.coverImage} alt="" className="size-9 rounded-[8px] object-cover" />
+                      )}
+                      <span className="max-w-xs truncate text-sm font-medium text-foreground">{post.title}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <code className="text-xs text-muted-foreground">/{post.slug}</code>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">{post.author?.name || post.author?.email || '—'}</span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'rounded-full border',
+                        post.status === 'PUBLISHED'
+                          ? 'border-success/20 bg-success/10 text-success'
+                          : 'border-warning/20 bg-warning/10 text-warning',
+                      )}
+                    >
+                      {post.status === 'PUBLISHED' ? t('admin.published', 'Published') : t('admin.draft', 'Draft')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">{relativeTime(post.updatedAt, locale)}</span>
+                  </TableCell>
+                  <TableCell className="text-end">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditing(post)}
+                        title={t('common.edit', 'Edit')}
+                        className="gap-1"
+                      >
+                        <Icon name="edit" size={16} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteTarget(post)}
+                        title={t('common.delete', 'Delete')}
+                        className="text-error hover:bg-error/5"
+                      >
+                        <Icon name="delete" size={16} />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Editor dialog (create or edit) */}
+      <BlogEditorDialog
+        open={creating || !!editing}
+        post={editing}
+        onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null) } }}
+        onSaved={() => { setCreating(false); setEditing(null); refetch() }}
+      />
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="warning" size={20} className="text-error" />
+              {t('blog.deleteTitle', 'Delete post?')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('blog.deleteConfirm', 'Are you sure you want to delete')} <span className="font-semibold text-foreground">{deleteTarget?.title}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="gap-1.5">
+              {deleting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="delete" size={16} />}
+              {t('common.delete', 'Delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
+  open: boolean
+  post: BlogPost | null
+  onOpenChange: (o: boolean) => void
+  onSaved: () => void
+}) {
+  const { t } = useT()
+  const [title, setTitle] = React.useState('')
+  const [slug, setSlug] = React.useState('')
+  const [excerpt, setExcerpt] = React.useState('')
+  const [coverImage, setCoverImage] = React.useState('')
+  const [status, setStatus] = React.useState<'DRAFT' | 'PUBLISHED'>('DRAFT')
+  const [content, setContent] = React.useState<TiptapJSON | null>(null)
+  const [saving, setSaving] = React.useState(false)
+
+  // Sync form state when the dialog opens (for create or edit).
+  React.useEffect(() => {
+    if (open) {
+      setTitle(post?.title || '')
+      setSlug(post?.slug || '')
+      setExcerpt(post?.excerpt || '')
+      setCoverImage(post?.coverImage || '')
+      setStatus(post?.status || 'DRAFT')
+      setContent(post?.content ? (post.content as TiptapJSON) : null)
+    }
+  }, [open, post])
+
+  async function handleSave() {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      const payload = {
+        title: title.trim(),
+        slug: slug.trim() || undefined, // server auto-generates if omitted
+        excerpt: excerpt.trim(),
+        content: content || { type: 'doc', content: [{ type: 'paragraph' }] },
+        coverImage: coverImage.trim() || null,
+        status,
+      }
+      if (post) {
+        await apiPatch(`/api/admin/blog/${post.id}`, payload)
+        toast.success(t('blog.updated', 'Post updated'))
+      } else {
+        await apiPost('/api/admin/blog', payload)
+        toast.success(t('blog.created', 'Post created'))
+      }
+      onSaved()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="article" size={20} className="text-primary" />
+            {post ? t('blog.editPost', 'Edit Post') : t('admin.newPost', 'New Post')}
+          </DialogTitle>
+          <DialogDescription>{t('blog.editorDesc', 'Write your post content using the rich text editor.')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Title + Slug */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.title', 'Title')}</Label>
+              <Input
+                placeholder="My Blog Post"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.slug', 'Slug')}</Label>
+              <Input
+                placeholder="auto-generated from title"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                className="font-mono text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Excerpt */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('admin.excerpt', 'Excerpt')}</Label>
+            <Textarea
+              placeholder={t('blog.excerptPlaceholder', 'A short summary shown on blog cards…')}
+              value={excerpt}
+              onChange={(e) => setExcerpt(e.target.value)}
+              rows={2}
+              maxLength={500}
+            />
+            <p className="text-[11px] text-muted-foreground">{excerpt.length}/500</p>
+          </div>
+
+          {/* Cover Image + Status */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.coverImage', 'Cover Image URL')}</Label>
+              <Input
+                placeholder="https://…"
+                value={coverImage}
+                onChange={(e) => setCoverImage(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('common.status', 'Status')}</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as 'DRAFT' | 'PUBLISHED')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DRAFT">{t('admin.draft', 'Draft')}</SelectItem>
+                  <SelectItem value="PUBLISHED">{t('admin.published', 'Published')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Content editor */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('admin.content', 'Content')}</Label>
+            <TiptapEditor content={content} onChange={setContent} />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+          <Button onClick={handleSave} disabled={!title.trim() || saving} className="gap-1.5">
+            {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+            {post ? t('common.save', 'Save') : t('blog.create', 'Create')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -2248,6 +2578,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'commission': return <CommissionSection />
     case 'affiliate-rates': return <AffiliateRatesSection />
     case 'promo-codes': return <PromoCodesSection />
+    case 'blog': return <BlogSection />
     case 'cancellations': return <CancellationsSection />
     case 'payouts': return <PayoutsSection />
     case 'ledger': return <LedgerSection />
