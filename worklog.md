@@ -1208,3 +1208,27 @@ Work Log:
 - Added i18n keys `blog.preview` and `blog.previewDesc` in all 4 locales (en, tr, fa, ar).
 - Verification (agent-browser): Logged in as admin → Blog Posts → clicked "Welcome to Wishubest" title → preview dialog opened showing the rendered content ("Welcome bold text." with bold mark correctly applied), cover image placeholder, author, date, Published badge, and excerpt. Clicked "Edit Post" → seamlessly transitioned to the editor dialog with title and content pre-filled. No errors.
 - Commit: `c073c0c feat(ui): make blog post titles clickable to preview rendered content`. Pushed to origin/main.
+
+---
+Task ID: 12.2
+Agent: main (Lead Architect)
+Task: Phase 12.2 — Public Blog Pages (SSR). Create /blog and /blog/[slug] as Next.js Server Components for SEO-friendly public rendering of CMS content.
+
+Work Log:
+- Step 1 (blog list page): Created `src/app/blog/page.tsx` — a pure async Server Component (`async function BlogListPage()`). Fetches all PUBLISHED posts directly via Prisma `db.blogPost.findMany()` (no fetch() to internal APIs). Selects only id, title, slug, excerpt, coverImage, createdAt, author name. Renders a responsive grid of blog cards (1 col mobile, 2 col sm, 3 col lg) with cover image (or gradient placeholder), title, excerpt (line-clamp-3), date, and author. Header with "Wishubest" brand link + "Back to app" button. Hero section with title and description. Footer. Empty state for when no posts exist. Commit: `0dd1ce2`.
+- Step 2 (blog detail page): Created `src/app/blog/[slug]/page.tsx` — a pure async Server Component. Fetches the post by slug via Prisma; calls `notFound()` if not found or not PUBLISHED (drafts are not publicly accessible). Renders cover image, h1 title, author + date meta, excerpt in a styled callout, and the content. Initially tried `generateHTML` from `@tiptap/core` but it threw `ReferenceError: window is not defined` in the SSR environment — TipTap's `generateHTML` requires browser APIs. Created a custom server-safe renderer instead (see fix below). Commit: `e7bc955`.
+- Step 3 (SEO metadata): Added `generateMetadata({ params })` to the detail page. Returns a dynamic `Metadata` object with: `title` (post title + " — Wishubest Blog"), `description` (post excerpt), `alternates.canonical`, `openGraph` (type=article, url, publishedTime, modifiedTime, authors, images from coverImage), and `twitter` (summary_large_image card). Falls back to "Post not found" title when the post doesn't exist. Verified via curl: all OG/Twitter meta tags present in the rendered HTML. Commit: `33f7be8`.
+- Step 4 (landing page link): Added a "Blog" link to the landing page (`src/components/landing/landing.tsx`) in both the header (with article icon, hidden text on mobile) and the footer. Uses Next.js `<Link href="/blog">` for client-side navigation from the SPA shell to the SSR blog route. Commit: `b1879f2`.
+- SSR rendering fix: `generateHTML` from `@tiptap/core` uses `window` (browser-only), causing `ReferenceError: window is not defined` in Server Components. Created `src/lib/tiptap-render.ts` — a custom, server-safe TipTap JSON → HTML renderer that walks the JSON tree without any browser dependencies. Supports all node types used by the admin editor: doc, paragraph, heading (1-6), bulletList, orderedList, listItem, blockquote, codeBlock, horizontalRule, hardBreak, image, text. Supports marks: bold, italic, strike, underline, code, link. Properly escapes HTML to prevent XSS. Falls back gracefully for null/invalid content. Updated the detail page to use `renderTiptapToHtml()` instead of `generateHTML()`. Verified: content now renders correctly as `<p>Welcome <strong>bold</strong> text.</p>`. Commit: `8643c26`.
+- Verification (curl + agent-browser):
+  - curl: `/blog` → 200, renders "Welcome to Wishubest" post card. `/blog/welcome-to-wishubest` → 200, content renders as `<p>Welcome <strong>bold</strong> text.</p>`. `/blog/nonexistent-post` → 404. SEO meta tags present: og:title, og:description, og:type=article, article:published_time, article:modified_time, article:author, twitter:card=summary_large_image. `<title>` = "Welcome to Wishubest — Wishubest Blog".
+  - agent-browser: Blog list page shows hero "Medical Tourism Blog" + post card (title, excerpt, date, author). Clicked post → detail page renders title, author, date, excerpt callout, and rendered content "Welcome bold text." (bold correctly applied). Landing page has "Blog" link in header and footer → clicking navigates to `/blog`. Non-existent slug shows 404 page. No page errors.
+  - Dev log: no `window is not defined` errors after the fix. Lint: 0 errors.
+
+Stage Summary:
+- 5 commits pushed to origin/main: 0dd1ce2 (list page), e7bc955 (detail page), 33f7be8 (SEO metadata), b1879f2 (landing link), 8643c26 (SSR renderer fix).
+- All blog pages are pure React Server Components (async functions, no "use client"). Data fetched directly via Prisma — no fetch() to internal APIs.
+- SEO: dynamic <title>, meta description, Open Graph (article type with published/modified time + author), Twitter Card (summary_large_image). All populated from the post data.
+- XSS-safe: the custom renderer escapes all text content and only produces known-safe HTML tags. The TipTap JSON is never interpreted as raw HTML.
+- The blog routes are completely separate from the Zustand SPA dashboard — they render independently on the server for search engine crawling.
+- Lint: 0 errors. Dev server running cleanly.
