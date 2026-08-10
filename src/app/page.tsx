@@ -102,10 +102,11 @@ export default function Home() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [locale, theme])
 
-  // if a session exists and we're on landing/auth, go to dashboard (unless viewing public profile)
+  // if a session exists and we're on landing/auth, go to dashboard (restore last section if available)
   useEffect(() => {
     if (session && (view.name === 'landing' || view.name === 'auth')) {
-      goDashboard('overview')
+      const lastSection = useApp.getState().lastSection
+      goDashboard(lastSection || 'overview')
     }
     if (!session && view.name === 'dashboard') {
       useApp.getState().goLanding()
