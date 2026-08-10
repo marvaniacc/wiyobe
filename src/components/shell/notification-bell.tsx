@@ -11,8 +11,12 @@ import { toast } from 'sonner'
 
 const NOTIF_ICON: Record<string, string> = {
   booking_created: 'event_available',
+  booking_accepted: 'check_circle',
+  booking_declined: 'cancel',
   booking_cancelled: 'event_busy',
   booking_completed: 'task_alt',
+  booking_no_show: 'person_off',
+  chat_message: 'forum',
   payout_sent: 'payments',
   review_received: 'reviews',
   system: 'campaign',
@@ -20,8 +24,12 @@ const NOTIF_ICON: Record<string, string> = {
 
 const NOTIF_COLOR: Record<string, string> = {
   booking_created: 'bg-success/10 text-success',
+  booking_accepted: 'bg-success/10 text-success',
+  booking_declined: 'bg-error/10 text-error',
   booking_cancelled: 'bg-error/10 text-error',
   booking_completed: 'bg-primary/10 text-primary',
+  booking_no_show: 'bg-warning/10 text-warning',
+  chat_message: 'bg-info/10 text-info',
   payout_sent: 'bg-warning/10 text-warning',
   review_received: 'bg-[#9334E6]/10 text-[#9334E6]',
   system: 'bg-surface-secondary text-muted-foreground',
