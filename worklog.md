@@ -1165,3 +1165,31 @@ Stage Summary:
 - Financial integrity guaranteed: discount always capped at platform commission, provider revenue never reduced, affiliate commission recalculated on reduced platform cut.
 - usedCount only increments on successful booking creation (not validation).
 - All constraints met. Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 12.1
+Agent: main (Lead Architect)
+Task: Phase 12.1 — In-App CMS. Install TipTap, create BlogPost model, build admin editor. Content stored as JSON (not HTML) to prevent XSS. Public rendering deferred to Phase 12.2.
+
+Work Log:
+- Step 1 (dependencies): Installed `@tiptap/react@3.29.2`, `@tiptap/starter-kit@3.29.2`, `@tiptap/extension-image@3.29.2`, `@tiptap/extension-link@3.29.2`, `@tiptap/pm@3.29.2`. Did NOT install Pro version packages. Commit: `4da7f03`.
+- Step 2 (schema): Added `BlogPost` model to `prisma/schema.prisma`: `id`, `title`, `slug @unique`, `excerpt`, `content Json` (TipTap JSON), `coverImage String?`, `authorId`, `author User @relation`, `status @default("DRAFT")`, `createdAt`, `updatedAt`. Added `@@index([status])` and `@@index([authorId])` for query performance. Added `blogPosts BlogPost[]` back-relation to `User`. Pushed via `bun run db:push`. Commit: `0b5ce89`.
+- Step 3 (API): Created two API routes:
+  - `src/app/api/admin/blog/route.ts` — GET (list all with author), POST (create with auto-slug from title + de-duplication).
+  - `src/app/api/admin/blog/[id]/route.ts` — GET (single with full content), PATCH (update; slug re-de-duplicated on change), DELETE.
+  - `slugify()` function: lowercase, trim, remove non-word chars, spaces→hyphens, collapse multiple hyphens, trim edges → kebab-case.
+  - `ensureUniqueSlug()`: appends -2, -3, etc. if slug exists (excludes the current post's id during PATCH).
+  - Admin-only authorization on all routes. Commit: `de1df9d`.
+- Step 4 (TipTap component): Created `src/components/admin/tiptap-editor.tsx` — a `'use client'` component wrapping TipTap. Configured with `StarterKit` (headings 1-3, bold, italic, bullet/ordered lists, blockquote, code, history), `Link` (openOnClick: false, noopener/noreferrer), `Image` (allowBase64: true). **Strictly JSON input/output**: `content` prop is TipTap JSON, `onChange` callback emits `editor.getJSON()`. Toolbar with Bold, Italic, H1, H2, H3, Bullet List, Ordered List, Blockquote, Link (dialog), Image (dialog), Undo, Redo. Active-state highlighting. Syncs external content changes via `useEffect` (compares JSON strings to avoid cursor jumps). Commit: `05aedc1`.
+- Step 5 (admin UI): Added `BlogSection` + `BlogEditorDialog` to `admin-dashboard.tsx`. Table view: Title (with cover thumbnail), Slug, Author, Status (Draft=amber/Published=green badge), Updated (relative time), Actions (edit/delete). Empty state with "New Post" CTA. Editor dialog: Title input, Slug input (auto-generated placeholder), Excerpt textarea (500-char counter), Cover Image URL, Status dropdown (Draft/Published), TipTap editor for content. Create/Edit modes. Delete confirmation dialog. Added "Blog Posts" nav item (`article` icon) to admin nav. Commit: `031cb8c`.
+- Step 6 (i18n): Added 24 keys × 4 locales (en, tr, fa, ar): `admin.blogPosts`, `admin.blogDesc`, `admin.newPost`, `admin.title`, `admin.slug`, `admin.excerpt`, `admin.content`, `admin.coverImage`, `admin.draft`, `admin.published`, `blog.noPosts`, `blog.noPostsDesc`, `blog.slug`, `blog.author`, `blog.updated`, `blog.deleted`, `blog.deleteTitle`, `blog.deleteConfirm`, `blog.editPost`, `blog.editorDesc`, `blog.excerptPlaceholder`, `blog.created`, `blog.updated`, `blog.create`. Commit: `ebe1f39`.
+- Verification (curl + agent-browser):
+  - curl: GET returns empty list initially. POST creates "Welcome to Wishubest" with auto-slug `welcome-to-wishubest`, TipTap JSON content stored exactly as sent (heading + paragraph), status PUBLISHED. PATCH updates content with bold marks — verified content is dict (JSON), type=doc, no HTML tags. GET single returns full JSON content.
+  - agent-browser (admin): "Blog Posts" nav item present. Section shows table with the test post (title, slug, author "Platform Admin", Published badge). "New Post" dialog opens with Title, Slug, Excerpt (500-char counter), Cover Image, Status dropdown, and TipTap editor with full toolbar (Bold, Italic, H1/H2/H3, Lists, Blockquote, Link, Image, Undo/Redo). Typed "Medical Tourism Tips" + excerpt, clicked Create → post appears in list as Draft with slug `/medical-tourism-tips`. Verified content stored as JSON for both posts (dict, type=doc, no HTML). No page errors. Lint: 0 errors.
+
+Stage Summary:
+- 6 commits pushed to origin/main: 4da7f03 (deps), 0b5ce89 (schema), de1df9d (API), 05aedc1 (TipTap), 031cb8c (admin UI), ebe1f39 (i18n).
+- XSS prevention: TipTap editor strictly outputs/accepts JSON (not HTML). Content stored as Prisma `Json` type. Verified no HTML tags in stored content.
+- Slug auto-generation: kebab-case from title, de-duplicated with numeric suffix.
+- Phase 12.2 (public rendering) deferred — will render the JSON content safely with a TipTap renderer or custom JSON-to-React mapper.
+- Lint: 0 errors. Dev server running cleanly.
