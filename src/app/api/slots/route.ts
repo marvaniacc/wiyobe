@@ -49,6 +49,18 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
     if (!id) return error(400, 'id required')
+
+    // Ownership check: verify the slot belongs to the authenticated provider
+    const u = await db.user.findUnique({ where: { id: session.id }, include: { doctor: true, hospital: true, translator: true } })
+    const ownershipWhere: any = { id }
+    if (u?.doctor) ownershipWhere.doctorId = u.doctor.id
+    else if (u?.hospital) ownershipWhere.hospitalId = u.hospital.id
+    else if (u?.translator) ownershipWhere.translatorId = u.translator.id
+    else return error(403, 'Not a provider')
+
+    const existing = await db.slot.findFirst({ where: ownershipWhere, select: { id: true } })
+    if (!existing) return error(403, 'You do not own this slot')
+
     await db.slot.delete({ where: { id } })
     return json({ ok: true })
   } catch (e) { return handleError(e) }
