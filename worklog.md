@@ -1134,3 +1134,34 @@ Stage Summary:
 - The "Appointment Day" stage intelligently activates only when the startDate has actually arrived (for CONFIRMED bookings), so patients see accurate progress.
 - No new API endpoints created (constraint met) — component uses only the booking object passed as a prop.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 11.3
+Agent: main (Lead Architect)
+Task: Phase 11 final step — Promo Codes. Implement promo code backend, admin UI, and patient checkout integration. Financial rule: discount is deducted from the PLATFORM's commission, NOT the provider's revenue. Affiliate commission recalculated on the reduced platform commission.
+
+Work Log:
+- Step 1 (schema): Added `PromoCode` model (code, discountType, discountValue, maxUses, usedCount, expiryDate, isActive, timestamps) and `promoCodeId String?` + `discountAmount String @default("0")` to the `Booking` model. The `discountAmount` snapshots the actual discount applied (capped at platformCut) for financial audit integrity — the promo code's `discountValue` might change after the booking is created. Commit: `26eacba`.
+- Step 2 (APIs): Created two API routes:
+  - `src/app/api/admin/promo-codes/route.ts` — GET (list all with booking counts), POST (create with validation: code uniqueness, percentage ≤100), PATCH (toggle active/edit maxUses/expiry/discountValue), DELETE (only if usedCount === 0, to preserve audit history).
+  - `src/app/api/promo/validate/route.ts` — POST accepts `code`, `bookingAmount`, `providerType`. Validates active/expiry/maxUses. Calculates raw discount (PERCENTAGE: % of bookingAmount; FIXED: cents→dollars). **Caps the discount at the platform commission** for the given providerType (looks up CommissionRate) — the provider's revenue is NEVER reduced. Returns `{ valid, discountAmount, newTotal, capped, platformCut }`. Does NOT increment usedCount (constraint met).
+  Commit: `d7f8a97`.
+- Step 3 (booking API): Updated `POST /api/bookings` to accept optional `promoCode`. If provided, validates the code (active/not-expired/under-maxUses), calculates the discount (capped at `basePlatformCut`). Financial logic:
+  - `patientCharge = amount - discountAmount` (patient pays less)
+  - `providerNet = amount - basePlatformCut` (**UNCHANGED** — full net share)
+  - `newPlatformCut = basePlatformCut - discountAmount` (platform commission reduced)
+  - `affiliateCommission = newPlatformCut * affiliateRate%` (recalculated on reduced platform cut)
+  Saves `promoCodeId` + `discountAmount` to the booking. Increments `usedCount` only on successful booking creation. Payment amount = `patientCharge`. Ledger entries updated: PATIENT_CHARGE uses discounted amount; COMMISSION uses reduced platformCut with discount note in description; PROVIDER_CREDIT unchanged. Patient notification/email shows discounted amount; provider notification/email shows full amount. Commit: `85bf055`.
+- Step 4 (patient UI): Added promo code input to the BookingDialog step 2 (payment step). Input field with uppercase transform, "Apply" button, Enter-key support. On apply: calls `/api/promo/validate`, shows success (green) or error (red) message. When valid: shows discount line in the summary (green, "−$X.XX") and updates the Total to the discounted `effectiveTotal`. The promo code is passed to `POST /api/bookings` via the `promoCode` field. State resets on dialog close. Commit: `4e2a67c`.
+- Step 5 (admin UI): Added `PromoCodesSection` + `CreatePromoCodeDialog` to admin-dashboard.tsx. Table view with Code, Discount, Usage (usedCount/maxUses), Expiry, Status (Active/Inactive badge), Actions (toggle active, delete). Create dialog with Code (auto-uppercase), Type (Percentage/Fixed dropdown), Value, Max uses, Expiry date. Toggle active calls PATCH. Delete only available for unused codes (usedCount === 0). Info banner explaining the financial model. Added "Promo Codes" nav item (`local_offer` icon) to the admin nav. Commit: `f7ecb7b`.
+- Step 6 (i18n): Added 36 keys × 4 locales (en, tr, fa, ar) including `admin.promoCodes`, `admin.promoCodesDesc`, `promo.enterCode`, `promo.apply`, `promo.applied`, `promo.invalid`, `promo.discountApplied`, `promo.capped`, `promo.create`, `promo.createDesc`, `promo.code`, `promo.discount`, `promo.usage`, `promo.expiry`, `promo.expired`, `promo.bookings`, `promo.activate/deactivate/activated/deactivated`, `promo.cannotDeleteUsed`, `promo.deleted`, `promo.deleteTitle/Confirm`, `promo.financialNote`, `promo.type/percentage/fixed/valuePercent/valueFixed/fixedHint/maxUses`, `common.active/inactive/status/actions` (trimmed duplicates for keys that already existed). Commit: `eb7d64a`.
+- Verification (curl + agent-browser):
+  - curl validation API: WELCOME10 (10% of $100 = $10 discount, platformCut $30, not capped) → newTotal $90.00. SAVE500 ($5 fixed) → newTotal $95.00. MEGO50 (50% of $100 = $50, capped at platformCut $30) → discountAmount $30.00, capped=true, newTotal $70.00. FAKE99 → invalid.
+  - agent-browser (admin): "Promo Codes" nav item present. Section shows table with all 3 codes (MEGO50, SAVE500, WELCOME10) with correct discount displays (50%, $5.00, 10%), usage counts, active badges. "Create Code" dialog renders with all fields. Financial model info banner visible.
+  - agent-browser (patient): Opened booking dialog for Dr. Mehmet Yilmaz, selected slot, continued to payment step. Promo code section visible with "Enter promo code" label + Apply button. Typed "WELCOME10" + Apply → discount line "Discount applied (WELCOME10) −$10.00" appeared in green, Total updated from $100.00 → $90.00, success message "Promo code applied! — Discount applied: $10.00". Typed "FAKE99" + Apply → Total reverted to $100.00, error "Invalid code" in red. No page errors. Lint: 0 errors.
+
+Stage Summary:
+- 6 commits pushed to origin/main: 26eacba (schema), d7f8a97 (APIs), 85bf055 (booking logic), 4e2a67c (patient UI), f7ecb7b (admin UI), eb7d64a (i18n).
+- Financial integrity guaranteed: discount always capped at platform commission, provider revenue never reduced, affiliate commission recalculated on reduced platform cut.
+- usedCount only increments on successful booking creation (not validation).
+- All constraints met. Lint: 0 errors. Dev server running cleanly.
