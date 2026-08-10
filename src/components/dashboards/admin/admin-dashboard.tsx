@@ -4,7 +4,7 @@ import * as React from 'react'
 import { Icon } from '@/components/shared/icon'
 import { MessagesSection } from '@/components/chat/messages-section'
 import { useT } from '@/hooks/use-t'
-import { useApi, apiPost, apiPut } from '@/hooks/use-api'
+import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
@@ -1895,6 +1895,344 @@ function ReportsSection() {
 }
 
 // ============================================================================
+// Section: Promo Codes — CRUD for promo code management
+// ============================================================================
+
+type PromoCode = {
+  id: string
+  code: string
+  discountType: 'PERCENTAGE' | 'FIXED'
+  discountValue: number
+  maxUses: number | null
+  usedCount: number
+  expiryDate: string | null
+  isActive: boolean
+  createdAt: string
+  _count?: { bookings: number }
+}
+
+function PromoCodesSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ promoCodes: PromoCode[] }>('/api/admin/promo-codes')
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [deleteTarget, setDeleteTarget] = React.useState<PromoCode | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
+
+  const codes = data?.promoCodes || []
+
+  async function toggleActive(pc: PromoCode) {
+    try {
+      await apiPatch('/api/admin/promo-codes', { id: pc.id, isActive: !pc.isActive })
+      toast.success(pc.isActive ? t('promo.deactivated', 'Promo code deactivated') : t('promo.activated', 'Promo code activated'))
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await apiDelete(`/api/admin/promo-codes?id=${deleteTarget.id}`)
+      toast.success(t('promo.deleted', 'Promo code deleted'))
+      setDeleteTarget(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title={t('admin.promoCodes', 'Promo Codes')} icon="local_offer" />
+        <LoadingCard lines={4} />
+      </div>
+    )
+  }
+  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={t('admin.promoCodes', 'Promo Codes')}
+        description={t('admin.promoCodesDesc', 'Create and manage promotional discount codes for patients')}
+        icon="local_offer"
+        action={
+          <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+            <Icon name="add" size={18} />
+            {t('promo.create', 'Create Code')}
+          </Button>
+        }
+      />
+
+      {codes.length === 0 ? (
+        <Card className="mt-6">
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <Icon name="local_offer" size={32} className="text-muted-foreground/50" />
+            <p className="text-sm font-medium text-foreground">{t('promo.noCodes', 'No promo codes yet')}</p>
+            <p className="max-w-sm text-xs text-muted-foreground">{t('promo.noCodesDesc', 'Create a promo code to offer patients discounts at checkout. Discounts are deducted from the platform commission, not provider revenue.')}</p>
+            <Button onClick={() => setCreateOpen(true)} className="mt-2 gap-1.5">
+              <Icon name="add" size={16} />
+              {t('promo.create', 'Create Code')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="mt-6 overflow-hidden rounded-[16px] border border-divider">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('promo.code', 'Code')}</TableHead>
+                <TableHead>{t('promo.discount', 'Discount')}</TableHead>
+                <TableHead className="text-center">{t('promo.usage', 'Usage')}</TableHead>
+                <TableHead>{t('promo.expiry', 'Expiry')}</TableHead>
+                <TableHead className="text-center">{t('common.status', 'Status')}</TableHead>
+                <TableHead className="text-end">{t('common.actions', 'Actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {codes.map((pc) => {
+                const isExpired = pc.expiryDate && new Date(pc.expiryDate) < new Date()
+                const usageExhausted = pc.maxUses !== null && pc.usedCount >= pc.maxUses
+                return (
+                  <TableRow key={pc.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <code className="rounded-md bg-primary/5 px-2 py-0.5 text-sm font-semibold text-primary">{pc.code}</code>
+                        {pc._count?.bookings ? (
+                          <span className="text-xs text-muted-foreground">{pc._count.bookings} {t('promo.bookings', 'bookings')}</span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-medium text-foreground">
+                        {pc.discountType === 'PERCENTAGE' ? `${pc.discountValue}%` : formatCurrency(String(pc.discountValue / 100), 'USD', locale)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        {pc.usedCount}{pc.maxUses !== null ? ` / ${pc.maxUses}` : ''}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {pc.expiryDate ? (
+                        <span className={cn('text-sm', isExpired ? 'text-error' : 'text-muted-foreground')}>
+                          {formatDate(pc.expiryDate, locale)}
+                          {isExpired && <span className="ms-1 text-xs">({t('promo.expired', 'expired')})</span>}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'rounded-full border',
+                          pc.isActive && !isExpired && !usageExhausted
+                            ? 'border-success/20 bg-success/10 text-success'
+                            : 'border-divider bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {pc.isActive && !isExpired && !usageExhausted ? t('common.active', 'Active') : t('common.inactive', 'Inactive')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-end">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => toggleActive(pc)}
+                          title={pc.isActive ? t('promo.deactivate', 'Deactivate') : t('promo.activate', 'Activate')}
+                          className="gap-1"
+                        >
+                          <Icon name={pc.isActive ? 'toggle_off' : 'toggle_on'} size={18} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteTarget(pc)}
+                          disabled={pc.usedCount > 0}
+                          title={pc.usedCount > 0 ? t('promo.cannotDeleteUsed', 'Cannot delete a used code') : t('common.delete', 'Delete')}
+                          className="text-error hover:bg-error/5"
+                        >
+                          <Icon name="delete" size={16} />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Info banner about financial model */}
+      <div className="mt-4 flex items-start gap-2 rounded-[12px] border border-info/20 bg-info/5 p-3.5">
+        <Icon name="info" size={16} className="mt-0.5 shrink-0 text-info" />
+        <p className="text-xs text-muted-foreground">
+          {t('promo.financialNote', 'Promo code discounts are deducted from the platform commission. The provider always receives their full revenue. If an affiliate is involved, their commission is calculated on the reduced platform commission.')}
+        </p>
+      </div>
+
+      <CreatePromoCodeDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => { setCreateOpen(false); refetch() }} />
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="warning" size={20} className="text-error" />
+              {t('promo.deleteTitle', 'Delete promo code?')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('promo.deleteConfirm', 'Are you sure you want to delete the code')} <code className="font-semibold text-foreground">{deleteTarget?.code}</code>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="gap-1.5">
+              {deleting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="delete" size={16} />}
+              {t('common.delete', 'Delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function CreatePromoCodeDialog({ open, onOpenChange, onCreated }: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onCreated: () => void
+}) {
+  const { t } = useT()
+  const [code, setCode] = React.useState('')
+  const [discountType, setDiscountType] = React.useState<'PERCENTAGE' | 'FIXED'>('PERCENTAGE')
+  const [discountValue, setDiscountValue] = React.useState('')
+  const [maxUses, setMaxUses] = React.useState('')
+  const [expiryDate, setExpiryDate] = React.useState('')
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (open) {
+      setCode('')
+      setDiscountType('PERCENTAGE')
+      setDiscountValue('')
+      setMaxUses('')
+      setExpiryDate('')
+    }
+  }, [open])
+
+  async function handleCreate() {
+    if (!code.trim() || !discountValue) return
+    setSaving(true)
+    try {
+      await apiPost('/api/admin/promo-codes', {
+        code: code.trim().toUpperCase(),
+        discountType,
+        discountValue: parseInt(discountValue, 10),
+        maxUses: maxUses ? parseInt(maxUses, 10) : null,
+        expiryDate: expiryDate || null,
+        isActive: true,
+      })
+      toast.success(t('promo.created', 'Promo code created'))
+      onCreated()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="local_offer" size={20} className="text-primary" />
+            {t('promo.create', 'Create Promo Code')}
+          </DialogTitle>
+          <DialogDescription>{t('promo.createDesc', 'Create a new discount code for patients.')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('promo.code', 'Code')}</Label>
+            <Input
+              placeholder="WINTER10"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              className="uppercase"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('promo.type', 'Type')}</Label>
+              <Select value={discountType} onValueChange={(v) => setDiscountType(v as 'PERCENTAGE' | 'FIXED')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PERCENTAGE">{t('promo.percentage', 'Percentage')}</SelectItem>
+                  <SelectItem value="FIXED">{t('promo.fixed', 'Fixed amount')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                {discountType === 'PERCENTAGE' ? t('promo.valuePercent', 'Value (%)') : t('promo.valueFixed', 'Value (cents)')}
+              </Label>
+              <Input
+                type="number"
+                placeholder={discountType === 'PERCENTAGE' ? '10' : '500'}
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                min={1}
+                max={discountType === 'PERCENTAGE' ? 100 : undefined}
+              />
+              {discountType === 'FIXED' && (
+                <p className="text-[11px] text-muted-foreground">{t('promo.fixedHint', 'Enter amount in cents (500 = $5.00)')}</p>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('promo.maxUses', 'Max uses (optional)')}</Label>
+              <Input
+                type="number"
+                placeholder="∞"
+                value={maxUses}
+                onChange={(e) => setMaxUses(e.target.value)}
+                min={1}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('promo.expiry', 'Expiry date')}</Label>
+              <Input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+          <Button onClick={handleCreate} disabled={!code.trim() || !discountValue || saving} className="gap-1.5">
+            {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="check" size={16} />}
+            {t('promo.create', 'Create Code')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -1909,6 +2247,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'moderation': return <ModerationSection />
     case 'commission': return <CommissionSection />
     case 'affiliate-rates': return <AffiliateRatesSection />
+    case 'promo-codes': return <PromoCodesSection />
     case 'cancellations': return <CancellationsSection />
     case 'payouts': return <PayoutsSection />
     case 'ledger': return <LedgerSection />

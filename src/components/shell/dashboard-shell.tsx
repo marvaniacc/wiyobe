@@ -94,6 +94,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
     { key: 'commission', labelKey: 'dash.commission', icon: 'percent' },
     { key: 'affiliate-rates', labelKey: 'admin.affiliateRates', icon: 'campaign' },
+    { key: 'promo-codes', labelKey: 'admin.promoCodes', icon: 'local_offer' },
     { key: 'cancellations', labelKey: 'dash.cancellations', icon: 'cancel_schedule_send' },
     { key: 'payouts', labelKey: 'dash.payouts', icon: 'account_balance' },
     { key: 'ledger', labelKey: 'dash.ledger', icon: 'receipt_long' },
