@@ -131,10 +131,14 @@ export async function POST(req: Request) {
         },
       })
       if (doctorIds.length > 0) {
-        await tx.medicalRecordAccess.createMany({
-          data: doctorIds.map((doctorId) => ({ documentId: created.id, doctorId })),
-          skipDuplicates: true,
-        })
+        // createMany with skipDuplicates isn't supported on SQLite, so
+        // grant access one-by-one. The document was just created so there
+        // are no existing grants to conflict with.
+        for (const doctorId of doctorIds) {
+          await tx.medicalRecordAccess.create({
+            data: { documentId: created.id, doctorId },
+          })
+        }
       }
       return created
     })

@@ -62,19 +62,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const toGrant = [...validIds].filter((did) => !existingIds.has(did))
       const toRevoke = [...existingIds].filter((did) => !validIds.has(did))
 
-      await db.$transaction([
-        ...(toGrant.length > 0
-          ? [db.medicalRecordAccess.createMany({
-              data: toGrant.map((doctorId) => ({ documentId: id, doctorId })),
-              skipDuplicates: true,
-            })]
-          : []),
-        ...(toRevoke.length > 0
-          ? [db.medicalRecordAccess.deleteMany({
-              where: { documentId: id, doctorId: { in: toRevoke } },
-            })]
-          : []),
-      ])
+      // Use the interactive $transaction callback so we can run the grant
+      // and revoke operations conditionally (the array form requires every
+      // element to be a valid Prisma promise and doesn't support
+      // skipDuplicates on SQLite).
+      await db.$transaction(async (tx) => {
+        if (toGrant.length > 0) {
+          // Filter out any ids that somehow already exist (race safety)
+          // since createMany with skipDuplicates isn't supported on SQLite.
+          for (const doctorId of toGrant) {
+            await tx.medicalRecordAccess.upsert({
+              where: { documentId_doctorId: { documentId: id, doctorId } },
+              create: { documentId: id, doctorId },
+              update: {},
+            })
+          }
+        }
+        if (toRevoke.length > 0) {
+          await tx.medicalRecordAccess.deleteMany({
+            where: { documentId: id, doctorId: { in: toRevoke } },
+          })
+        }
+      })
     }
 
     // Update notes if provided.
