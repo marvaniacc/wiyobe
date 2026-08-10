@@ -102,6 +102,9 @@ model User {
   notifications     Notification[]
   favorites         Favorite[]   @relation("favorites")
   medicalDocuments  MedicalDocument[] @relation("medicalDocuments")
+  // Medical documents that other patients (or this user's patients) have
+  // explicitly shared with this user (when they are a doctor).
+  sharedMedicalRecords MedicalRecordAccess[] @relation("doctorRecordAccess")
   disputesRaised    Dispute[]    @relation("disputesRaised")
   disputesAgainst   Dispute[]    @relation("disputesAgainst")
   disputesResolved  Dispute[]    @relation("disputesResolved")
@@ -451,6 +454,26 @@ model MedicalDocument {
   dataUrl    String   // base64 data URL (MVP) — would be S3 URL in production
   notes      String?
   createdAt  DateTime @default(now())
+
+  // Doctors the patient has explicitly granted access to this document.
+  // A join table is used instead of a String[] scalar list because SQLite
+  // does not support scalar lists in Prisma. This also enables efficient
+  // authorization queries (a doctor can fetch only documents where a row
+  // with their userId exists here).
+  accessGrants MedicalRecordAccess[]
+}
+
+/// Junction table — grants a single doctor access to a single medical document.
+model MedicalRecordAccess {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    MedicalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  doctorId    String   // the User id of the doctor granted access
+  doctor      User     @relation("doctorRecordAccess", fields: [doctorId], references: [id], onDelete: Cascade)
+  grantedAt   DateTime @default(now())
+
+  @@unique([documentId, doctorId]) // a doctor can't be granted access twice to the same doc
+  @@index([doctorId])              // fast lookup of "all docs shared with me"
 }
 
 enum DisputeStatus {
