@@ -207,12 +207,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ bookingI
       newY(20)
     }
 
-    // Total box
+    // Total box — draw directly with explicit y (helpers use closure y, not an arg)
     newY(5)
     const boxY = y
     drawRect(350, height - boxY, 195, 28, blue)
-    drawText('TOTAL PAID', 360, boxY + 9, 11, fontBold, white)
-    drawTextRight(formatCurrency(booking.amount, booking.currency || 'USD', 'en'), width - margin - 5, boxY + 9, 11, fontBold, white)
+    page.drawText('TOTAL PAID', { x: 360, y: boxY + 9, size: 11, font: fontBold, color: white })
+    const totalAmountText = formatCurrency(booking.amount, booking.currency || 'USD', 'en')
+    const totalAmountWidth = fontBold.widthOfTextAtSize(totalAmountText, 11)
+    page.drawText(totalAmountText, { x: width - margin - 5 - totalAmountWidth, y: boxY + 9, size: 11, font: fontBold, color: white })
     newY(45)
 
     // === Footer ===
@@ -227,15 +229,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ bookingI
     newY(14)
     page.drawText(footerText2, { x: (width - fw2) / 2, y, size: 8, font, color: lightGray })
 
-    // Serialize
+    // Serialize — pdf-lib returns a Uint8Array; wrap in Node Buffer for a
+    // robust binary Response body across all Next.js runtimes.
     const pdfBytes = await pdfDoc.save()
+    const body = Buffer.from(pdfBytes)
 
-    return new Response(pdfBytes, {
+    return new Response(body, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${invoiceNumber}.pdf"`,
-        'Content-Length': String(pdfBytes.length),
+        'Content-Disposition': `attachment; filename="${invoiceNumber}.pdf"`,
+        'Content-Length': String(body.length),
         'Cache-Control': 'private, no-store',
       },
     })
