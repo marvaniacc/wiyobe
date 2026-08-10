@@ -63,6 +63,51 @@ function renderContent(content: unknown): string {
   }
 }
 
+/**
+ * Generate dynamic SEO metadata for each blog post. This runs on the server
+ * and populates <title>, meta description, and Open Graph / Twitter Card
+ * tags so search engines and social media link previews work correctly.
+ *
+ * Returns minimal fallback metadata when the post is not found (Next.js will
+ * then render the notFound() page).
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const post = await getPost(slug)
+  if (!post) {
+    return { title: 'Post not found — Wishubest Blog' }
+  }
+
+  const url = `/blog/${post.slug}`
+  const images = post.coverImage ? [{ url: post.coverImage, width: 1200, height: 630, alt: post.title }] : undefined
+
+  return {
+    title: `${post.title} — Wishubest Blog`,
+    description: post.excerpt || post.title,
+    alternates: { canonical: url },
+    openGraph: {
+      title: post.title,
+      description: post.excerpt || post.title,
+      type: 'article',
+      url,
+      publishedTime: post.createdAt.toISOString(),
+      modifiedTime: post.updatedAt.toISOString(),
+      authors: post.author?.name ? [post.author.name] : undefined,
+      images,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt || post.title,
+      images,
+    },
+  }
+}
+
 export default async function BlogDetailPage({
   params,
 }: {
