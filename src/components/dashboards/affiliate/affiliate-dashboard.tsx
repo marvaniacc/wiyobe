@@ -18,7 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
-import { Progress } from '@/components/ui/progress'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -918,11 +917,6 @@ function ProfileSection() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">{t('affiliate.referralCode')}</span>
                 <span className="font-mono text-sm font-bold text-foreground">{data.affiliate?.referralCode}</span>
-              </div>
-              <Separator className="my-2" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{t('affiliate.commissionRate')}</span>
-                <span className="text-sm font-semibold text-foreground">{data.affiliate?.commissionRate ?? '25'}%</span>
               </div>
             </div>
           </CardContent>
