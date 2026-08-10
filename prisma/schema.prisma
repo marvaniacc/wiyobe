@@ -109,6 +109,7 @@ model User {
   affiliateReferrals AffiliateClick[] @relation("affiliateReferrals")
   referredByAffiliateId String?
   referredByAffiliate  Affiliate? @relation("ReferredProviders", fields: [referredByAffiliateId], references: [id])
+  referredAt           DateTime?
   kycDocuments      KycDocument[] @relation("kycDocuments")
   kycReviewed       KycDocument[] @relation("kycReviewed")
   ticketsRaised     Ticket[]    @relation("ticketsRaised")
