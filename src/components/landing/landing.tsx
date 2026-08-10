@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useApp } from '@/stores/app-store'
 import { Icon } from '@/components/shared/icon'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,14 @@ export function LandingPage() {
           <span className="text-lg font-semibold text-foreground">{t('brand.name')}</span>
         </div>
         <div className="flex items-center gap-1.5">
+          {/* Blog link — public SSR route */}
+          <Link
+            href="/blog"
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Icon name="article" size={18} />
+            <span className="hidden sm:inline">Blog</span>
+          </Link>
           {/* Language */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -105,7 +114,13 @@ export function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-divider bg-surface px-6 py-4 text-center text-xs text-muted-foreground">
-        <span>© {new Date().getFullYear()} {t('brand.name')}. {t('footer.rights')}</span>
+        <div className="flex items-center justify-center gap-4">
+          <span>© {new Date().getFullYear()} {t('brand.name')}. {t('footer.rights')}</span>
+          <span className="text-divider">·</span>
+          <Link href="/blog" className="font-medium text-muted-foreground transition-colors hover:text-primary">
+            Blog
+          </Link>
+        </div>
       </footer>
     </div>
   )
