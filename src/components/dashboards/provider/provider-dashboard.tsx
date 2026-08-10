@@ -508,6 +508,7 @@ function AppointmentsSection({ role }: { role: string }) {
       <Tabs value={filter} onValueChange={setFilter}>
         <TabsList className="h-10">
           <TabsTrigger value="all" className="gap-1.5 px-3"><Icon name="list" size={14} />{t('common.all')}</TabsTrigger>
+          <TabsTrigger value="pending" className="gap-1.5 px-3"><Icon name="pending" size={14} />{t('common.pending')}</TabsTrigger>
           <TabsTrigger value="confirmed" className="gap-1.5 px-3"><Icon name="check_circle" size={14} />{t('common.confirmed')}</TabsTrigger>
           <TabsTrigger value="completed" className="gap-1.5 px-3"><Icon name="task_alt" size={14} />{t('common.completed')}</TabsTrigger>
           <TabsTrigger value="cancelled" className="gap-1.5 px-3"><Icon name="cancel" size={14} />{t('common.cancelled')}</TabsTrigger>
