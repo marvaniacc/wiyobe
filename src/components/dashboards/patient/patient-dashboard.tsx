@@ -1065,6 +1065,10 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
   const [nights, setNights] = useState(1)
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Promo code state
+  const [promoInput, setPromoInput] = useState('')
+  const [promoResult, setPromoResult] = useState<{ valid: boolean; code: string; discountAmount: string; newTotal: string; message?: string; capped?: boolean } | null>(null)
+  const [promoApplying, setPromoApplying] = useState(false)
 
   const hotel = provider ? isHotel(provider) : false
   const showOnline = provider ? onlinePriceAvailable(provider) : false
@@ -1096,6 +1100,37 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
     setNights(1)
     setNotes('')
     setSubmitting(false)
+    setPromoInput('')
+    setPromoResult(null)
+    setPromoApplying(false)
+  }
+
+  // The effective total the patient pays (with promo discount applied if valid).
+  const effectiveTotal = promoResult?.valid ? promoResult.newTotal : total
+
+  async function handleApplyPromo() {
+    if (!promoInput.trim() || !provider) return
+    setPromoApplying(true)
+    setPromoResult(null)
+    try {
+      const res = await apiPost<{ valid: boolean; code?: string; discountAmount?: string; newTotal?: string; message?: string; capped?: boolean }>('/api/promo/validate', {
+        code: promoInput.trim(),
+        bookingAmount: parseFloat(total),
+        providerType: provider.providerType,
+      })
+      if (res.valid && res.code && res.discountAmount && res.newTotal) {
+        setPromoResult({ valid: true, code: res.code, discountAmount: res.discountAmount, newTotal: res.newTotal, capped: res.capped })
+        toast.success(t('promo.applied'))
+      } else {
+        setPromoResult({ valid: false, code: '', discountAmount: '0', newTotal: total, message: res.message || t('promo.invalid') })
+        toast.error(res.message || t('promo.invalid'))
+      }
+    } catch (e: any) {
+      setPromoResult({ valid: false, code: '', discountAmount: '0', newTotal: total, message: e.message || t('promo.invalid') })
+      toast.error(e.message || t('promo.invalid'))
+    } finally {
+      setPromoApplying(false)
+    }
   }
 
   function handleClose(o: boolean) {
@@ -1127,6 +1162,7 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
       startDate: bodyStartDate,
       endDate: bodyEndDate,
       notes: notes.trim() || undefined,
+      promoCode: promoResult?.valid ? promoResult.code : undefined,
     })
       .then(() => {
         toast.success(t('booking.bookingCreated'))
@@ -1304,14 +1340,64 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
                     <span className="font-medium text-foreground">{nights}</span>
                   </div>
                 )}
+                {/* Promo discount line */}
+                {promoResult?.valid && (
+                  <div className="flex items-center justify-between text-success">
+                    <span className="flex items-center gap-1.5">
+                      <Icon name="local_offer" size={14} fill />
+                      {t('promo.discountApplied')} ({promoResult.code})
+                    </span>
+                    <span className="font-medium tabular-nums">−{formatCurrency(promoResult.discountAmount, 'USD', locale)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-foreground">{t('common.total')}</span>
                   <span className="text-lg font-semibold text-foreground tabular-nums">
-                    {formatCurrency(total, 'USD', locale)}
+                    {formatCurrency(effectiveTotal, 'USD', locale)}
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Promo code input */}
+            <div className="space-y-2 rounded-xl border border-divider p-3">
+              <Label className="flex items-center gap-1.5 text-sm font-medium">
+                <Icon name="local_offer" size={14} className="text-primary" />
+                {t('promo.enterCode')}
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="WINTER10"
+                  value={promoInput}
+                  onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoResult(null) }}
+                  className="flex-1 uppercase"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && promoInput.trim()) { e.preventDefault(); handleApplyPromo() } }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleApplyPromo}
+                  disabled={!promoInput.trim() || promoApplying}
+                  className="shrink-0 gap-1.5"
+                >
+                  {promoApplying ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="check" size={14} />}
+                  {t('promo.apply')}
+                </Button>
+              </div>
+              {promoResult?.valid && (
+                <p className="flex items-center gap-1.5 text-xs text-success">
+                  <Icon name="check_circle" size={14} fill />
+                  {t('promo.applied')} — {t('promo.discountApplied')}: {formatCurrency(promoResult.discountAmount, 'USD', locale)}
+                  {promoResult.capped && <span className="text-muted-foreground">({t('promo.capped', 'discount capped at platform commission')})</span>}
+                </p>
+              )}
+              {promoResult && !promoResult.valid && (
+                <p className="flex items-center gap-1.5 text-xs text-error">
+                  <Icon name="cancel" size={14} fill />
+                  {promoResult.message || t('promo.invalid')}
+                </p>
+              )}
             </div>
 
             {/* Booking recap */}
