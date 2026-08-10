@@ -343,6 +343,11 @@ model Booking {
   cancelledById      String?
   cancelledAt        DateTime?
   refundAmount       String?
+  // Promo code applied at checkout. The discount is deducted from the
+  // PLATFORM's commission — the provider always receives their full net share.
+  promoCodeId        String?
+  promoCode          PromoCode?    @relation(fields: [promoCodeId], references: [id])
+  discountAmount     String        @default("0")       // snapshot of the discount applied (capped at platformCut)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -353,6 +358,23 @@ model Booking {
   chatMessages       ChatMessage[]
   itineraryId        String?
   itinerary          Itinerary?  @relation(fields: [itineraryId], references: [id])
+}
+
+/// Promo codes for patient conversion boosts. The discount is always
+/// deducted from the platform's commission, never from provider revenue.
+model PromoCode {
+  id            String    @id @default(cuid())
+  code          String    @unique              // e.g. "WINTER10" — stored uppercase
+  discountType  String                          // "PERCENTAGE" | "FIXED"
+  discountValue Int                             // Percentage: 1-100. Fixed: amount in cents.
+  maxUses       Int?                            // null = unlimited
+  usedCount     Int       @default(0)
+  expiryDate    DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bookings      Booking[]
 }
 
 model Payment {
