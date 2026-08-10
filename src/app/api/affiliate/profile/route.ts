@@ -24,7 +24,6 @@ export async function GET() {
         data: {
           userId: session.id,
           referralCode,
-          commissionRate: '10',
         },
       })
     }
@@ -73,7 +72,7 @@ export async function PUT(req: Request) {
     if (!affiliate) {
       const referralCode = generateReferralCode(body.name || session.email)
       affiliate = await db.affiliate.create({
-        data: { userId: session.id, referralCode, commissionRate: '10' },
+        data: { userId: session.id, referralCode },
       })
     }
 
