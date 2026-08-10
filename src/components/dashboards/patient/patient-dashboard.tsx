@@ -34,6 +34,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { downloadICal } from '@/lib/ical'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
@@ -2661,6 +2662,16 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
             </Badge>
             <span className="text-xs text-muted-foreground">{formatDateTime(booking.startDate, locale)}</span>
           </div>
+
+          {/* PENDING info banner */}
+          {booking.status === 'PENDING' && (
+            <Alert className="border-warning/30 bg-warning/5">
+              <Icon name="hourglass_top" size={18} className="text-warning" />
+              <AlertDescription className="text-sm text-foreground">
+                {t('patient.pendingApproval')}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Timeline */}
           <div>
