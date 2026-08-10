@@ -6,6 +6,7 @@ import { MessagesSection } from '@/components/chat/messages-section'
 import { useT } from '@/hooks/use-t'
 import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
 import { TiptapEditor, type TiptapJSON } from '@/components/admin/tiptap-editor'
+import { TiptapPreview } from '@/components/admin/tiptap-preview'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
@@ -2256,6 +2257,7 @@ function BlogSection() {
   const { data, loading, error, refetch } = useApi<{ posts: BlogPost[] }>('/api/admin/blog')
   const [editing, setEditing] = React.useState<BlogPost | null>(null)
   const [creating, setCreating] = React.useState(false)
+  const [previewPost, setPreviewPost] = React.useState<BlogPost | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<BlogPost | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -2329,13 +2331,18 @@ function BlogSection() {
               {posts.map((post) => (
                 <TableRow key={post.id}>
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPost(post)}
+                      className="flex items-center gap-2 text-left transition-opacity hover:opacity-80"
+                      title={t('blog.preview', 'Preview')}
+                    >
                       {post.coverImage && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={post.coverImage} alt="" className="size-9 rounded-[8px] object-cover" />
+                        <img src={post.coverImage} alt="" className="size-9 shrink-0 rounded-[8px] object-cover" />
                       )}
-                      <span className="max-w-xs truncate text-sm font-medium text-foreground">{post.title}</span>
-                    </div>
+                      <span className="max-w-xs truncate text-sm font-medium text-primary hover:underline">{post.title}</span>
+                    </button>
                   </TableCell>
                   <TableCell>
                     <code className="text-xs text-muted-foreground">/{post.slug}</code>
@@ -2413,6 +2420,75 @@ function BlogSection() {
             <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="gap-1.5">
               {deleting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="delete" size={16} />}
               {t('common.delete', 'Delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Post preview — renders the stored TipTap JSON as it will appear publicly */}
+      <Dialog open={!!previewPost} onOpenChange={(o) => !o && setPreviewPost(null)}>
+        <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="visibility" size={20} className="text-primary" />
+              {t('blog.preview', 'Preview')}
+            </DialogTitle>
+            <DialogDescription>{t('blog.previewDesc', 'This is how the post will appear to readers.')}</DialogDescription>
+          </DialogHeader>
+
+          {previewPost && (
+            <article className="space-y-4">
+              {/* Cover image */}
+              {previewPost.coverImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={previewPost.coverImage} alt={previewPost.title} className="aspect-[16/9] w-full rounded-[14px] object-cover" />
+              )}
+
+              {/* Title + meta */}
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">{previewPost.title}</h1>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Icon name="person" size={14} />
+                    {previewPost.author?.name || previewPost.author?.email || '—'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Icon name="event" size={14} />
+                    {formatDate(previewPost.createdAt, locale)}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'rounded-full border',
+                      previewPost.status === 'PUBLISHED'
+                        ? 'border-success/20 bg-success/10 text-success'
+                        : 'border-warning/20 bg-warning/10 text-warning',
+                    )}
+                  >
+                    {previewPost.status === 'PUBLISHED' ? t('admin.published', 'Published') : t('admin.draft', 'Draft')}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Excerpt */}
+              {previewPost.excerpt && (
+                <p className="rounded-[12px] border-s-2 border-primary bg-primary/5 p-3 text-sm italic text-muted-foreground">
+                  {previewPost.excerpt}
+                </p>
+              )}
+
+              {/* Rendered content */}
+              <div className="rounded-[14px] border border-divider p-5">
+                <TiptapPreview content={previewPost.content as TiptapJSON} />
+              </div>
+            </article>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewPost(null)}>{t('common.close', 'Close')}</Button>
+            <Button onClick={() => { const p = previewPost; setPreviewPost(null); setEditing(p) }} className="gap-1.5">
+              <Icon name="edit" size={16} />
+              {t('blog.editPost', 'Edit Post')}
             </Button>
           </DialogFooter>
         </DialogContent>
