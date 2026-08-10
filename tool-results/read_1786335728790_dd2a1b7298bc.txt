@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import * as React from 'react'
+     4→import { Icon } from '@/components/shared/icon'
+     5→import { MessagesSection } from '@/components/chat/messages-section'
+     6→import { useT } from '@/hooks/use-t'
+     7→import { useApi, apiPost, apiPut } from '@/hooks/use-api'
+     8→import { useApp } from '@/stores/app-store'
+     9→import { cn } from '@/lib/utils'
+    10→import { toast } from 'sonner'
+    11→import { formatCurrency, formatDate, formatDateTime, relativeTime } from '@/lib/money'
+    12→import { Button } from '@/components/ui/button'
+    13→import { Input } from '@/components/ui/input'
+    14→import { Label } from '@/components/ui/label'
+    15→import { Textarea } from '@/components/ui/textarea'
+    16→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+    17→import { Badge } from '@/components/ui/badge'
+    18→import { Skeleton } from '@/components/ui/skeleton'
+    19→import { Separator } from '@/components/ui/separator'
+    20→import {
+    21→  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+    22→} from '@/components/ui/table'
+    23→import {
+    24→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    25→} from '@/components/ui/select'
+    26→import {
+    27→  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+    28→} from '@/components/ui/dialog'
+    29→import {
+    30→  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
+    31→  PieChart, Pie, Cell,
+    32→} from 'recharts'
+    33→
+    34→// ============================================================================
+    35→// Types
+    36→// ============================================================================
+    37→
+    38→type Status = 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED' | 'NO_SHOW'
+    39→type Role = 'PATIENT' | 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR' | 'ADMIN'
+    40→type ProviderType = 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR'
+    41→type LedgerType =
+    42→  | 'PATIENT_CHARGE' | 'COMMISSION' | 'PROVIDER_CREDIT' | 'PROVIDER_DEBIT'
+    43→  | 'REFUND_PATIENT' | 'REFUND_COMMISSION_REVERSAL' | 'REFUND_PROVIDER_DEBIT' | 'PAYOUT'
+    44→
+    45→interface AdminUser {
+    46→  id: string
+    47→  email: string
+    48→  role: Role
+    49→  status: Status
+    50→  name: string | null
+    51→  preferredLanguage: string
+    52→  country: string | null
+    53→  city: string | null
+    54→  createdAt: string
+    55→  doctor?: { specialty: string; verified: boolean; city: string; country: string } | null
+    56→  hospital?: { name: string; verified: boolean; city: string; country: string } | null
+    57→  hotel?: { name: string; verified: boolean; city: string; country: string } | null
+    58→  translator?: { specialization: string; verified: boolean; city: string; country: string } | null
+    59→  patient?: { dateOfBirth: string | null } | null
+    60→}
+    61→
+    62→interface AdminStats {
+    63→  totalBookings: number
+    64→  completedBookings: number
+    65→  activeProviders: number
+    66→  totalUsers: number
+    67→  platformRevenue: string
+    68→  pendingProviders: number
+    69→  recentBookings: Array<{
+    70→    id: string
+    71→    providerType: ProviderType
+    72→    visitType: 'IN_PERSON' | 'ONLINE'
+    73→    status: Status
+    74→    startDate: string
+    75→    amount: string
+    76→    patient: { name: string | null }
+    77→  }>
+    78→  byType: Array<{ providerType: ProviderType; _count: number }>
+    79→  dailyRevenue: Array<{ date: string; amount: number }>
+    80→}
+    81→
+    82→interface CommissionRate { id: string; providerType: ProviderType; rate: string }
+    83→interface CancellationPolicy {
+    84→  id: string
+    85→  providerType: ProviderType
+    86→  freeCancellationHours: number
+    87→  cancellationFeePercent: string
+    88→}
+    89→
+    90→interface ProviderBalanceRow {
+    91→  userId: string
+    92→  name: string | null
+    93→  email: string
+    94→  providerType: ProviderType
+    95→  available: string
+    96→  pending: string
+    97→  paidOut: string
+    98→  lifetime: string
+    99→}
+   100→
+   101→interface Payout {
+   102→  id: string
+   103→  providerUserId: string
+   104→  providerType: ProviderType
+   105→  amount: string
+   106→  status: 'PENDING' | 'COMPLETED'
+   107→  method: string
+   108→  reference: string | null
+   109→  periodStart: string
+   110→  periodEnd: string
+   111→  completedAt: string | null
+   112→  createdAt: string
+   113→  providerUser: { name: string | null; email: string }
+   114→}
+   115→
+   116→interface LedgerEntry {
+   117→  id: string
+   118→  type: LedgerType
+   119→  bookingId: string | null
+   120→  paymentId: string | null
+   121→  payoutId: string | null
+   122→  userId: string | null
+   123→  amount: string
+   124→  description: string
+   125→  createdAt: string
+   126→  booking?: { id: string; patient: { name: string | null } | null } | null
+   127→  user?: { name: string | null; email: string } | null
+   128→}
+   129→
+   130→// ============================================================================
+   131→// Shared helpers
+   132→// ============================================================================
+   133→
+   134→const ROLE_LABEL_KEY: Record<Role, string> = {
+   135→  PATIENT: 'role.patient',
+   136→  DOCTOR: 'role.doctor',
+   137→  HOSPITAL: 'role.hospital',
+   138→  HOTEL: 'role.hotel',
+   139→  TRANSLATOR: 'role.translator',
+   140→  ADMIN: 'role.admin',
+   141→}
+   142→
+   143→const PROVIDER_TYPE_LABEL_KEY: Record<ProviderType, string> = {
+   144→  DOCTOR: 'role.doctor',
+   145→  HOSPITAL: 'role.hospital',
+   146→  HOTEL: 'role.hotel',
+   147→  TRANSLATOR: 'role.translator',
+   148→}
+   149→
+   150→function exportCSV(filename: string, headers: string[], rows: Array<Array<string | number | null | undefined>>) {
+   151→  const escape = (val: string | number | null | undefined) => {
+   152→    const s = String(val ?? '')
+   153→    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+   154→    return s
+   155→  }
+   156→  const csv = [headers.map(escape).join(','), ...rows.map((r) => r.map(escape).join(','))].join('\n')
+   157→  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+   158→  const url = URL.createObjectURL(blob)
+   159→  const a = document.createElement('a')
+   160→  a.href = url
+   161→  a.download = filename
+   162→  document.body.appendChild(a)
+   163→  a.click()
+   164→  document.body.removeChild(a)
+   165→  URL.revokeObjectURL(url)
+   166→}
+   167→
+   168→function StatusBadge({ status }: { status: Status }) {
+   169→  const { t } = useT()
+   170→  const map: Record<string, { labelKey: string; cls: string }> = {
+   171→    ACTIVE: { labelKey: 'common.active', cls: 'bg-success/10 text-success border border-success/20' },
+   172→    PENDING: { labelKey: 'common.pending', cls: 'bg-warning text-warning-foreground' },
+   173→    SUSPENDED: { labelKey: 'common.suspended', cls: 'bg-error/10 text-error border border-error/20' },
+   174→    CONFIRMED: { labelKey: 'common.active', cls: 'bg-primary/10 text-primary border border-primary/20' },
+   175→    COMPLETED: { labelKey: 'common.completed', cls: 'bg-success/10 text-success border border-success/20' },
+   176→    CANCELLED: { labelKey: 'common.cancelled', cls: 'bg-error/10 text-error border border-error/20' },
+   177→    REFUNDED: { labelKey: 'common.cancelled', cls: 'bg-error/10 text-error border border-error/20' },
+   178→    NO_SHOW: { labelKey: 'common.cancelled', cls: 'bg-warning text-warning-foreground' },
+   179→  }
+   180→  const cfg = map[status] || map.ACTIVE
+   181→  return (
+   182→    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', cfg.cls)}>
+   183→      {t(cfg.labelKey)}
+   184→    </span>
+   185→  )
+   186→}
+   187→
+   188→function RoleBadge({ role }: { role: Role }) {
+   189→  const { t } = useT()
+   190→  const map: Record<Role, string> = {
+   191→    PATIENT: 'bg-info/10 text-info border-info/20',
+   192→    DOCTOR: 'bg-primary/10 text-primary border-primary/20',
+   193→    HOSPITAL: 'bg-primary/10 text-primary border-primary/20',
+   194→    HOTEL: 'bg-primary/10 text-primary border-primary/20',
+   195→    TRANSLATOR: 'bg-primary/10 text-primary border-primary/20',
+   196→    ADMIN: 'bg-foreground/10 text-foreground border-divider',
+   197→  }
+   198→  return (
+   199→    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', map[role])}>
+   200→      {t(ROLE_LABEL_KEY[role])}
+   201→    </span>
+   202→  )
+   203→}
+   204→
+   205→function VerifiedBadge({ verified }: { verified: boolean }) {
+   206→  const { t } = useT()
+   207→  if (verified) {
+   208→    return (
+   209→      <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+   210→        <Icon name="check_circle" size={14} fill /> {t('common.verified')}
+   211→      </span>
+   212→    )
+   213→  }
+   214→  return (
+   215→    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+   216→      <Icon name="pending" size={14} /> {t('common.pending')}
+   217→    </span>
+   218→  )
+   219→}
+   220→
+   221→function LedgerTypeBadge({ type }: { type: LedgerType }) {
+   222→  const map: Record<LedgerType, string> = {
+   223→    PATIENT_CHARGE: 'bg-success/10 text-success border border-success/20',
+   224→    COMMISSION: 'bg-primary/10 text-primary border border-primary/20',
+   225→    PROVIDER_CREDIT: 'bg-info/10 text-info border border-info/20',
+   226→    PROVIDER_DEBIT: 'bg-warning text-warning-foreground',
+   227→    REFUND_PATIENT: 'bg-error/10 text-error border border-error/20',
+   228→    REFUND_COMMISSION_REVERSAL: 'bg-error/10 text-error border border-error/20',
+   229→    REFUND_PROVIDER_DEBIT: 'bg-error/10 text-error border border-error/20',
+   230→    PAYOUT: 'bg-warning text-warning-foreground',
+   231→  }
+   232→  const label = type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+   233→  return (
+   234→    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap', map[type])}>
+   235→      {label}
+   236→    </span>
+   237→  )
+   238→}
+   239→
+   240→function getProviderProfile(u: AdminUser) {
+   241→  if (u.doctor) return { type: 'DOCTOR' as ProviderType, label: u.doctor.specialty, verified: u.doctor.verified, city: u.doctor.city, country: u.doctor.country, name: u.name }
+   242→  if (u.hospital) return { type: 'HOSPITAL' as ProviderType, label: u.hospital.name, verified: u.hospital.verified, city: u.hospital.city, country: u.hospital.country, name: u.hospital.name }
+   243→  if (u.hotel) return { type: 'HOTEL' as ProviderType, label: u.hotel.name, verified: u.hotel.verified, city: u.hotel.city, country: u.hotel.country, name: u.hotel.name }
+   244→  if (u.translator) return { type: 'TRANSLATOR' as ProviderType, label: u.translator.specialization, verified: u.translator.verified, city: u.translator.city, country: u.translator.country, name: u.name }
+   245→  return null
+   246→}
+   247→
+   248→// ============================================================================
+   249→// Layout primitives
+   250→// ============================================================================
+   251→
+   252→function PageHeader({ title, description, icon, action }: { title: string; description?: string; icon: string; action?: React.ReactNode }) {
+   253→  return (
+   254→    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   255→      <div className="flex items-start gap-3">
+   256→        <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+   257→          <Icon name={icon} size={24} fill />
+   258→        </div>
+   259→        <div>
+   260→          <h1 className="text-xl font-semibold text-foreground sm:text-2xl">{title}</h1>
+   261→          {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
+   262→        </div>
+   263→      </div>
+   264→      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
+   265→    </div>
+   266→  )
+   267→}
+   268→
+   269→function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+   270→  const { t } = useT()
+   271→  return (
+   272→    <Card className="py-8">
+   273→      <CardContent className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+   274→        <div className="flex size-12 items-center justify-center rounded-full bg-error/10 text-error">
+   275→          <Icon name="error" size={26} fill />
+   276→        </div>
+   277→        <p className="text-sm text-muted-foreground">{message}</p>
+   278→        {onRetry && (
+   279→          <Button size="sm" variant="outline" onClick={onRetry} className="gap-1.5">
+   280→            <Icon name="refresh" size={16} /> {t('admin.retry')}
+   281→          </Button>
+   282→        )}
+   283→      </CardContent>
+   284→    </Card>
+   285→  )
+   286→}
+   287→
+   288→function LoadingCard({ lines = 3 }: { lines?: number }) {
+   289→  return (
+   290→    <Card>
+   291→      <CardHeader>
+   292→        <Skeleton className="h-5 w-40" />
+   293→        <Skeleton className="h-3 w-64" />
+   294→      </CardHeader>
+   295→      <CardContent className="flex flex-col gap-3">
+   296→        {Array.from({ length: lines }).map((_, i) => (
+   297→          <Skeleton key={`item-${i}`} className="h-12 w-full" />
+   298→        ))}
+   299→      </CardContent>
+   300→    </Card>
+   301→  )
+   302→}
+   303→
+   304→function EmptyState({ icon, title, description, action }: { icon: string; title: string; description?: string; action?: React.ReactNode }) {
+   305→  return (
+   306→    <Card className="gap-0">
+   307→      <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+   308→        <div className="flex size-16 items-center justify-center rounded-[20px] bg-surface-secondary text-muted-foreground">
+   309→          <Icon name={icon} size={32} />
+   310→        </div>
+   311→        <div>
+   312→          <p className="text-base font-semibold text-foreground">{title}</p>
+   313→          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+   314→        </div>
+   315→        {action}
+   316→      </CardContent>
+   317→    </Card>
+   318→  )
+   319→}
+   320→
+   321→function StatCard({ icon, label, value, tone = 'primary', subtitle }: { icon: string; label: string; value: string; tone?: 'primary' | 'success' | 'warning' | 'info'; subtitle?: string }) {
+   322→  const toneCls = {
+   323→    primary: 'bg-primary/10 text-primary',
+   324→    success: 'bg-success/10 text-success',
+   325→    warning: 'bg-warning/10 text-warning',
+   326→    info: 'bg-info/10 text-info',
+   327→  }[tone]
+   328→  return (
+   329→    <Card className="group gap-0 overflow-hidden py-0 transition-all hover:-translate-y-0.5 hover:shadow-md">
+   330→      <CardContent className="flex items-start gap-4 p-5">
+   331→        <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-[14px] transition-transform group-hover:scale-105', toneCls)}>
+   332→          <Icon name={icon} size={24} fill />
+   333→        </div>
+   334→        <div className="min-w-0 flex-1">
+   335→          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+   336→          <p className="mt-1 truncate text-2xl font-semibold tabular-nums text-foreground">{value}</p>
+   337→          {subtitle && <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>}
+   338→        </div>
+   339→      </CardContent>
+   340→    </Card>
+   341→  )
+   342→}
+   343→
+   344→// ============================================================================
+   345→// Overview section
+   346→// ============================================================================
+   347→
+   348→function OverviewSection() {
+   349→  const { t, locale } = useT()
+   350→  const goDashboard = useApp((s) => s.goDashboard)
+   351→  const { data, loading, error, refetch } = useApi<AdminStats>('/api/stats')
+   352→
+   353→  if (loading) {
+   354→    return (
+   355→      <div>
+   356→        <PageHeader title={t('admin.overviewTitle')} icon="space_dashboard" />
+   357→        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   358→          {Array.from({ length: 4 }).map((_, i) => (
+   359→            <Card key={`item-${i}`} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+   360→          ))}
+   361→        </div>
+   362→        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+   363→          <LoadingCard lines={4} />
+   364→          <LoadingCard lines={4} />
+   365→          <LoadingCard lines={4} />
+   366→        </div>
+   367→      </div>
+   368→    )
+   369→  }
+   370→
+   371→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+   372→
+   373→  const byTypeMap: Record<ProviderType, number> = { DOCTOR: 0, HOSPITAL: 0, HOTEL: 0, TRANSLATOR: 0 }
+   374→  data.byType.forEach((b) => { byTypeMap[b.providerType as ProviderType] = b._count })
+   375→
+   376→  const chartData = data.dailyRevenue.map((d) => ({
+   377→    date: formatDate(d.date, locale, { month: 'short', day: 'numeric' }),
+   378→    amount: Number(d.amount),
+   379→  }))
+   380→
+   381→  return (
+   382→    <div className="animate-fade-in">
+   383→      <PageHeader title={t('admin.overviewTitle')} icon="space_dashboard" />
+   384→
+   385→      {data.pendingProviders > 0 && (
+   386→        <Card key="pending-alert" className="mb-6 border-warning/30 bg-warning/5 py-4">
+   387→          <CardContent className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+   388→            <div className="flex items-center gap-3">
+   389→              <div className="flex size-10 items-center justify-center rounded-full bg-warning text-warning-foreground">
+   390→                <Icon name="schedule" size={22} fill />
+   391→              </div>
+   392→              <div>
+   393→                <p className="text-sm font-medium text-foreground">
+   394→                  {data.pendingProviders} {t('admin.pendingProvidersAlert')}
+   395→                </p>
+   396→                <p className="text-xs text-muted-foreground">{t('admin.moderationDesc')}</p>
+   397→              </div>
+   398→            </div>
+   399→            <Button size="sm" variant="default" onClick={() => goDashboard('moderation')} className="gap-1.5">
+   400→              <Icon name="manage_accounts" size={16} fill /> {t('admin.reviewNow')}
+   401→            </Button>
+   402→          </CardContent>
+   403→        </Card>
+   404→      )}
+   405→
+   406→      {/* Stat cards */}
+   407→      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+   408→        <StatCard icon="payments" label={t('admin.platformRevenue')} value={formatCurrency(data.platformRevenue, 'USD', locale)} tone="success" />
+   409→        <StatCard icon="event" label={t('admin.totalBookings')} value={String(data.totalBookings)} tone="primary" />
+   410→        <StatCard icon="check_circle" label={t('admin.completedVisits')} value={String(data.completedBookings)} tone="info" />
+   411→        <StatCard icon="verified" label={t('admin.activeProviders')} value={String(data.activeProviders)} tone="primary" />
+   412→        <StatCard icon="group" label={t('admin.totalUsers')} value={String(data.totalUsers)} tone="info" />
+   413→      </div>
+   414→
+   415→      {/* Chart + by type */}
+   416→      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+   417→        <Card className="lg:col-span-2">
+   418→          <CardHeader>
+   419→            <CardTitle className="text-base">{t('admin.revenueLast7')}</CardTitle>
+   420→          </CardHeader>
+   421→          <CardContent>
+   422→            <div className="h-64 w-full">
+   423→              <ResponsiveContainer width="100%" height="100%">
+   424→                <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+   425→                  <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+   426→                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+   427→                  <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={56}
+   428→                    tickFormatter={(v) => formatCurrency(String(v), 'USD', locale).replace(/\.\d+$/, '')} />
+   429→                  <Tooltip
+   430→                    cursor={{ fill: '#F1F3F4' }}
+   431→                    contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+   432→                    formatter={(v: number) => [formatCurrency(String(v), 'USD', locale), t('admin.platformRevenue')]}
+   433→                  />
+   434→                  <Bar dataKey="amount" fill="#1A73E8" radius={[6, 6, 0, 0]} maxBarSize={48} />
+   435→                </BarChart>
+   436→              </ResponsiveContainer>
+   437→            </div>
+   438→          </CardContent>
+   439→        </Card>
+   440→
+   441→        <Card>
+   442→          <CardHeader>
+   443→            <CardTitle className="text-base">{t('admin.byProviderType')}</CardTitle>
+   444→          </CardHeader>
+   445→          <CardContent className="flex flex-col gap-3">
+   446→            {(Object.keys(byTypeMap) as ProviderType[]).map((pt) => (
+   447→              <div key={pt} className="flex items-center justify-between rounded-[12px] border border-divider bg-surface-secondary/50 px-4 py-3">
+   448→                <div className="flex items-center gap-2.5">
+   449→                  <div className="flex size-9 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+   450→                    <Icon name={pt === 'DOCTOR' ? 'medical_services' : pt === 'HOSPITAL' ? 'local_hospital' : pt === 'HOTEL' ? 'hotel' : 'translate'} size={20} fill />
+   451→                  </div>
+   452→                  <span className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</span>
+   453→                </div>
+   454→                <span className="text-lg font-semibold text-foreground">{byTypeMap[pt]}</span>
+   455→              </div>
+   456→            ))}
+   457→          </CardContent>
+   458→        </Card>
+   459→      </div>
+   460→
+   461→      {/* Recent bookings */}
+   462→      <Card className="mt-4">
+   463→        <CardHeader>
+   464→          <CardTitle className="text-base">{t('admin.recentBookings')}</CardTitle>
+   465→        </CardHeader>
+   466→        <CardContent className="px-0">
+   467→          <Table>
+   468→            <TableHeader>
+   469→              <TableRow className="hover:bg-transparent">
+   470→                <TableHead className="ps-6 text-xs uppercase tracking-wide text-muted-foreground">{t('admin.user')}</TableHead>
+   471→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.role')}</TableHead>
+   472→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.date')}</TableHead>
+   473→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.status')}</TableHead>
+   474→                <TableHead className="pe-6 text-end text-xs uppercase tracking-wide text-muted-foreground">{t('common.amount')}</TableHead>
+   475→              </TableRow>
+   476→            </TableHeader>
+   477→            <TableBody>
+   478→              {data.recentBookings.length === 0 && (
+   479→                <TableRow>
+   480→                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">{t('admin.noData')}</TableCell>
+   481→                </TableRow>
+   482→              )}
+   483→              {data.recentBookings.map((b) => (
+   484→                <TableRow key={b.id} className="h-14">
+   485→                  <TableCell className="ps-6 font-medium text-foreground">{b.patient.name || '—'}</TableCell>
+   486→                  <TableCell>
+   487→                    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+   488→                      <Icon name={b.providerType === 'DOCTOR' ? 'medical_services' : b.providerType === 'HOSPITAL' ? 'local_hospital' : b.providerType === 'HOTEL' ? 'hotel' : 'translate'} size={16} />
+   489→                      {t(PROVIDER_TYPE_LABEL_KEY[b.providerType])}
+   490→                    </span>
+   491→                  </TableCell>
+   492→                  <TableCell className="text-sm text-muted-foreground">{formatDate(b.startDate, locale)}</TableCell>
+   493→                  <TableCell><StatusBadge status={b.status} /></TableCell>
+   494→                  <TableCell className="pe-6 text-end font-semibold text-foreground">{formatCurrency(b.amount, 'USD', locale)}</TableCell>
+   495→                </TableRow>
+   496→              ))}
+   497→            </TableBody>
+   498→          </Table>
+   499→        </CardContent>
+   500→      </Card>
+   501→    </div>
+   502→  )
+   503→}
+   504→
+   505→// ============================================================================
+   506→// Users action hook (shared by providers/users/moderation)
+   507→// ============================================================================
+   508→
+   509→function useUserAction(onSuccess?: () => void) {
+   510→  const { t } = useT()
+   511→  const [busyId, setBusyId] = React.useState<string | null>(null)
+   512→  const run = React.useCallback(async (userId: string, action: 'approve' | 'suspend' | 'activate' | 'reject') => {
+   513→    setBusyId(userId)
+   514→    try {
+   515→      await apiPost('/api/admin/users', { userId, action })
+   516→      toast.success(t('admin.userUpdated'))
+   517→      onSuccess?.()
+   518→    } catch (e: any) {
+   519→      toast.error(e.message || t('admin.error'))
+   520→    } finally {
+   521→      setBusyId(null)
+   522→    }
+   523→  }, [onSuccess, t])
+   524→  return { busyId, run }
+   525→}
+   526→
+   527→// ============================================================================
+   528→// Providers section
+   529→// ============================================================================
+   530→
+   531→function ProvidersSection() {
+   532→  const { t, locale } = useT()
+   533→  const [search, setSearch] = React.useState('')
+   534→  const { data, loading, error, refetch } = useApi<{ users: AdminUser[] }>('/api/admin/users')
+   535→  const { busyId, run } = useUserAction(refetch)
+   536→
+   537→  const providers = React.useMemo(() => {
+   538→    if (!data?.users) return []
+   539→    const q = search.trim().toLowerCase()
+   540→    return data.users
+   541→      .filter((u) => ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'].includes(u.role))
+   542→      .filter((u) => u.status === 'ACTIVE')
+   543→      .filter((u) => !q || (u.name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+   544→  }, [data, search])
+   545→
+   546→  if (loading) {
+   547→    return (
+   548→      <div>
+   549→        <PageHeader title={t('admin.providersTitle')} icon="verified" />
+   550→        <LoadingCard lines={6} />
+   551→      </div>
+   552→    )
+   553→  }
+   554→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+   555→
+   556→  return (
+   557→    <div className="animate-fade-in">
+   558→      <PageHeader
+   559→        title={t('admin.providersTitle')}
+   560→        description={t('admin.providersDesc')}
+   561→        icon="verified"
+   562→        action={
+   563→          <div className="relative w-full sm:w-72">
+   564→            <Icon name="search" size={18} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted-foreground" />
+   565→            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('admin.searchUsers')} className="h-10 ps-10" />
+   566→          </div>
+   567→        }
+   568→      />
+   569→      <Card className="py-0">
+   570→        <Table>
+   571→          <TableHeader>
+   572→            <TableRow className="hover:bg-transparent">
+   573→              <TableHead className="ps-6 text-xs uppercase tracking-wide text-muted-foreground">{t('admin.name')}</TableHead>
+   574→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.role')}</TableHead>
+   575→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.specialty')}</TableHead>
+   576→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.location')}</TableHead>
+   577→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.verified')}</TableHead>
+   578→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.joined')}</TableHead>
+   579→              <TableHead className="pe-6 text-end text-xs uppercase tracking-wide text-muted-foreground">{t('common.actions')}</TableHead>
+   580→            </TableRow>
+   581→          </TableHeader>
+   582→          <TableBody>
+   583→            {providers.length === 0 && (
+   584→              <TableRow>
+   585→                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">{t('admin.noData')}</TableCell>
+   586→              </TableRow>
+   587→            )}
+   588→            {providers.map((u) => {
+   589→              const p = getProviderProfile(u)
+   590→              return (
+   591→                <TableRow key={u.id} className="h-16">
+   592→                  <TableCell className="ps-6">
+   593→                    <div className="flex flex-col">
+   594→                      <span className="font-medium text-foreground">{p?.name || u.name || '—'}</span>
+   595→                      <span className="text-xs text-muted-foreground">{u.email}</span>
+   596→                    </div>
+   597→                  </TableCell>
+   598→                  <TableCell><RoleBadge role={u.role} /></TableCell>
+   599→                  <TableCell className="text-sm text-foreground">{p?.label || '—'}</TableCell>
+   600→                  <TableCell className="text-sm text-muted-foreground">
+   601→                    {u.city || p?.city ? [u.city || p?.city, u.country || p?.country].filter(Boolean).join(', ') : '—'}
+   602→                  </TableCell>
+   603→                  <TableCell>{p ? <VerifiedBadge verified={p.verified} /> : '—'}</TableCell>
+   604→                  <TableCell className="text-sm text-muted-foreground">{formatDate(u.createdAt, locale)}</TableCell>
+   605→                  <TableCell className="pe-6 text-end">
+   606→                    <Button
+   607→                      size="sm"
+   608→                      variant="outline"
+   609→                      onClick={() => run(u.id, 'suspend')}
+   610→                      disabled={busyId === u.id}
+   611→                      className="gap-1.5 text-error hover:bg-error/5 hover:text-error"
+   612→                    >
+   613→                      <Icon name="block" size={14} /> {t('admin.suspend')}
+   614→                    </Button>
+   615→                  </TableCell>
+   616→                </TableRow>
+   617→              )
+   618→            })}
+   619→          </TableBody>
+   620→        </Table>
+   621→      </Card>
+   622→    </div>
+   623→  )
+   624→}
+   625→
+   626→// ============================================================================
+   627→// Users section
+   628→// ============================================================================
+   629→
+   630→function UsersSection() {
+   631→  const { t, locale } = useT()
+   632→  const [search, setSearch] = React.useState('')
+   633→  const [roleFilter, setRoleFilter] = React.useState<string>('all')
+   634→  const { data, loading, error, refetch } = useApi<{ users: AdminUser[] }>('/api/admin/users')
+   635→  const { busyId, run } = useUserAction(refetch)
+   636→
+   637→  const users = React.useMemo(() => {
+   638→    if (!data?.users) return []
+   639→    const q = search.trim().toLowerCase()
+   640→    return data.users
+   641→      .filter((u) => roleFilter === 'all' || u.role === roleFilter)
+   642→      .filter((u) => !q || (u.name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+   643→  }, [data, search, roleFilter])
+   644→
+   645→  if (loading) {
+   646→    return (
+   647→      <div>
+   648→        <PageHeader title={t('admin.usersTitle')} icon="group" />
+   649→        <LoadingCard lines={6} />
+   650→      </div>
+   651→    )
+   652→  }
+   653→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+   654→
+   655→  return (
+   656→    <div className="animate-fade-in">
+   657→      <PageHeader
+   658→        title={t('admin.usersTitle')}
+   659→        description={t('admin.usersDesc')}
+   660→        icon="group"
+   661→        action={
+   662→          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+   663→            <div className="relative w-full sm:w-64">
+   664→              <Icon name="search" size={18} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted-foreground" />
+   665→              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('admin.searchUsers')} className="h-10 ps-10" />
+   666→            </div>
+   667→            <Select value={roleFilter} onValueChange={setRoleFilter}>
+   668→              <SelectTrigger className="h-10 w-full sm:w-44 rounded-[14px]">
+   669→                <SelectValue />
+   670→              </SelectTrigger>
+   671→              <SelectContent>
+   672→                <SelectItem value="all">{t('admin.allRoles')}</SelectItem>
+   673→                <SelectItem value="PATIENT">{t('role.patient')}</SelectItem>
+   674→                <SelectItem value="DOCTOR">{t('role.doctor')}</SelectItem>
+   675→                <SelectItem value="HOSPITAL">{t('role.hospital')}</SelectItem>
+   676→                <SelectItem value="HOTEL">{t('role.hotel')}</SelectItem>
+   677→                <SelectItem value="TRANSLATOR">{t('role.translator')}</SelectItem>
+   678→                <SelectItem value="ADMIN">{t('role.admin')}</SelectItem>
+   679→              </SelectContent>
+   680→            </Select>
+   681→          </div>
+   682→        }
+   683→      />
+   684→      <Card className="py-0">
+   685→        <Table>
+   686→          <TableHeader>
+   687→            <TableRow className="hover:bg-transparent">
+   688→              <TableHead className="ps-6 text-xs uppercase tracking-wide text-muted-foreground">{t('admin.name')}</TableHead>
+   689→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.role')}</TableHead>
+   690→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.status')}</TableHead>
+   691→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.location')}</TableHead>
+   692→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.joined')}</TableHead>
+   693→              <TableHead className="pe-6 text-end text-xs uppercase tracking-wide text-muted-foreground">{t('common.actions')}</TableHead>
+   694→            </TableRow>
+   695→          </TableHeader>
+   696→          <TableBody>
+   697→            {users.length === 0 && (
+   698→              <TableRow>
+   699→                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">{t('admin.noData')}</TableCell>
+   700→              </TableRow>
+   701→            )}
+   702→            {users.map((u) => (
+   703→              <TableRow key={u.id} className="h-16">
+   704→                <TableCell className="ps-6">
+   705→                  <div className="flex flex-col">
+   706→                    <span className="font-medium text-foreground">{u.name || '—'}</span>
+   707→                    <span className="text-xs text-muted-foreground">{u.email}</span>
+   708→                  </div>
+   709→                </TableCell>
+   710→                <TableCell><RoleBadge role={u.role} /></TableCell>
+   711→                <TableCell><StatusBadge status={u.status} /></TableCell>
+   712→                <TableCell className="text-sm text-muted-foreground">
+   713→                  {[u.city, u.country].filter(Boolean).join(', ') || '—'}
+   714→                </TableCell>
+   715→                <TableCell className="text-sm text-muted-foreground">{formatDate(u.createdAt, locale)}</TableCell>
+   716→                <TableCell className="pe-6 text-end">
+   717→                  {u.role === 'ADMIN' ? (
+   718→                    <span className="text-xs text-muted-foreground">—</span>
+   719→                  ) : u.status === 'SUSPENDED' ? (
+   720→                    <Button
+   721→                      size="sm"
+   722→                      variant="outline"
+   723→                      onClick={() => run(u.id, 'activate')}
+   724→                      disabled={busyId === u.id}
+   725→                      className="gap-1.5 text-success hover:bg-success/5 hover:text-success"
+   726→                    >
+   727→                      <Icon name="check_circle" size={14} /> {t('admin.activate')}
+   728→                    </Button>
+   729→                  ) : (
+   730→                    <Button
+   731→                      size="sm"
+   732→                      variant="outline"
+   733→                      onClick={() => run(u.id, 'suspend')}
+   734→                      disabled={busyId === u.id}
+   735→                      className="gap-1.5 text-error hover:bg-error/5 hover:text-error"
+   736→                    >
+   737→                      <Icon name="block" size={14} /> {t('admin.suspend')}
+   738→                    </Button>
+   739→                  )}
+   740→                </TableCell>
+   741→              </TableRow>
+   742→            ))}
+   743→          </TableBody>
+   744→        </Table>
+   745→      </Card>
+   746→    </div>
+   747→  )
+   748→}
+   749→
+   750→// ============================================================================
+   751→// Moderation section
+   752→// ============================================================================
+   753→
+   754→function ModerationSection() {
+   755→  const { t, locale } = useT()
+   756→  const { data, loading, error, refetch } = useApi<{ users: AdminUser[] }>('/api/admin/users')
+   757→  const { busyId, run } = useUserAction(refetch)
+   758→
+   759→  const pending = React.useMemo(() => {
+   760→    if (!data?.users) return []
+   761→    return data.users.filter((u) => u.status === 'PENDING')
+   762→  }, [data])
+   763→
+   764→  if (loading) {
+   765→    return (
+   766→      <div>
+   767→        <PageHeader title={t('admin.moderationTitle')} icon="manage_accounts" />
+   768→        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+   769→          <LoadingCard lines={3} />
+   770→          <LoadingCard lines={3} />
+   771→        </div>
+   772→      </div>
+   773→    )
+   774→  }
+   775→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+   776→
+   777→  return (
+   778→    <div className="animate-fade-in">
+   779→      <PageHeader
+   780→        title={t('admin.moderationTitle')}
+   781→        description={t('admin.moderationDesc')}
+   782→        icon="manage_accounts"
+   783→        action={
+   784→          pending.length > 0 ? (
+   785→            <Badge className="rounded-full bg-warning text-warning-foreground px-3 py-1 text-xs">
+   786→              {pending.length} {t('admin.pendingCount')}
+   787→            </Badge>
+   788→          ) : undefined
+   789→        }
+   790→      />
+   791→
+   792→      {pending.length === 0 ? (
+   793→        <Card className="py-12">
+   794→          <CardContent className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+   795→            <div className="flex size-14 items-center justify-center rounded-full bg-success/10 text-success">
+   796→              <Icon name="check_circle" size={32} fill />
+   797→            </div>
+   798→            <p className="text-sm font-medium text-foreground">{t('admin.noPending')}</p>
+   799→          </CardContent>
+   800→        </Card>
+   801→      ) : (
+   802→        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+   803→          {pending.map((u) => {
+   804→            const p = getProviderProfile(u)
+   805→            return (
+   806→              <Card key={u.id} className="gap-0">
+   807→                <CardHeader className="pb-3">
+   808→                  <div className="flex items-start justify-between gap-3">
+   809→                    <div className="flex items-center gap-3">
+   810→                      <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+   811→                        <Icon name={u.role === 'DOCTOR' ? 'medical_services' : u.role === 'HOSPITAL' ? 'local_hospital' : u.role === 'HOTEL' ? 'hotel' : 'translate'} size={24} fill />
+   812→                      </div>
+   813→                      <div>
+   814→                        <CardTitle className="text-base">{p?.name || u.name || '—'}</CardTitle>
+   815→                        <CardDescription className="text-xs">{u.email}</CardDescription>
+   816→                      </div>
+   817→                    </div>
+   818→                    <RoleBadge role={u.role} />
+   819→                  </div>
+   820→                </CardHeader>
+   821→                <CardContent className="flex flex-col gap-3">
+   822→                  <div className="grid grid-cols-2 gap-3 text-sm">
+   823→                    {p?.label && (
+   824→                      <div>
+   825→                        <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.specialty')}</p>
+   826→                        <p className="font-medium text-foreground">{p.label}</p>
+   827→                      </div>
+   828→                    )}
+   829→                    <div>
+   830→                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.location')}</p>
+   831→                      <p className="font-medium text-foreground">{[u.city || p?.city, u.country || p?.country].filter(Boolean).join(', ') || '—'}</p>
+   832→                    </div>
+   833→                    <div>
+   834→                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.submittedOn')}</p>
+   835→                      <p className="font-medium text-foreground">{formatDate(u.createdAt, locale)} · {relativeTime(u.createdAt, locale)}</p>
+   836→                    </div>
+   837→                  </div>
+   838→                  <Separator />
+   839→                  <div className="flex items-center justify-end gap-2">
+   840→                    <Button
+   841→                      size="sm"
+   842→                      variant="outline"
+   843→                      onClick={() => run(u.id, 'reject')}
+   844→                      disabled={busyId === u.id}
+   845→                      className="gap-1.5 text-error hover:bg-error/5 hover:text-error"
+   846→                    >
+   847→                      <Icon name="block" size={14} /> {t('admin.reject')}
+   848→                    </Button>
+   849→                    <Button
+   850→                      size="sm"
+   851→                      variant="success"
+   852→                      onClick={() => run(u.id, 'approve')}
+   853→                      disabled={busyId === u.id}
+   854→                      className="gap-1.5"
+   855→                    >
+   856→                      <Icon name="check_circle" size={14} fill /> {t('admin.approve')}
+   857→                    </Button>
+   858→                  </div>
+   859→                </CardContent>
+   860→              </Card>
+   861→            )
+   862→          })}
+   863→        </div>
+   864→      )}
+   865→    </div>
+   866→  )
+   867→}
+   868→
+   869→// ============================================================================
+   870→// Commission section
+   871→// ============================================================================
+   872→
+   873→function CommissionSection() {
+   874→  const { t, locale } = useT()
+   875→  const { data, loading, error, refetch } = useApi<{ rates: CommissionRate[] }>('/api/admin/commission')
+   876→  const [rates, setRates] = React.useState<Record<ProviderType, string>>({ DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' })
+   877→  const [saving, setSaving] = React.useState(false)
+   878→
+   879→  React.useEffect(() => {
+   880→    if (data?.rates) {
+   881→      const map: Record<ProviderType, string> = { DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' }
+   882→      data.rates.forEach((r) => { map[r.providerType] = r.rate })
+   883→      setRates(map)
+   884→    }
+   885→  }, [data])
+   886→
+   887→  async function save() {
+   888→    setSaving(true)
+   889→    try {
+   890→      const payload = { rates: (Object.keys(rates) as ProviderType[]).map((pt) => ({ providerType: pt, rate: rates[pt] || '0' })) }
+   891→      await apiPut('/api/admin/commission', payload)
+   892→      toast.success(t('admin.commissionUpdated'))
+   893→      refetch()
+   894→    } catch (e: any) {
+   895→      toast.error(e.message || t('admin.error'))
+   896→    } finally {
+   897→      setSaving(false)
+   898→    }
+   899→  }
+   900→
+   901→  if (loading) {
+   902→    return (
+   903→      <div>
+   904→        <PageHeader title={t('admin.commissionTitle')} icon="percent" />
+   905→        <LoadingCard lines={4} />
+   906→      </div>
+   907→    )
+   908→  }
+   909→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+   910→
+   911→  const types: ProviderType[] = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']
+   912→  const iconFor = (pt: ProviderType) => pt === 'DOCTOR' ? 'medical_services' : pt === 'HOSPITAL' ? 'local_hospital' : pt === 'HOTEL' ? 'hotel' : 'translate'
+   913→
+   914→  return (
+   915→    <div className="animate-fade-in">
+   916→      <PageHeader title={t('admin.commissionTitle')} description={t('admin.commissionDesc')} icon="percent" />
+   917→      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+   918→        <Card className="lg:col-span-2">
+   919→          <CardHeader>
+   920→            <CardTitle className="text-base">{t('admin.commissionTitle')}</CardTitle>
+   921→            <CardDescription>{t('admin.commissionDesc')}</CardDescription>
+   922→          </CardHeader>
+   923→          <CardContent className="flex flex-col gap-3">
+   924→            {types.map((pt) => (
+   925→              <div key={pt} className="flex flex-col gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+   926→                <div className="flex items-center gap-3">
+   927→                  <div className="flex size-10 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+   928→                    <Icon name={iconFor(pt)} size={22} fill />
+   929→                  </div>
+   930→                  <div>
+   931→                    <p className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</p>
+   932→                    <p className="text-xs text-muted-foreground">{t('admin.currentRate')}: {rates[pt] || '0'}%</p>
+   933→                  </div>
+   934→                </div>
+   935→                <div className="flex items-center gap-2">
+   936→                  <Input
+   937→                    type="number"
+   938→                    min="0"
+   939→                    max="100"
+   940→                    step="0.5"
+   941→                    value={rates[pt]}
+   942→                    onChange={(e) => setRates((s) => ({ ...s, [pt]: e.target.value }))}
+   943→                    className="h-10 w-32 text-end"
+   944→                  />
+   945→                  <span className="text-sm font-medium text-muted-foreground">%</span>
+   946→                </div>
+   947→              </div>
+   948→            ))}
+   949→            <div className="flex justify-end pt-2">
+   950→              <Button onClick={save} disabled={saving} className="gap-1.5">
+   951→                <Icon name="save" size={16} /> {t('admin.saveRates')}
+   952→              </Button>
+   953→            </div>
+   954→          </CardContent>
+   955→        </Card>
+   956→
+   957→        <Card>
+   958→          <CardHeader>
+   959→            <CardTitle className="text-base">{t('admin.currentRate')}</CardTitle>
+   960→          </CardHeader>
+   961→          <CardContent className="flex flex-col gap-3">
+   962→            {types.map((pt) => (
+   963→              <div key={pt} className="flex items-center justify-between rounded-[12px] bg-surface-secondary/60 px-4 py-3">
+   964→                <span className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</span>
+   965→                <span className="text-lg font-semibold text-primary">{rates[pt] || '0'}%</span>
+   966→              </div>
+   967→            ))}
+   968→            <p className="pt-1 text-xs text-muted-foreground">
+   969→              {formatCurrency('0', 'USD', locale).replace(/[\d.,]+$/, '')} — {t('admin.commissionDesc')}
+   970→            </p>
+   971→          </CardContent>
+   972→        </Card>
+   973→      </div>
+   974→    </div>
+   975→  )
+   976→}
+   977→
+   978→// ============================================================================
+   979→// Cancellations section
+   980→// ============================================================================
+   981→
+   982→function CancellationsSection() {
+   983→  const { t, locale } = useT()
+   984→  const { data: polData, loading: polLoading, error: polError, refetch: polRefetch } = useApi<{ policies: CancellationPolicy[] }>('/api/admin/cancellation')
+   985→  const { data: bkData, loading: bkLoading, error: bkError, refetch: bkRefetch } = useApi<{ bookings: any[] }>('/api/bookings?status=CANCELLED')
+   986→
+   987→  const [policies, setPolicies] = React.useState<Record<ProviderType, { hours: string; fee: string }>>({
+   988→    DOCTOR: { hours: '24', fee: '20' },
+   989→    HOSPITAL: { hours: '24', fee: '20' },
+   990→    HOTEL: { hours: '24', fee: '10' },
+   991→    TRANSLATOR: { hours: '24', fee: '20' },
+   992→  })
+   993→  const [saving, setSaving] = React.useState(false)
+   994→
+   995→  React.useEffect(() => {
+   996→    if (polData?.policies) {
+   997→      const map: Record<ProviderType, { hours: string; fee: string }> = { DOCTOR: { hours: '24', fee: '20' }, HOSPITAL: { hours: '24', fee: '20' }, HOTEL: { hours: '24', fee: '10' }, TRANSLATOR: { hours: '24', fee: '20' } }
+   998→      polData.policies.forEach((p) => {
+   999→        map[p.providerType] = { hours: String(p.freeCancellationHours), fee: p.cancellationFeePercent }
+  1000→      })
+  1001→      setPolicies(map)
+  1002→    }
+  1003→  }, [polData])
+  1004→
+  1005→  async function save() {
+  1006→    setSaving(true)
+  1007→    try {
+  1008→      const payload = { policies: (Object.keys(policies) as ProviderType[]).map((pt) => ({ providerType: pt, freeCancellationHours: parseInt(policies[pt].hours || '0', 10), cancellationFeePercent: policies[pt].fee || '0' })) }
+  1009→      await apiPut('/api/admin/cancellation', payload)
+  1010→      toast.success(t('admin.policiesUpdated'))
+  1011→      polRefetch()
+  1012→    } catch (e: any) {
+  1013→      toast.error(e.message || t('admin.error'))
+  1014→    } finally {
+  1015→      setSaving(false)
+  1016→    }
+  1017→  }
+  1018→
+  1019→  if (polLoading) {
+  1020→    return (
+  1021→      <div>
+  1022→        <PageHeader title={t('dash.cancellations')} icon="cancel_schedule_send" />
+  1023→        <LoadingCard lines={4} />
+  1024→      </div>
+  1025→    )
+  1026→  }
+  1027→  if (polError || !polData) return <ErrorState message={polError || t('admin.error')} onRetry={polRefetch} />
+  1028→
+  1029→  const types: ProviderType[] = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']
+  1030→  const iconFor = (pt: ProviderType) => pt === 'DOCTOR' ? 'medical_services' : pt === 'HOSPITAL' ? 'local_hospital' : pt === 'HOTEL' ? 'hotel' : 'translate'
+  1031→
+  1032→  const cancelled = bkData?.bookings || []
+  1033→
+  1034→  return (
+  1035→    <div className="animate-fade-in">
+  1036→      <PageHeader title={t('dash.cancellations')} icon="cancel_schedule_send" />
+  1037→
+  1038→      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  1039→        <Card>
+  1040→          <CardHeader>
+  1041→            <CardTitle className="text-base">{t('dash.cancellations')}</CardTitle>
+  1042→            <CardDescription>{t('admin.policiesUpdated')}</CardDescription>
+  1043→          </CardHeader>
+  1044→          <CardContent className="flex flex-col gap-4">
+  1045→            {types.map((pt) => (
+  1046→              <div key={pt} className="rounded-[14px] border border-divider bg-surface-secondary/40 p-4">
+  1047→                <div className="mb-3 flex items-center gap-3">
+  1048→                  <div className="flex size-9 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+  1049→                    <Icon name={iconFor(pt)} size={20} fill />
+  1050→                  </div>
+  1051→                  <span className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</span>
+  1052→                </div>
+  1053→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+  1054→                  <div>
+  1055→                    <Label className="mb-1.5 text-xs text-muted-foreground">{t('admin.freeCancellationHours')}</Label>
+  1056→                    <Input
+  1057→                      type="number"
+  1058→                      min="0"
+  1059→                      value={policies[pt].hours}
+  1060→                      onChange={(e) => setPolicies((s) => ({ ...s, [pt]: { ...s[pt], hours: e.target.value } }))}
+  1061→                      className="h-10"
+  1062→                    />
+  1063→                  </div>
+  1064→                  <div>
+  1065→                    <Label className="mb-1.5 text-xs text-muted-foreground">{t('admin.cancellationFeePercent')}</Label>
+  1066→                    <div className="flex items-center gap-2">
+  1067→                      <Input
+  1068→                        type="number"
+  1069→                        min="0"
+  1070→                        max="100"
+  1071→                        step="0.5"
+  1072→                        value={policies[pt].fee}
+  1073→                        onChange={(e) => setPolicies((s) => ({ ...s, [pt]: { ...s[pt], fee: e.target.value } }))}
+  1074→                        className="h-10"
+  1075→                      />
+  1076→                      <span className="text-sm font-medium text-muted-foreground">%</span>
+  1077→                    </div>
+  1078→                  </div>
+  1079→                </div>
+  1080→              </div>
+  1081→            ))}
+  1082→            <div className="flex justify-end pt-1">
+  1083→              <Button onClick={save} disabled={saving} className="gap-1.5">
+  1084→                <Icon name="save" size={16} /> {t('admin.savePolicies')}
+  1085→              </Button>
+  1086→            </div>
+  1087→          </CardContent>
+  1088→        </Card>
+  1089→
+  1090→        <Card className="py-0">
+  1091→          <CardHeader className="pt-6">
+  1092→            <CardTitle className="text-base">{t('admin.cancelledBookings')}</CardTitle>
+  1093→          </CardHeader>
+  1094→          <CardContent className="px-0">
+  1095→            {bkLoading ? (
+  1096→              <div className="flex flex-col gap-2 px-6 pb-6">
+  1097→                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={`item-${i}`} className="h-14 w-full" />)}
+  1098→              </div>
+  1099→            ) : bkError ? (
+  1100→              <div className="px-6 pb-6"><ErrorState message={bkError} onRetry={bkRefetch} /></div>
+  1101→            ) : (
+  1102→              <Table>
+  1103→                <TableHeader>
+  1104→                  <TableRow className="hover:bg-transparent">
+  1105→                    <TableHead className="ps-6 text-xs uppercase tracking-wide text-muted-foreground">{t('admin.user')}</TableHead>
+  1106→                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.amount')}</TableHead>
+  1107→                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.refundAmount')}</TableHead>
+  1108→                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.feeRetained')}</TableHead>
+  1109→                    <TableHead className="pe-6 text-xs uppercase tracking-wide text-muted-foreground">{t('admin.cancelledOn')}</TableHead>
+  1110→                  </TableRow>
+  1111→                </TableHeader>
+  1112→                <TableBody>
+  1113→                  {cancelled.length === 0 && (
+  1114→                    <TableRow>
+  1115→                      <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">{t('admin.noData')}</TableCell>
+  1116→                    </TableRow>
+  1117→                  )}
+  1118→                  {cancelled.map((b) => {
+  1119→                    const refund = b.refundAmount ? parseFloat(b.refundAmount) : 0
+  1120→                    const amt = parseFloat(b.amount || '0')
+  1121→                    const fee = Math.max(0, amt - refund)
+  1122→                    return (
+  1123→                      <TableRow key={b.id} className="h-14">
+  1124→                        <TableCell className="ps-6">
+  1125→                          <div className="flex flex-col">
+  1126→                            <span className="text-sm font-medium text-foreground">{b.patient?.name || '—'}</span>
+  1127→                            <span className="text-xs text-muted-foreground">{t(PROVIDER_TYPE_LABEL_KEY[b.providerType as ProviderType])}</span>
+  1128→                          </div>
+  1129→                        </TableCell>
+  1130→                        <TableCell className="text-sm text-foreground">{formatCurrency(b.amount || '0', 'USD', locale)}</TableCell>
+  1131→                        <TableCell className="text-sm text-success">{formatCurrency(String(refund), 'USD', locale)}</TableCell>
+  1132→                        <TableCell className="text-sm text-error">{formatCurrency(String(fee), 'USD', locale)}</TableCell>
+  1133→                        <TableCell className="pe-6 text-sm text-muted-foreground">{b.cancelledAt ? formatDate(b.cancelledAt, locale) : '—'}</TableCell>
+  1134→                      </TableRow>
+  1135→                    )
+  1136→                  })}
+  1137→                </TableBody>
+  1138→              </Table>
+  1139→            )}
+  1140→          </CardContent>
+  1141→        </Card>
+  1142→      </div>
+  1143→    </div>
+  1144→  )
+  1145→}
+  1146→
+  1147→// ============================================================================
+  1148→// Payouts section
+  1149→// ============================================================================
+  1150→
+  1151→function PayoutsSection() {
+  1152→  const { t, locale } = useT()
+  1153→  const { data, loading, error, refetch } = useApi<{ providers: ProviderBalanceRow[]; payouts: Payout[] }>('/api/payouts')
+  1154→  const [running, setRunning] = React.useState(false)
+  1155→  const [payDialog, setPayDialog] = React.useState<Payout | null>(null)
+  1156→  const [reference, setReference] = React.useState('')
+  1157→  const [paying, setPaying] = React.useState(false)
+  1158→
+  1159→  async function runSettlement() {
+  1160→    setRunning(true)
+  1161→    try {
+  1162→      const res = await apiPost<{ created: any[]; count: number }>('/api/payouts/run')
+  1163→      if (res.count > 0) {
+  1164→        toast.success(`${t('admin.settlementCreated')} — ${res.count} ${t('admin.payoutsCreated')}`)
+  1165→      } else {
+  1166→        toast.info(t('admin.noPayoutsCreated'))
+  1167→      }
+  1168→      refetch()
+  1169→    } catch (e: any) {
+  1170→      toast.error(e.message || t('admin.error'))
+  1171→    } finally {
+  1172→      setRunning(false)
+  1173→    }
+  1174→  }
+  1175→
+  1176→  async function markPaid() {
+  1177→    if (!payDialog) return
+  1178→    setPaying(true)
+  1179→    try {
+  1180→      await apiPost('/api/payouts/pay', { payoutId: payDialog.id, reference: reference || undefined })
+  1181→      toast.success(t('admin.markPaidSuccess'))
+  1182→      setPayDialog(null)
+  1183→      setReference('')
+  1184→      refetch()
+  1185→    } catch (e: any) {
+  1186→      toast.error(e.message || t('admin.error'))
+  1187→    } finally {
+  1188→      setPaying(false)
+  1189→    }
+  1190→  }
+  1191→
+  1192→  function exportPayoutsCsv() {
+  1193→    if (!data?.payouts) return
+  1194→    exportCSV(
+  1195→      `payouts-${new Date().toISOString().slice(0, 10)}.csv`,
+  1196→      ['Date', 'Provider', 'Email', 'Type', 'Amount', 'Status', 'Method', 'Reference'],
+  1197→      data.payouts.map((p) => [
+  1198→        new Date(p.createdAt).toISOString(),
+  1199→        p.providerUser?.name || '',
+  1200→        p.providerUser?.email || '',
+  1201→        p.providerType,
+  1202→        p.amount,
+  1203→        p.status,
+  1204→        p.method,
+  1205→        p.reference || '',
+  1206→      ])
+  1207→    )
+  1208→  }
+  1209→
+  1210→  if (loading) {
+  1211→    return (
+  1212→      <div>
+  1213→        <PageHeader title={t('admin.payoutsTitle')} icon="account_balance" />
+  1214→        <LoadingCard lines={4} />
+  1215→      </div>
+  1216→    )
+  1217→  }
+  1218→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+  1219→
+  1220→  return (
+  1221→    <div className="animate-fade-in">
+  1222→      <PageHeader
+  1223→        title={t('admin.payoutsTitle')}
+  1224→        description={t('admin.payoutsDesc')}
+  1225→        icon="account_balance"
+  1226→        action={
+  1227→          <div className="flex flex-wrap gap-2">
+  1228→            <Button variant="outline" size="sm" onClick={exportPayoutsCsv} className="gap-1.5">
+  1229→              <Icon name="download" size={16} /> {t('admin.exportCsv')}
+  1230→            </Button>
+  1231→            <Button size="sm" onClick={runSettlement} disabled={running} className="gap-1.5">
+  1232→              <Icon name="payments" size={16} fill /> {t('admin.runSettlement')}
+  1233→            </Button>
+  1234→          </div>
+  1235→        }
+  1236→      />
+  1237→
+  1238→      {/* Provider balances */}
+  1239→      <Card className="mb-4 py-0">
+  1240→        <CardHeader className="pt-6">
+  1241→          <CardTitle className="text-base">{t('admin.providerBalances')}</CardTitle>
+  1242→        </CardHeader>
+  1243→        <CardContent className="px-0">
+  1244→          <Table>
+  1245→            <TableHeader>
+  1246→              <TableRow className="hover:bg-transparent">
+  1247→                <TableHead className="ps-6 text-xs uppercase tracking-wide text-muted-foreground">{t('admin.name')}</TableHead>
+  1248→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.role')}</TableHead>
+  1249→                <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t('admin.available')}</TableHead>
+  1250→                <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t('admin.pendingFunds')}</TableHead>
+  1251→                <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t('admin.paidOut')}</TableHead>
+  1252→                <TableHead className="pe-6 text-end text-xs uppercase tracking-wide text-muted-foreground">{t('admin.lifetime')}</TableHead>
+  1253→              </TableRow>
+  1254→            </TableHeader>
+  1255→            <TableBody>
+  1256→              {data.providers.length === 0 && (
+  1257→                <TableRow>
+  1258→                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">{t('admin.noData')}</TableCell>
+  1259→                </TableRow>
+  1260→              )}
+  1261→              {data.providers.map((p) => (
+  1262→                <TableRow key={p.userId} className="h-14">
+  1263→                  <TableCell className="ps-6">
+  1264→                    <div className="flex flex-col">
+  1265→                      <span className="text-sm font-medium text-foreground">{p.name || '—'}</span>
+  1266→                      <span className="text-xs text-muted-foreground">{p.email}</span>
+  1267→                    </div>
+  1268→                  </TableCell>
+  1269→                  <TableCell><RoleBadge role={p.providerType as Role} /></TableCell>
+  1270→                  <TableCell className="text-end text-sm font-semibold text-success">{formatCurrency(p.available, 'USD', locale)}</TableCell>
+  1271→                  <TableCell className="text-end text-sm text-warning">{formatCurrency(p.pending, 'USD', locale)}</TableCell>
+  1272→                  <TableCell className="text-end text-sm text-muted-foreground">{formatCurrency(p.paidOut, 'USD', locale)}</TableCell>
+  1273→                  <TableCell className="pe-6 text-end text-sm font-medium text-foreground">{formatCurrency(p.lifetime, 'USD', locale)}</TableCell>
+  1274→                </TableRow>
+  1275→              ))}
+  1276→            </TableBody>
+  1277→          </Table>
+  1278→        </CardContent>
+  1279→      </Card>
+  1280→
+  1281→      {/* Payout history */}
+  1282→      <Card className="py-0">
+  1283→        <CardHeader className="pt-6">
+  1284→          <CardTitle className="text-base">{t('admin.payoutHistory')}</CardTitle>
+  1285→        </CardHeader>
+  1286→        <CardContent className="px-0">
+  1287→          <Table>
+  1288→            <TableHeader>
+  1289→              <TableRow className="hover:bg-transparent">
+  1290→                <TableHead className="ps-6 text-xs uppercase tracking-wide text-muted-foreground">{t('admin.createdOn')}</TableHead>
+  1291→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.name')}</TableHead>
+  1292→                <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t('common.amount')}</TableHead>
+  1293→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('common.status')}</TableHead>
+  1294→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.method')}</TableHead>
+  1295→                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.reference')}</TableHead>
+  1296→                <TableHead className="pe-6 text-end text-xs uppercase tracking-wide text-muted-foreground">{t('common.actions')}</TableHead>
+  1297→              </TableRow>
+  1298→            </TableHeader>
+  1299→            <TableBody>
+  1300→              {data.payouts.length === 0 && (
+  1301→                <TableRow>
+  1302→                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">{t('admin.noData')}</TableCell>
+  1303→                </TableRow>
+  1304→              )}
+  1305→              {data.payouts.map((p) => (
+  1306→                <TableRow key={p.id} className="h-14">
+  1307→                  <TableCell className="ps-6 text-sm text-muted-foreground">{formatDate(p.createdAt, locale)}</TableCell>
+  1308→                  <TableCell>
+  1309→                    <div className="flex flex-col">
+  1310→                      <span className="text-sm font-medium text-foreground">{p.providerUser?.name || '—'}</span>
+  1311→                      <span className="text-xs text-muted-foreground">{p.providerUser?.email}</span>
+  1312→                    </div>
+  1313→                  </TableCell>
+  1314→                  <TableCell className="text-end text-sm font-semibold text-foreground">{formatCurrency(p.amount, 'USD', locale)}</TableCell>
+  1315→                  <TableCell>
+  1316→                    {p.status === 'COMPLETED' ? (
+  1317→                      <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+  1318→                        {t('common.completed')}
+  1319→                      </span>
+  1320→                    ) : (
+  1321→                      <span className="inline-flex items-center rounded-full bg-warning px-2.5 py-0.5 text-xs font-medium text-warning-foreground">
+  1322→                        {t('common.pending')}
+  1323→                      </span>
+  1324→                    )}
+  1325→                  </TableCell>
+  1326→                  <TableCell className="text-sm text-muted-foreground">{p.method}</TableCell>
+  1327→                  <TableCell className="text-sm text-muted-foreground">{p.reference || '—'}</TableCell>
+  1328→                  <TableCell className="pe-6 text-end">
+  1329→                    {p.status === 'PENDING' && (
+  1330→                      <Button size="sm" variant="outline" onClick={() => { setPayDialog(p); setReference('') }} className="gap-1.5">
+  1331→                        <Icon name="check_circle" size={14} /> {t('admin.markPaid')}
+  1332→                      </Button>
+  1333→                    )}
+  1334→                  </TableCell>
+  1335→                </TableRow>
+  1336→              ))}
+  1337→            </TableBody>
+  1338→          </Table>
+  1339→        </CardContent>
+  1340→      </Card>
+  1341→
+  1342→      {/* Mark as paid dialog */}
+  1343→      <Dialog open={!!payDialog} onOpenChange={(o) => !o && setPayDialog(null)}>
+  1344→        <DialogContent>
+  1345→          <DialogHeader>
+  1346→            <DialogTitle>{t('admin.markPaid')}</DialogTitle>
+  1347→            <DialogDescription>{t('admin.confirmMarkPaid')}</DialogDescription>
+  1348→          </DialogHeader>
+  1349→          {payDialog && (
+  1350→            <div className="flex flex-col gap-3">
+  1351→              <div className="rounded-[14px] bg-surface-secondary/60 p-4">
+  1352→                <div className="flex items-center justify-between text-sm">
+  1353→                  <span className="text-muted-foreground">{t('admin.name')}</span>
+  1354→                  <span className="font-medium text-foreground">{payDialog.providerUser?.name || '—'}</span>
+  1355→                </div>
+  1356→                <div className="mt-2 flex items-center justify-between text-sm">
+  1357→                  <span className="text-muted-foreground">{t('common.amount')}</span>
+  1358→                  <span className="font-semibold text-foreground">{formatCurrency(payDialog.amount, 'USD', locale)}</span>
+  1359→                </div>
+  1360→              </div>
+  1361→              <div>
+  1362→                <Label className="mb-1.5">{t('admin.reference')}</Label>
+  1363→                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t('admin.referencePlaceholder')} />
+  1364→              </div>
+  1365→            </div>
+  1366→          )}
+  1367→          <DialogFooter>
+  1368→            <Button variant="outline" onClick={() => setPayDialog(null)}>{t('common.cancel')}</Button>
+  1369→            <Button variant="success" onClick={markPaid} disabled={paying} className="gap-1.5">
+  1370→              <Icon name="check_circle" size={16} fill /> {t('admin.markPaid')}
+  1371→            </Button>
+  1372→          </DialogFooter>
+  1373→        </DialogContent>
+  1374→      </Dialog>
+  1375→    </div>
+  1376→  )
+  1377→}
+  1378→
+  1379→// ============================================================================
+  1380→// Ledger section
+  1381→// ============================================================================
+  1382→
+  1383→const LEDGER_TYPES: LedgerType[] = [
+  1384→  'PATIENT_CHARGE', 'COMMISSION', 'PROVIDER_CREDIT', 'PROVIDER_DEBIT',
+  1385→  'REFUND_PATIENT', 'REFUND_COMMISSION_REVERSAL', 'REFUND_PROVIDER_DEBIT', 'PAYOUT',
+  1386→]
+  1387→const PAGE_SIZE = 25
+  1388→
+  1389→function LedgerSection() {
+  1390→  const { t, locale } = useT()
+  1391→  const [typeFilter, setTypeFilter] = React.useState<string>('all')
+  1392→  const [search, setSearch] = React.useState('')
+  1393→  const [page, setPage] = React.useState(0)
+  1394→  const { data, loading, error, refetch } = useApi<{ entries: LedgerEntry[] }>('/api/ledger')
+  1395→
+  1396→  const filtered = React.useMemo(() => {
+  1397→    if (!data?.entries) return []
+  1398→    const q = search.trim().toLowerCase()
+  1399→    return data.entries
+  1400→      .filter((e) => typeFilter === 'all' || e.type === typeFilter)
+  1401→      .filter((e) => !q || e.description.toLowerCase().includes(q) || (e.user?.email || '').toLowerCase().includes(q))
+  1402→  }, [data, typeFilter, search])
+  1403→
+  1404→  const summary = React.useMemo(() => {
+  1405→    let credits = 0, debits = 0
+  1406→    filtered.forEach((e) => {
+  1407→      const amt = parseFloat(e.amount)
+  1408→      if (amt >= 0) credits += amt
+  1409→      else debits += Math.abs(amt)
+  1410→    })
+  1411→    return { credits, debits, net: credits - debits }
+  1412→  }, [filtered])
+  1413→
+  1414→  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  1415→  const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  1416→  React.useEffect(() => { setPage(0) }, [typeFilter, search])
+  1417→
+  1418→  function exportCsv() {
+  1419→    if (!filtered.length) return
+  1420→    exportCSV(
+  1421→      `ledger-${new Date().toISOString().slice(0, 10)}.csv`,
+  1422→      ['Date', 'Type', 'Description', 'Amount', 'Booking ID', 'User'],
+  1423→      filtered.map((e) => [
+  1424→        new Date(e.createdAt).toISOString(),
+  1425→        e.type,
+  1426→        e.description,
+  1427→        e.amount,
+  1428→        e.bookingId || '',
+  1429→        e.user?.email || '',
+  1430→      ])
+  1431→    )
+  1432→  }
+  1433→
+  1434→  if (loading) {
+  1435→    return (
+  1436→      <div>
+  1437→        <PageHeader title={t('admin.ledgerTitle')} icon="receipt_long" />
+  1438→        <LoadingCard lines={8} />
+  1439→      </div>
+  1440→    )
+  1441→  }
+  1442→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+  1443→
+  1444→  return (
+  1445→    <div className="animate-fade-in">
+  1446→      <PageHeader
+  1447→        title={t('admin.ledgerTitle')}
+  1448→        description={t('admin.ledgerDesc')}
+  1449→        icon="receipt_long"
+  1450→        action={
+  1451→          <Button variant="outline" size="sm" onClick={exportCsv} disabled={!filtered.length} className="gap-1.5">
+  1452→            <Icon name="download" size={16} /> {t('admin.exportCsv')}
+  1453→          </Button>
+  1454→        }
+  1455→      />
+  1456→
+  1457→      {/* Summary */}
+  1458→      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+  1459→        <Card className="py-4">
+  1460→          <CardContent className="flex items-center gap-3">
+  1461→            <div className="flex size-11 items-center justify-center rounded-[14px] bg-success/10 text-success">
+  1462→              <Icon name="trending_up" size={22} fill />
+  1463→            </div>
+  1464→            <div>
+  1465→              <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.totalCredits')}</p>
+  1466→              <p className="text-lg font-semibold text-success">{formatCurrency(summary.credits.toFixed(2), 'USD', locale)}</p>
+  1467→            </div>
+  1468→          </CardContent>
+  1469→        </Card>
+  1470→        <Card className="py-4">
+  1471→          <CardContent className="flex items-center gap-3">
+  1472→            <div className="flex size-11 items-center justify-center rounded-[14px] bg-error/10 text-error">
+  1473→              <Icon name="trending_down" size={22} fill />
+  1474→            </div>
+  1475→            <div>
+  1476→              <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.totalDebits')}</p>
+  1477→              <p className="text-lg font-semibold text-error">{formatCurrency(summary.debits.toFixed(2), 'USD', locale)}</p>
+  1478→            </div>
+  1479→          </CardContent>
+  1480→        </Card>
+  1481→        <Card className="py-4">
+  1482→          <CardContent className="flex items-center gap-3">
+  1483→            <div className="flex size-11 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+  1484→              <Icon name="analytics" size={22} fill />
+  1485→            </div>
+  1486→            <div>
+  1487→              <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.net')}</p>
+  1488→              <p className="text-lg font-semibold text-foreground">{formatCurrency(summary.net.toFixed(2), 'USD', locale)}</p>
+  1489→            </div>
+  1490→          </CardContent>
+  1491→        </Card>
+  1492→      </div>
+  1493→
+  1494→      {/* Filters */}
+  1495→      <Card className="mb-4 py-4">
+  1496→        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+  1497→          <div className="relative flex-1">
+  1498→            <Icon name="search" size={18} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted-foreground" />
+  1499→            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('admin.description')} className="h-10 ps-10" />
+  1500→          </div>
+  1501→          <Select value={typeFilter} onValueChange={setTypeFilter}>
+  1502→            <SelectTrigger className="h-10 w-full rounded-[14px] sm:w-56">
+  1503→              <SelectValue />
+  1504→            </SelectTrigger>
+  1505→            <SelectContent>
+  1506→              <SelectItem value="all">{t('admin.allTypes')}</SelectItem>
+  1507→              {LEDGER_TYPES.map((lt) => (
+  1508→                <SelectItem key={lt} value={lt}>{lt.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>
+  1509→              ))}
+  1510→            </SelectContent>
+  1511→          </Select>
+  1512→        </CardContent>
+  1513→      </Card>
+  1514→
+  1515→      {/* Table */}
+  1516→      <Card className="py-0">
+  1517→        <Table>
+  1518→          <TableHeader>
+  1519→            <TableRow className="hover:bg-transparent">
+  1520→              <TableHead className="ps-6 text-xs uppercase tracking-wide text-muted-foreground">{t('common.date')}</TableHead>
+  1521→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.type')}</TableHead>
+  1522→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.description')}</TableHead>
+  1523→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.relatedBooking')}</TableHead>
+  1524→              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t('admin.user')}</TableHead>
+  1525→              <TableHead className="pe-6 text-end text-xs uppercase tracking-wide text-muted-foreground">{t('common.amount')}</TableHead>
+  1526→            </TableRow>
+  1527→          </TableHeader>
+  1528→          <TableBody>
+  1529→            {pageRows.length === 0 && (
+  1530→              <TableRow>
+  1531→                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">{t('admin.noData')}</TableCell>
+  1532→              </TableRow>
+  1533→            )}
+  1534→            {pageRows.map((e) => {
+  1535→              const amt = parseFloat(e.amount)
+  1536→              const positive = amt >= 0
+  1537→              return (
+  1538→                <TableRow key={e.id} className="h-14">
+  1539→                  <TableCell className="ps-6 text-sm text-muted-foreground">{formatDateTime(e.createdAt, locale)}</TableCell>
+  1540→                  <TableCell><LedgerTypeBadge type={e.type} /></TableCell>
+  1541→                  <TableCell className="max-w-[280px] truncate text-sm text-foreground" title={e.description}>{e.description}</TableCell>
+  1542→                  <TableCell className="text-xs text-muted-foreground">{e.bookingId ? e.bookingId.slice(-6) : '—'}</TableCell>
+  1543→                  <TableCell className="text-sm text-muted-foreground">{e.user?.email || '—'}</TableCell>
+  1544→                  <TableCell className={cn('pe-6 text-end text-sm font-semibold', positive ? 'text-success' : 'text-error')}>
+  1545→                    {positive ? '+' : '−'}{formatCurrency(Math.abs(amt).toFixed(2), 'USD', locale)}
+  1546→                  </TableCell>
+  1547→                </TableRow>
+  1548→              )
+  1549→            })}
+  1550→          </TableBody>
+  1551→        </Table>
+  1552→        {/* Pagination */}
+  1553→        {filtered.length > PAGE_SIZE && (
+  1554→          <div className="flex items-center justify-between border-t border-divider px-6 py-3">
+  1555→            <p className="text-xs text-muted-foreground">
+  1556→              {t('admin.showing')} {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} {t('admin.of')} {filtered.length} {t('admin.totalEntries')}
+  1557→            </p>
+  1558→            <div className="flex items-center gap-2">
+  1559→              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="gap-1">
+  1560→                <Icon name="chevron_left" size={16} className="rtl:rotate-180" /> {t('admin.prev')}
+  1561→              </Button>
+  1562→              <span className="text-xs text-muted-foreground">{page + 1} / {pageCount}</span>
+  1563→              <Button size="sm" variant="outline" disabled={page >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="gap-1">
+  1564→                {t('admin.next')} <Icon name="chevron_right" size={16} className="rtl:rotate-180" />
+  1565→              </Button>
+  1566→            </div>
+  1567→          </div>
+  1568→        )}
+  1569→      </Card>
+  1570→    </div>
+  1571→  )
+  1572→}
+  1573→
+  1574→// ============================================================================
+  1575→// Reports section
+  1576→// ============================================================================
+  1577→
+  1578→function ReportsSection() {
+  1579→  const { t, locale } = useT()
+  1580→  const { data, loading, error, refetch } = useApi<{ entries: LedgerEntry[] }>('/api/ledger')
+  1581→
+  1582→  const report = React.useMemo(() => {
+  1583→    if (!data?.entries) return null
+  1584→    let commission = 0, commissionReversal = 0, patientCharge = 0, refundPatient = 0, payout = 0
+  1585→    const byTypeMap: Record<string, number> = {}
+  1586→    const dailyMap: Record<string, number> = {}
+  1587→
+  1588→    data.entries.forEach((e) => {
+  1589→      const amt = parseFloat(e.amount)
+  1590→      if (e.type === 'COMMISSION') {
+  1591→        commission += amt
+  1592→        const day = new Date(e.createdAt).toISOString().slice(0, 10)
+  1593→        dailyMap[day] = (dailyMap[day] || 0) + amt
+  1594→      } else if (e.type === 'REFUND_COMMISSION_REVERSAL') {
+  1595→        commissionReversal += Math.abs(amt)
+  1596→        const day = new Date(e.createdAt).toISOString().slice(0, 10)
+  1597→        dailyMap[day] = (dailyMap[day] || 0) - Math.abs(amt)
+  1598→      } else if (e.type === 'PATIENT_CHARGE') {
+  1599→        patientCharge += amt
+  1600→      } else if (e.type === 'REFUND_PATIENT') {
+  1601→        refundPatient += Math.abs(amt)
+  1602→      } else if (e.type === 'PAYOUT') {
+  1603→        payout += Math.abs(amt)
+  1604→      }
+  1605→    })
+  1606→
+  1607→    const platformRevenue = commission - commissionReversal
+  1608→    const dailyRevenue = Object.entries(dailyMap)
+  1609→      .map(([date, amount]) => ({ date, amount }))
+  1610→      .sort((a, b) => a.date.localeCompare(b.date))
+  1611→      .slice(-14)
+  1612→
+  1613→    return { platformRevenue, commission, commissionReversal, patientCharge, refundPatient, payout, dailyRevenue }
+  1614→  }, [data])
+  1615→
+  1616→  function exportReport(name: string, headers: string[], rows: (string | number)[][]) {
+  1617→    exportCSV(`${name}-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows)
+  1618→  }
+  1619→
+  1620→  if (loading) {
+  1621→    return (
+  1622→      <div>
+  1623→        <PageHeader title={t('admin.reportsTitle')} icon="analytics" />
+  1624→        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  1625→          {Array.from({ length: 4 }).map((_, i) => <Card key={`item-${i}`} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>)}
+  1626→        </div>
+  1627→        <LoadingCard lines={4} />
+  1628→      </div>
+  1629→    )
+  1630→  }
+  1631→  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+  1632→  if (!report) return <ErrorState message={t('admin.noData')} onRetry={refetch} />
+  1633→
+  1634→  const chartData = report.dailyRevenue.map((d) => ({
+  1635→    date: formatDate(d.date, locale, { month: 'short', day: 'numeric' }),
+  1636→    amount: Number(d.amount.toFixed(2)),
+  1637→  }))
+  1638→
+  1639→  return (
+  1640→    <div className="animate-fade-in">
+  1641→      <PageHeader
+  1642→        title={t('admin.reportsTitle')}
+  1643→        description={t('admin.reportsDesc')}
+  1644→        icon="analytics"
+  1645→      />
+  1646→
+  1647→      {/* Big stat cards */}
+  1648→      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  1649→        <StatCard icon="payments" label={t('admin.platformRevenue')} value={formatCurrency(report.platformRevenue.toFixed(2), 'USD', locale)} tone="success" subtitle={t('admin.commission')} />
+  1650→        <StatCard icon="receipt_long" label={t('admin.totalProcessed')} value={formatCurrency(report.patientCharge.toFixed(2), 'USD', locale)} tone="primary" />
+  1651→        <StatCard icon="undo" label={t('admin.totalRefunded')} value={formatCurrency(report.refundPatient.toFixed(2), 'USD', locale)} tone="warning" />
+  1652→        <StatCard icon="account_balance" label={t('admin.totalPayouts')} value={formatCurrency(report.payout.toFixed(2), 'USD', locale)} tone="info" />
+  1653→      </div>
+  1654→
+  1655→      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+  1656→        {/* Revenue chart */}
+  1657→        <Card className="lg:col-span-2">
+  1658→          <CardHeader>
+  1659→            <CardTitle className="text-base">{t('admin.revenueOverTime')}</CardTitle>
+  1660→          </CardHeader>
+  1661→          <CardContent>
+  1662→            <div className="h-72 w-full">
+  1663→              <ResponsiveContainer width="100%" height="100%">
+  1664→                <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+  1665→                  <defs>
+  1666→                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+  1667→                      <stop offset="0%" stopColor="#1A73E8" stopOpacity={0.35} />
+  1668→                      <stop offset="100%" stopColor="#1A73E8" stopOpacity={0.02} />
+  1669→                    </linearGradient>
+  1670→                  </defs>
+  1671→                  <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+  1672→                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+  1673→                  <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={56}
+  1674→                    tickFormatter={(v) => formatCurrency(String(v), 'USD', locale).replace(/\.\d+$/, '')} />
+  1675→                  <Tooltip
+  1676→                    cursor={{ stroke: '#1A73E8', strokeWidth: 1 }}
+  1677→                    contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+  1678→                    formatter={(v: number) => [formatCurrency(String(v), 'USD', locale), t('admin.platformRevenue')]}
+  1679→                  />
+  1680→                  <Area type="monotone" dataKey="amount" stroke="#1A73E8" strokeWidth={2} fill="url(#revGrad)" />
+  1681→                </AreaChart>
+  1682→              </ResponsiveContainer>
+  1683→            </div>
+  1684→          </CardContent>
+  1685→        </Card>
+  1686→
+  1687→        {/* Export buttons */}
+  1688→        <Card>
+  1689→          <CardHeader>
+  1690→            <CardTitle className="text-base">{t('admin.exportReport')}</CardTitle>
+  1691→            <CardDescription>{t('admin.reportsDesc')}</CardDescription>
+  1692→          </CardHeader>
+  1693→          <CardContent className="flex flex-col gap-2">
+  1694→            <Button
+  1695→              variant="outline"
+  1696→              onClick={() => exportReport('platform-revenue',
+  1697→                ['Metric', 'Amount'],
+  1698→                [[t('admin.platformRevenue'), report.platformRevenue.toFixed(2)], [t('admin.commission'), report.commission.toFixed(2)], [t('admin.refundAmount'), report.commissionReversal.toFixed(2)]]
+  1699→              )}
+  1700→              className="justify-start gap-2"
+  1701→            >
+  1702→              <Icon name="download" size={16} /> {t('admin.platformRevenue')}
+  1703→            </Button>
+  1704→            <Button
+  1705→              variant="outline"
+  1706→              onClick={() => exportReport('patient-charges',
+  1707→                ['Metric', 'Amount'],
+  1708→                [[t('admin.totalProcessed'), report.patientCharge.toFixed(2)], [t('admin.totalRefunded'), report.refundPatient.toFixed(2)]]
+  1709→              )}
+  1710→              className="justify-start gap-2"
+  1711→            >
+  1712→              <Icon name="download" size={16} /> {t('admin.totalProcessed')}
+  1713→            </Button>
+  1714→            <Button
+  1715→              variant="outline"
+  1716→              onClick={() => exportReport('payouts',
+  1717→                ['Metric', 'Amount'],
+  1718→                [[t('admin.totalPayouts'), report.payout.toFixed(2)]]
+  1719→              )}
+  1720→              className="justify-start gap-2"
+  1721→            >
+  1722→              <Icon name="download" size={16} /> {t('admin.totalPayouts')}
+  1723→            </Button>
+  1724→            <Button
+  1725→              variant="outline"
+  1726→              onClick={() => exportReport('full-ledger',
+  1727→                ['Date', 'Type', 'Description', 'Amount', 'User'],
+  1728→                data.entries.map((e) => [new Date(e.createdAt).toISOString(), e.type, e.description, e.amount, e.user?.email || ''])
+  1729→              )}
+  1730→              className="justify-start gap-2"
+  1731→            >
+  1732→              <Icon name="download" size={16} /> {t('admin.ledgerTitle')}
+  1733→            </Button>
+  1734→          </CardContent>
+  1735→        </Card>
+  1736→      </div>
+  1737→    </div>
+  1738→  )
+  1739→}
+  1740→
+  1741→// ============================================================================
+  1742→// Main exported component
+  1743→// ============================================================================
+  1744→
+  1745→export function AdminDashboard({ section }: { section: string }) {
+  1746→  switch (section) {
+  1747→    case 'overview': return <OverviewSection />
+  1748→    case 'analytics': return <AdminAnalyticsSection />
+  1749→    case 'messages': return <MessagesSection />
+  1750→    case 'providers': return <ProvidersSection />
+  1751→    case 'users': return <UsersSection />
+  1752→    case 'moderation': return <ModerationSection />
+  1753→    case 'commission': return <CommissionSection />
+  1754→    case 'cancellations': return <CancellationsSection />
+  1755→    case 'payouts': return <PayoutsSection />
+  1756→    case 'ledger': return <LedgerSection />
+  1757→    case 'reports': return <ReportsSection />
+  1758→    case 'disputes': return <DisputesSection />
+  1759→    case 'affiliates': return <AffiliatesSection />
+  1760→    default: return <OverviewSection />
+  1761→  }
+  1762→}
+  1763→
+  1764→// ============================================================================
+  1765→// Admin Analytics section — platform-wide revenue, user growth, booking trends
+  1766→// ============================================================================
+  1767→
+  1768→const ANALYTICS_PIE_COLORS = ['#1A73E8', '#188038', '#F9AB00', '#D93025', '#9334E6']
+  1769→
+  1770→function AdminAnalyticsSection() {
+  1771→  const { t, locale } = useT()
+  1772→  const { data, loading, error, refetch } = useApi<any>('/api/admin/analytics')
+  1773→
+  1774→  if (loading) {
+  1775→    return (
+  1776→      <div className="flex flex-col gap-6">
+  1777→        <PageHeader title={t('admin.analyticsTitle')} description={t('admin.analyticsDesc')} icon="analytics" />
+  1778→        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  1779→          {Array.from({ length: 4 }).map((_, i) => (
+  1780→            <Card key={`item-${i}`} className="py-5"><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+  1781→          ))}
+  1782→        </div>
+  1783→        <Card><CardContent className="p-6"><Skeleton className="h-72 w-full" /></CardContent></Card>
+  1784→      </div>
+  1785→    )
+  1786→  }
+  1787→  if (error || !data) return <ErrorState message={error || t('admin.noData')} onRetry={refetch} />
+  1788→
+  1789→  const s = data.summary
+  1790→
+  1791→  return (
+  1792→    <div className="flex flex-col gap-6">
+  1793→      <PageHeader title={t('admin.analyticsTitle')} description={t('admin.analyticsDesc')} icon="analytics" />
+  1794→
+  1795→      {/* Summary stat cards */}
+  1796→      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+  1797→        <StatCard icon="payments" label={t('admin.platformRevenue')} value={formatCurrency(s.platformRevenue, 'USD', locale)} tone="success" />
+  1798→        <StatCard icon="receipt_long" label={t('admin.totalProcessedShort')} value={formatCurrency(s.totalProcessed, 'USD', locale)} tone="primary" />
+  1799→        <StatCard icon="undo" label={t('admin.totalRefundedShort')} value={formatCurrency(s.totalRefunded, 'USD', locale)} tone="warning" />
+  1800→        <StatCard icon="check_circle" label={t('admin.completionRateShort')} value={`${s.completionRate}%`} tone="info" />
+  1801→        <StatCard icon="group" label={t('admin.totalUsers')} value={String(s.totalUsers)} tone="primary" />
+  1802→      </div>
+  1803→
+  1804→      {/* Monthly revenue chart */}
+  1805→      <Card>
+  1806→        <CardHeader>
+  1807→          <CardTitle className="flex items-center gap-2 text-base">
+  1808→            <Icon name="trending_up" size={18} className="text-success" />
+  1809→            {t('admin.monthlyRevenue')}
+  1810→          </CardTitle>
+  1811→        </CardHeader>
+  1812→        <CardContent>
+  1813→          <div className="h-72 w-full">
+  1814→            <ResponsiveContainer width="100%" height="100%">
+  1815→              <AreaChart data={data.monthlyRevenue} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+  1816→                <defs>
+  1817→                  <linearGradient id="adminRevGrad" x1="0" y1="0" x2="0" y2="1">
+  1818→                    <stop offset="0%" stopColor="#188038" stopOpacity={0.35} />
+  1819→                    <stop offset="100%" stopColor="#188038" stopOpacity={0.02} />
+  1820→                  </linearGradient>
+  1821→                </defs>
+  1822→                <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+  1823→                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+  1824→                <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={56}
+  1825→                  tickFormatter={(v) => formatCurrency(String(v), 'USD', locale).replace(/\.\d+$/, '')} />
+  1826→                <Tooltip
+  1827→                  cursor={{ stroke: '#188038', strokeWidth: 1 }}
+  1828→                  contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+  1829→                  formatter={(v: number) => [formatCurrency(String(v), 'USD', locale), t('admin.platformRevenue')]}
+  1830→                />
+  1831→                <Area type="monotone" dataKey="revenue" stroke="#188038" strokeWidth={2} fill="url(#adminRevGrad)" />
+  1832→              </AreaChart>
+  1833→            </ResponsiveContainer>
+  1834→          </div>
+  1835→        </CardContent>
+  1836→      </Card>
+  1837→
+  1838→      {/* Two-column: user growth + bookings by type */}
+  1839→      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  1840→        <Card>
+  1841→          <CardHeader>
+  1842→            <CardTitle className="flex items-center gap-2 text-base">
+  1843→              <Icon name="group_add" size={18} className="text-primary" />
+  1844→              {t('admin.userGrowth')}
+  1845→            </CardTitle>
+  1846→          </CardHeader>
+  1847→          <CardContent>
+  1848→            <div className="h-64 w-full">
+  1849→              <ResponsiveContainer width="100%" height="100%">
+  1850→                <BarChart data={data.userGrowth} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+  1851→                  <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" vertical={false} />
+  1852→                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={{ stroke: '#DADCE0' }} tickLine={false} />
+  1853→                  <YAxis tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={32} />
+  1854→                  <Tooltip cursor={{ fill: '#F1F3F4' }} contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }} />
+  1855→                  <Bar dataKey="patients" stackId="a" fill="#1A73E8" />
+  1856→                  <Bar dataKey="providers" stackId="a" fill="#188038" radius={[6, 6, 0, 0]} />
+  1857→                </BarChart>
+  1858→              </ResponsiveContainer>
+  1859→            </div>
+  1860→            <div className="mt-3 flex items-center justify-center gap-6 text-sm">
+  1861→              <div className="flex items-center gap-2">
+  1862→                <span className="size-3 rounded-full bg-primary" />
+  1863→                <span className="text-muted-foreground">{t('admin.patients')}</span>
+  1864→              </div>
+  1865→              <div className="flex items-center gap-2">
+  1866→                <span className="size-3 rounded-full bg-success" />
+  1867→                <span className="text-muted-foreground">{t('admin.providersShort')}</span>
+  1868→              </div>
+  1869→            </div>
+  1870→          </CardContent>
+  1871→        </Card>
+  1872→
+  1873→        <Card>
+  1874→          <CardHeader>
+  1875→            <CardTitle className="flex items-center gap-2 text-base">
+  1876→              <Icon name="pie_chart" size={18} className="text-primary" />
+  1877→              {t('admin.bookingsByType')}
+  1878→            </CardTitle>
+  1879→          </CardHeader>
+  1880→          <CardContent>
+  1881→            {data.providerTypeData.length > 0 ? (
+  1882→              <div className="flex flex-col items-center gap-4">
+  1883→                <div className="h-48 w-full">
+  1884→                  <ResponsiveContainer width="100%" height="100%">
+  1885→                    <PieChart>
+  1886→                      <Pie data={data.providerTypeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={2}>
+  1887→                        {data.providerTypeData.map((_: any, i: number) => <Cell key={`cell-${i}`} fill={ANALYTICS_PIE_COLORS[i % ANALYTICS_PIE_COLORS.length]} />)}
+  1888→                      </Pie>
+  1889→                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }} />
+  1890→                    </PieChart>
+  1891→                  </ResponsiveContainer>
+  1892→                </div>
+  1893→                <div className="flex flex-wrap justify-center gap-4">
+  1894→                  {data.providerTypeData.map((d: any, i: number) => (
+  1895→                    <div key={d.name} className="flex items-center gap-2 text-sm">
+  1896→                      <span className="size-3 rounded-full" style={{ backgroundColor: ANALYTICS_PIE_COLORS[i % ANALYTICS_PIE_COLORS.length] }} />
+  1897→                      <span className="text-muted-foreground">{d.name}</span>
+  1898→                      <span className="font-semibold text-foreground">{d.value}</span>
+  1899→                    </div>
+  1900→                  ))}
+  1901→                </div>
+  1902→              </div>
+  1903→            ) : (
+  1904→              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">{t('admin.noData')}</div>
+  1905→            )}
+  1906→          </CardContent>
+  1907→        </Card>
+  1908→      </div>
+  1909→
+  1910→      {/* Revenue by type + Top providers */}
+  1911→      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  1912→        <Card>
+  1913→          <CardHeader>
+  1914→            <CardTitle className="flex items-center gap-2 text-base">
+  1915→              <Icon name="bar_chart" size={18} className="text-primary" />
+  1916→              {t('admin.revenueByType')}
+  1917→            </CardTitle>
+  1918→          </CardHeader>
+  1919→          <CardContent>
+  1920→            {data.revenueByType.length > 0 ? (
+  1921→              <div className="h-56 w-full">
+  1922→                <ResponsiveContainer width="100%" height="100%">
+  1923→                  <BarChart data={data.revenueByType} layout="vertical" margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+  1924→                    <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" horizontal={false} />
+  1925→                    <XAxis type="number" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} tickFormatter={(v) => '$' + v} />
+  1926→                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#5F6368' }} axisLine={false} tickLine={false} width={72} />
+  1927→                    <Tooltip cursor={{ fill: '#F1F3F4' }} contentStyle={{ borderRadius: 12, border: '1px solid #DADCE0', fontSize: 12 }}
+  1928→                      formatter={(v: number) => [formatCurrency(String(v), 'USD', locale), t('admin.platformRevenue')]} />
+  1929→                    <Bar dataKey="value" fill="#1A73E8" radius={[0, 6, 6, 0]} />
+  1930→                  </BarChart>
+  1931→                </ResponsiveContainer>
+  1932→              </div>
+  1933→            ) : (
+  1934→              <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">{t('admin.noData')}</div>
+  1935→            )}
+  1936→          </CardContent>
+  1937→        </Card>
+  1938→
+  1939→        <Card>
+  1940→          <CardHeader>
+  1941→            <CardTitle className="flex items-center gap-2 text-base">
+  1942→              <Icon name="workspace_premium" size={18} className="text-primary" />
+  1943→              {t('admin.topProviders')}
+  1944→            </CardTitle>
+  1945→          </CardHeader>
+  1946→          <CardContent className="space-y-3">
+  1947→            {data.topProviders.length > 0 ? (
+  1948→              data.topProviders.map((p: any, i: number) => (
+  1949→                <div key={p.email} className="flex items-center gap-3">
+  1950→                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-secondary text-xs font-bold text-muted-foreground">
+  1951→                    {i + 1}
+  1952→                  </div>
+  1953→                  <div className="min-w-0 flex-1">
+  1954→                    <div className="flex items-center justify-between gap-2">
+  1955→                      <div className="min-w-0">
+  1956→                        <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+  1957→                        <p className="text-xs text-muted-foreground">{p.type}</p>
+  1958→                      </div>
+  1959→                      <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">{formatCurrency(String(p.revenue), 'USD', locale)}</span>
+  1960→                    </div>
+  1961→                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-secondary">
+  1962→                      <div className="h-full rounded-full bg-primary" style={{ width: `${(p.revenue / data.topProviders[0].revenue) * 100}%` }} />
+  1963→                    </div>
+  1964→                  </div>
+  1965→                </div>
+  1966→              ))
+  1967→            ) : (
+  1968→              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{t('admin.noData')}</div>
+  1969→            )}
+  1970→          </CardContent>
+  1971→        </Card>
+  1972→      </div>
+  1973→    </div>
+  1974→  )
+  1975→}
+  1976→
+  1977→// ============================================================================
+  1978→// Disputes section — admin manages booking disputes
+  1979→// ============================================================================
+  1980→
+  1981→const DISPUTE_STATUS_BADGE: Record<string, { cls: string; key: string }> = {
+  1982→  OPEN: { cls: 'bg-warning/10 text-warning border-warning/20', key: 'dispute.open' },
+  1983→  UNDER_REVIEW: { cls: 'bg-info/10 text-info border-info/20', key: 'dispute.underReview' },
+  1984→  RESOLVED: { cls: 'bg-success/10 text-success border-success/20', key: 'dispute.resolved' },
+  1985→  CLOSED: { cls: 'bg-muted text-muted-foreground border-divider', key: 'dispute.closed' },
+  1986→}
+  1987→
+  1988→const DISPUTE_TYPE_ICON: Record<string, string> = {
+  1989→  REFUND_REQUEST: 'undo',
+  1990→  SERVICE_QUALITY: 'thumb_down',
+  1991→  SCHEDULING_ISSUE: 'event_busy',
+  1992→  PAYMENT_ISSUE: 'payments',
+  1993→  OTHER: 'help',
+  1994→}
+  1995→
+  1996→function DisputesSection() {
+  1997→  const { t, locale } = useT()
+  1998→  const [tick, setTick] = React.useState(0)
+  1999→  const { data, loading, error, refetch } = useApi<{ disputes: any[] }>('/api/disputes', { deps: [tick] })
+  2000→  const [selected, setSelected] = React.useState<any | null>(null)
+
+[showing lines 1-2000 of 2382; use offset=2001 with limit to continue reading]
