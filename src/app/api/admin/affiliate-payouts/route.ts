@@ -23,7 +23,6 @@ export async function GET() {
         userId: a.userId,
         name: a.user.name || a.user.email,
         email: a.user.email,
-        tier: a.tier,
         availableBalance: a.availableBalance,
         pendingBalance: a.pendingBalance,
         paidOut: a.paidOut,
