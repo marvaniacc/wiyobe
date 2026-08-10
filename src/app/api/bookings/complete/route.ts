@@ -2,7 +2,6 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { notify } from '@/lib/notify'
-import { checkAndPromoteTier } from '@/lib/affiliate-tiers'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -72,9 +71,6 @@ export async function POST(req: Request) {
           link: 'payouts',
           meta: { bookingId: booking.id, amount: commissionAmount.toFixed(2) },
         })
-
-        // Check for tier promotion after earnings update
-        await checkAndPromoteTier(aff.id)
       }
     }
 
