@@ -206,7 +206,7 @@ export async function POST(req: Request) {
         serviceId: body.serviceId || null,
         slotId: body.slotId || null,
         visitType: body.visitType,
-        status: 'CONFIRMED',
+        status: 'PENDING',
         startDate: new Date(body.startDate),
         endDate: body.endDate ? new Date(body.endDate) : null,
         amount: toDec(amount),
