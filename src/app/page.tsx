@@ -113,6 +113,38 @@ export default function Home() {
     }
   }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Browser back button support — push history state on view changes,
+  // intercept popstate to navigate back within the app instead of exiting
+  useEffect(() => {
+    // Push a state whenever the view changes (so back button has something to go back to)
+    if (view.name === 'dashboard' || view.name === 'auth') {
+      window.history.pushState({ appView: view.name, section: view.name === 'dashboard' ? view.section : undefined }, '')
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      // If there's app state in the history entry, restore it
+      if (e.state?.appView) {
+        if (e.state.appView === 'dashboard' && session) {
+          useApp.getState().goDashboard(e.state.section || 'overview')
+        } else if (e.state.appView === 'auth' && !session) {
+          useApp.getState().goAuth('signin', 'PATIENT')
+        } else {
+          useApp.getState().goLanding()
+        }
+      } else {
+        // No app state — go to landing (or dashboard if logged in)
+        if (session) {
+          useApp.getState().goDashboard('overview')
+        } else {
+          useApp.getState().goLanding()
+        }
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [view.name, view.name === 'dashboard' ? view.section : '', session]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (sessionLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
