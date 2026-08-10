@@ -38,7 +38,6 @@ import { downloadICal } from '@/lib/ical'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
 import { ChatWidget } from '@/components/shared/chat-widget'
-import { TicketsSection } from '@/components/shared/tickets-section'
 import { Progress } from '@/components/ui/progress'
 
 /* =========================================================================
