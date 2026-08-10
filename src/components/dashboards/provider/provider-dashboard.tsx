@@ -570,6 +570,7 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
   const goMessages = useApp((s) => s.goMessages)
   const [completeOpen, setCompleteOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [declineOpen, setDeclineOpen] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -585,6 +586,34 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
       await apiPost('/api/bookings/complete', { bookingId: booking.id })
       toast.success(t('booking.confirmCompletion'))
       setCompleteOpen(false)
+      onDone()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleAccept() {
+    setBusy(true)
+    try {
+      await apiPost('/api/bookings/accept', { bookingId: booking.id })
+      toast.success('Booking accepted')
+      onDone()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDecline() {
+    setBusy(true)
+    try {
+      await apiPost('/api/bookings/decline', { bookingId: booking.id, reason: reason || undefined })
+      toast.success('Booking declined')
+      setDeclineOpen(false)
+      setReason('')
       onDone()
     } catch (e: any) {
       toast.error(e.message || t('common.error'))
@@ -646,6 +675,7 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
   }
 
   const isConfirmed = booking.status === 'CONFIRMED'
+  const isPending = booking.status === 'PENDING'
   const isOnline = booking.visitType === 'ONLINE'
 
   return (
@@ -688,6 +718,60 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
               <Icon name="forum" size={14} fill />
               <span className="hidden sm:inline">{t('chat.openChat')}</span>
             </Button>
+          )}
+          {/* Accept & Decline for PENDING bookings */}
+          {isPending && (
+            <>
+              <Button
+                variant="success"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleAccept}
+                disabled={busy}
+              >
+                <Icon name="check_circle" size={14} fill />
+                <span className="hidden sm:inline">Accept</span>
+              </Button>
+              <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-error hover:bg-error/5 hover:text-error"
+                    disabled={busy}
+                  >
+                    <Icon name="close" size={14} />
+                    <span className="hidden sm:inline">Decline</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Decline booking</DialogTitle>
+                    <DialogDescription>
+                      {booking.patient?.name} · {booking.service?.name || t('booking.inPerson')} · {formatCurrency(booking.amount, 'USD', locale)}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="decline-reason">Reason (optional)</Label>
+                    <Textarea
+                      id="decline-reason"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="e.g. Schedule conflict, not available…"
+                      rows={3}
+                    />
+                    <p className="text-xs text-muted-foreground">The patient will receive a full refund.</p>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeclineOpen(false)} disabled={busy}>{t('common.close')}</Button>
+                    <Button variant="destructive" onClick={handleDecline} disabled={busy} className="gap-1.5">
+                      {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="close" size={14} />}
+                      Decline booking
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
           {isConfirmed && isOnline && booking.videoSessionUrl && (
             <Button
