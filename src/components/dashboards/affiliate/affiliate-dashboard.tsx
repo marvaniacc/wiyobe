@@ -49,6 +49,7 @@ interface AffiliateData {
     availableBalance: string
     pendingBalance: string
     paidOut: string
+    commissionRate?: string
   }
   user: {
     name: string | null
@@ -921,7 +922,7 @@ function ProfileSection() {
               <Separator className="my-2" />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">{t('affiliate.commissionRate')}</span>
-                <span className="text-sm font-semibold text-foreground">{data.affiliate?.commissionRate}%</span>
+                <span className="text-sm font-semibold text-foreground">{data.affiliate?.commissionRate ?? '25'}%</span>
               </div>
             </div>
           </CardContent>

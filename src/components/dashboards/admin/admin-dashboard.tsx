@@ -40,7 +40,8 @@ type Status = 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'CONFIRMED' | 'COMPLETED' | '
 type Role = 'PATIENT' | 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR' | 'ADMIN'
 type ProviderType = 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR'
 type LedgerType =
-  | 'PATIENT_CHARGE' | 'COMMISSION' | 'PROVIDER_CREDIT' | 'PROVIDER_DEBIT'
+  | 'PATIENT_CHARGE' | 'COMMISSION' | 'AFFILIATE_COMMISSION' | 'AFFILIATE_COMMISSION_REVERSAL'
+  | 'PROVIDER_CREDIT' | 'PROVIDER_DEBIT'
   | 'REFUND_PATIENT' | 'REFUND_COMMISSION_REVERSAL' | 'REFUND_PROVIDER_DEBIT' | 'PAYOUT'
 
 interface AdminUser {
@@ -223,6 +224,8 @@ function LedgerTypeBadge({ type }: { type: LedgerType }) {
   const map: Record<LedgerType, string> = {
     PATIENT_CHARGE: 'bg-success/10 text-success border border-success/20',
     COMMISSION: 'bg-primary/10 text-primary border border-primary/20',
+    AFFILIATE_COMMISSION: 'bg-primary/10 text-primary border border-primary/20',
+    AFFILIATE_COMMISSION_REVERSAL: 'bg-error/10 text-error border border-error/20',
     PROVIDER_CREDIT: 'bg-info/10 text-info border border-info/20',
     PROVIDER_DEBIT: 'bg-warning text-warning-foreground',
     REFUND_PATIENT: 'bg-error/10 text-error border border-error/20',
@@ -1530,7 +1533,8 @@ function PayoutsSection() {
 // ============================================================================
 
 const LEDGER_TYPES: LedgerType[] = [
-  'PATIENT_CHARGE', 'COMMISSION', 'AFFILIATE_COMMISSION', 'PROVIDER_CREDIT', 'PROVIDER_DEBIT',
+  'PATIENT_CHARGE', 'COMMISSION', 'AFFILIATE_COMMISSION', 'AFFILIATE_COMMISSION_REVERSAL',
+  'PROVIDER_CREDIT', 'PROVIDER_DEBIT',
   'REFUND_PATIENT', 'REFUND_COMMISSION_REVERSAL', 'REFUND_PROVIDER_DEBIT', 'PAYOUT',
 ]
 const PAGE_SIZE = 25

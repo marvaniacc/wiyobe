@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     if (!auth) return error(403, 'Forbidden')
 
     // Decode the data URL → raw bytes
-    const match = attachment.dataUrl.match(/^data:([^;]+);base64,(.*)$/s)
+    const match = attachment.dataUrl.match(/^data:([^;]+);base64,([\s\S]*)$/)
     if (!match) return error(500, 'Invalid attachment encoding')
 
     const mimeType = match[1]

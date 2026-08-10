@@ -6,6 +6,8 @@ const SECRET = process.env.AUTH_SECRET
 if (!SECRET) {
   throw new Error('AUTH_SECRET environment variable is required. Set it in your .env file.')
 }
+// Re-bind to a narrowed type so downstream usages are guaranteed non-null.
+const AUTH_SECRET: string = SECRET
 const COOKIE_NAME = 'mt_session'
 
 export function hashPassword(password: string): string {
@@ -23,14 +25,14 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 function signToken(payload: object): string {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const sig = crypto.createHmac('sha256', SECRET).update(body).digest('base64url')
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url')
   return `${body}.${sig}`
 }
 
 function verifyToken<T = any>(token: string): T | null {
   const [body, sig] = token.split('.')
   if (!body || !sig) return null
-  const expected = crypto.createHmac('sha256', SECRET).update(body).digest('base64url')
+  const expected = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url')
   if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
   try {
     return JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as T

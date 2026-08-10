@@ -6,7 +6,7 @@ export function toDec(n: number | string): string {
 }
 
 export function addDec(...vals: (string | number | null | undefined)[]): string {
-  const sum = vals.reduce((acc, v) => acc + (v == null ? 0 : typeof v === 'string' ? parseFloat(v) || 0 : v), 0)
+  const sum = vals.reduce<number>((acc, v) => acc + (v == null ? 0 : typeof v === 'string' ? parseFloat(v) || 0 : v), 0)
   return sum.toFixed(2)
 }
 

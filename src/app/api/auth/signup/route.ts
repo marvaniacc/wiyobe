@@ -93,7 +93,6 @@ export async function POST(req: Request) {
         data: {
           userId: user.id,
           referralCode,
-          commissionRate: '10',
           website: body.website,
           socialMedia: body.socialMedia,
         },
@@ -101,7 +100,7 @@ export async function POST(req: Request) {
     }
 
     // Process referral code — link new user to the affiliate who referred them
-    if (body.referralCode && body.role !== 'AFFILIATE' && body.role !== 'ADMIN') {
+    if (body.referralCode && body.role !== 'AFFILIATE') {
       const affiliate = await db.affiliate.findUnique({
         where: { referralCode: body.referralCode },
       })

@@ -90,6 +90,7 @@ type Booking = {
   slot?: { id: string; startTime: string; endTime: string } | null
   payment?: { id: string; status: string; amount: string; refundAmount?: string } | null
   review?: { id: string; rating: number; comment: string } | null
+  doctor?: { city: string; country: string } | null
   createdAt: string
 }
 
@@ -185,12 +186,15 @@ function VisitTypePill({ visitType }: { visitType: string }) {
   )
 }
 
-function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
+function PageHeader({ title, description, action, icon }: { title: string; description?: string; action?: React.ReactNode; icon?: string }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
-        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      <div className="flex items-center gap-2.5">
+        {icon && <Icon name={icon} size={26} className="text-primary" fill />}
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
+          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        </div>
       </div>
       {action}
     </div>
@@ -1730,7 +1734,7 @@ function ReviewCard({ review, onReplied }: { review: Review; onReplied: () => vo
                 </div>
                 <p className="mt-1.5 text-sm text-foreground">{review.reply}</p>
                 <button
-                  onClick={() => { setShowReply(true); setReplyText(review.reply) }}
+                  onClick={() => { setShowReply(true); setReplyText(review.reply || '') }}
                   className="mt-1.5 text-xs font-medium text-primary hover:underline"
                 >
                   {t('review.editReply')}

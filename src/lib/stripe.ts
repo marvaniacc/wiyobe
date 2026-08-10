@@ -65,7 +65,7 @@ export async function refundPayment(paymentIntentId: string, amount?: number): P
     ...(amount ? { amount: Math.round(amount * 100) } : {}), // partial refund if amount specified
   })
 
-  return { id: refund.id, status: refund.status, amount: refund.amount / 100 }
+  return { id: refund.id, status: refund.status ?? 'unknown', amount: refund.amount / 100 }
 }
 
 // Retrieve a payment intent to check status

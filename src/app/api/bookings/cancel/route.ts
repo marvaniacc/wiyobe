@@ -21,7 +21,13 @@ export async function POST(req: Request) {
 
     const booking = await db.booking.findUnique({
       where: { id: body.bookingId },
-      include: { payment: true },
+      include: {
+        payment: true,
+        doctor: { include: { user: { select: { name: true } } } },
+        hospital: { select: { name: true } },
+        hotel: { select: { name: true } },
+        translator: { include: { user: { select: { name: true } } } },
+      },
     })
     if (!booking) return error(404, 'Booking not found')
 

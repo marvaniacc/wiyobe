@@ -137,14 +137,14 @@ export async function POST(req: Request) {
     const REFERRAL_TTL_MS = 365 * 24 * 60 * 60 * 1000 // 365 days
 
     // Step 1: Check patient's referral first (priority)
-    const patientUser = await db.user.findUnique({
+    const patientReferral = await db.user.findUnique({
       where: { id: session.id },
       select: { referredByAffiliateId: true },
     })
 
-    if (patientUser?.referredByAffiliateId) {
+    if (patientReferral?.referredByAffiliateId) {
       const patientAff = await db.affiliate.findUnique({
-        where: { id: patientUser.referredByAffiliateId },
+        where: { id: patientReferral.referredByAffiliateId },
       })
       // Self-referral prevention: if the patient IS the affiliate, skip
       if (patientAff && patientAff.verified && patientAff.userId !== session.id) {

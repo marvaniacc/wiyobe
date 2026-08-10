@@ -14,7 +14,9 @@ export function StarRating({ rating, size = 16, showValue = false, count }: { ra
             <span key={i} className="relative inline-block" style={{ width: size, height: size }}>
               <Icon name="star" size={size} className="absolute inset-0 text-border" fill />
               {(filled || isHalf) && (
-                <Icon name="star" size={size} className="absolute inset-0 text-warning" fill style={isHalf ? { clipPath: 'inset(0 50% 0 0)' } : undefined} />
+                <span className="absolute inset-0 overflow-hidden" style={isHalf ? { clipPath: 'inset(0 50% 0 0)' } : undefined}>
+                  <Icon name="star" size={size} className="text-warning" fill />
+                </span>
               )}
             </span>
           )

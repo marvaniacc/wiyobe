@@ -15,7 +15,15 @@ export async function POST(req: Request) {
     if (!session) return error(401, 'Unauthorized')
     const { bookingId } = await parseBody(req, schema)
 
-    const booking = await db.booking.findUnique({ where: { id: bookingId } })
+    const booking = await db.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        doctor: { include: { user: { select: { name: true } } } },
+        hospital: { select: { name: true } },
+        hotel: { select: { name: true } },
+        translator: { include: { user: { select: { name: true } } } },
+      },
+    })
     if (!booking) return error(404, 'Booking not found')
 
     const providerUserId = await (await import('@/lib/ledger')).resolveProviderUser(booking)

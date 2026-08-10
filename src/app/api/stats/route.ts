@@ -81,10 +81,10 @@ export async function GET() {
     const u = await db.user.findUnique({ where: { id: session.id }, include: { doctor: true, hospital: true, hotel: true, translator: true } })
     const where: any = {}
     let rating = 0, reviewCount = 0, providerName = ''
-    if (u?.doctor) { where.doctorId = u.doctor.id; rating = u.doctor.rating; reviewCount = u.doctor.reviewCount; providerName = u.user?.name || '' }
+    if (u?.doctor) { where.doctorId = u.doctor.id; rating = u.doctor.rating; reviewCount = u.doctor.reviewCount; providerName = u.name || '' }
     else if (u?.hospital) { where.hospitalId = u.hospital.id; rating = u.hospital.rating; reviewCount = u.hospital.reviewCount; providerName = u.hospital.name }
     else if (u?.hotel) { where.hotelId = u.hotel.id; rating = u.hotel.rating; reviewCount = u.hotel.reviewCount; providerName = u.hotel.name }
-    else if (u?.translator) { where.translatorId = u.translator.id; rating = u.translator.rating; reviewCount = u.translator.reviewCount; providerName = u.user?.name || '' }
+    else if (u?.translator) { where.translatorId = u.translator.id; rating = u.translator.rating; reviewCount = u.translator.reviewCount; providerName = u.name || '' }
     else return error(403, 'Not a provider')
 
     const [totalBookings, upcoming, completed] = await Promise.all([

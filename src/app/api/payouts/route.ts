@@ -18,7 +18,16 @@ export async function GET(req: Request) {
         where: { role: { in: ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'] }, status: 'ACTIVE' },
         include: { doctor: true, hospital: true, hotel: true, translator: true },
       })
-      const rows = []
+      const rows: Array<{
+        userId: string
+        name: string | null
+        email: string
+        providerType: ProviderType
+        available: string
+        pending: string
+        paidOut: string
+        lifetime: string
+      }> = []
       for (const p of providers) {
         const bal = await getProviderBalance(p.id)
         const pt = p.doctor ? 'DOCTOR' : p.hospital ? 'HOSPITAL' : p.hotel ? 'HOTEL' : 'TRANSLATOR' as ProviderType

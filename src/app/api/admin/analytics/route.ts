@@ -83,7 +83,12 @@ export async function GET() {
     // === Top providers by revenue ===
     const allProviders = await db.user.findMany({
       where: { role: { in: ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'] }, status: 'ACTIVE' },
-      include: { doctor: true, hospital: true, hotel: true, translator: true },
+      include: {
+        doctor: { include: { user: { select: { name: true } } } },
+        hospital: true,
+        hotel: true,
+        translator: { include: { user: { select: { name: true } } } },
+      },
     })
     const providerRevenuePromises = allProviders.map(async (u) => {
       const entries = await db.ledgerEntry.findMany({

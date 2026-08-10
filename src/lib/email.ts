@@ -115,6 +115,45 @@ export function bookingConfirmationEmail(patientName: string, providerName: stri
   }
 }
 
+export function bookingAcceptedEmail(patientName: string, providerName: string): { subject: string; html: string } {
+  return {
+    subject: `Booking accepted — ${providerName}`,
+    html: `
+      <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+        </div>
+        <div style="background: #F0FDF4; border-radius: 16px; padding: 24px; border: 1px solid #188038;">
+          <h2 style="color: #188038; font-size: 18px; margin: 0 0 12px;">✅ Booking Accepted</h2>
+          <p style="color: #5F6368; font-size: 14px;">Hi ${patientName},</p>
+          <p style="color: #5F6368; font-size: 14px;">Your booking with <strong>${providerName}</strong> has been accepted and is now confirmed.</p>
+          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">You can view your booking details in your MedTravel dashboard.</p>
+        </div>
+      </div>
+    `,
+  }
+}
+
+export function bookingDeclinedEmail(patientName: string, providerName: string, refundAmount: string): { subject: string; html: string } {
+  return {
+    subject: `Booking declined — ${providerName}`,
+    html: `
+      <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+        </div>
+        <div style="background: #FEF7F0; border-radius: 16px; padding: 24px; border: 1px solid #D93025;">
+          <h2 style="color: #D93025; font-size: 18px; margin: 0 0 12px;">❌ Booking Declined</h2>
+          <p style="color: #5F6368; font-size: 14px;">Hi ${patientName},</p>
+          <p style="color: #5F6368; font-size: 14px;">Unfortunately, <strong>${providerName}</strong> has declined your booking.</p>
+          ${parseFloat(refundAmount) > 0 ? `<p style="color: #188038; font-size: 14px; margin-top: 12px;">A full refund of <strong>$${refundAmount}</strong> will be processed to your original payment method within 5-10 business days.</p>` : ''}
+          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">Please browse other providers on MedTravel to find an available appointment.</p>
+        </div>
+      </div>
+    `,
+  }
+}
+
 export function bookingCancelledEmail(patientName: string, providerName: string, refundAmount: string): { subject: string; html: string } {
   return {
     subject: `Booking cancelled — ${providerName}`,

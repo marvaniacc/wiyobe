@@ -350,7 +350,7 @@ function OverviewSection() {
   const { data, loading, error, refetch } = useApi<PatientStats>('/api/stats')
 
   if (loading) return <OverviewSkeleton />
-  if (error || !data) return <ErrorState message={error} onRetry={refetch} />
+  if (error || !data) return <ErrorState message={error || undefined} onRetry={refetch} />
 
   const stats = [
     { icon: 'event', label: t('stat.totalBookings'), value: String(data.totalBookings ?? 0), tone: 'primary' as const },
@@ -2158,12 +2158,12 @@ function ProfileSection() {
   const { data, loading, error, refetch } = useApi<{ user: any }>('/api/profile')
 
   if (loading) return <ProfileSkeleton />
-  if (error || !data) return <ErrorState message={error} onRetry={refetch} />
+  if (error || !data) return <ErrorState message={error || undefined} onRetry={refetch} />
 
-  return <ProfileForm key={data.user.id} user={data.user} />
+  return <ProfileForm key={data.user.id} user={data.user} onUpdated={refetch} />
 }
 
-function ProfileForm({ user }: { user: any }) {
+function ProfileForm({ user, onUpdated }: { user: any; onUpdated?: () => void }) {
   const { t } = useT()
   const [saving, setSaving] = useState(false)
   // useState initializer — runs once per mount (parent uses `key` to remount on user change)
@@ -2215,7 +2215,7 @@ function ProfileForm({ user }: { user: any }) {
               initialAvatarUrl={user.avatarUrl}
               name={form.name || user.email}
               size={96}
-              onUpdated={() => refetch?.()}
+              onUpdated={() => onUpdated?.()}
             />
             <div>
               <div className="text-base font-semibold text-foreground">{form.name || user.email}</div>
@@ -2490,9 +2490,9 @@ function RescheduleDialog({ booking, open, onOpenChange, onDone }: {
     setSelected(null)
     // Build provider query based on provider type
     const params = new URLSearchParams()
-    if (booking.doctorId) params.set('doctorId', booking.doctorId)
-    if (booking.hospitalId) params.set('hospitalId', booking.hospitalId)
-    if (booking.translatorId) params.set('translatorId', booking.translatorId)
+    if (booking.doctor?.id) params.set('doctorId', booking.doctor.id)
+    if (booking.hospital?.id) params.set('hospitalId', booking.hospital.id)
+    if (booking.translator?.id) params.set('translatorId', booking.translator.id)
     fetch(`/api/providers/slots?${params}`)
       .then(r => r.json())
       .then(d => setSlots(d.slots || []))

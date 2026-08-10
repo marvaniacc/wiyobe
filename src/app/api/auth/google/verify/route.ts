@@ -18,7 +18,7 @@ interface GoogleUserInfo {
   email: string
   email_verified?: boolean
   name?: string
-  picture?: string
+  picture?: string | null
   locale?: string
 }
 
@@ -79,6 +79,10 @@ export async function POST(req: Request) {
     } else {
       return error(400, 'Either idToken or demoEmail is required.')
     }
+
+    // Defensive guard — after the branches above, googleInfo must be set (all
+    // failing paths return early). This satisfies the type-checker.
+    if (!googleInfo) return error(500, 'Authentication state error')
 
     const googleId = googleInfo.sub
     const email = googleInfo.email.toLowerCase()
