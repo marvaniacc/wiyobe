@@ -138,7 +138,7 @@ export async function POST(req: Request) {
       orderBy: { clickedAt: 'desc' },
     })
 
-    if (providerAffClick?.affiliate) {
+    if (providerAffClick?.affiliate && providerAffClick.affiliate.verified) {
       affiliateUserId = providerAffClick.affiliate.userId
       affiliateClickId = providerAffClick.id
       affiliateRecord = providerAffClick.affiliate
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
         include: { affiliate: true },
         orderBy: { clickedAt: 'desc' },
       })
-      if (patientAffClick?.affiliate) {
+      if (patientAffClick?.affiliate && patientAffClick.affiliate.verified) {
         affiliateUserId = patientAffClick.affiliate.userId
         affiliateClickId = patientAffClick.id
         affiliateRecord = patientAffClick.affiliate
