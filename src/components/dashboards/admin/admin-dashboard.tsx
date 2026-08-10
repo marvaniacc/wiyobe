@@ -1746,6 +1746,7 @@ export function AdminDashboard({ section }: { section: string }) {
   switch (section) {
     case 'overview': return <OverviewSection />
     case 'analytics': return <AdminAnalyticsSection />
+    case 'bookings': return <AdminBookingsSection />
     case 'messages': return <MessagesSection />
     case 'providers': return <ProvidersSection />
     case 'users': return <UsersSection />
@@ -1757,6 +1758,8 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'reports': return <ReportsSection />
     case 'disputes': return <DisputesSection />
     case 'affiliates': return <AffiliatesSection />
+    case 'settings': return <AdminSettingsSection />
+    case 'profile': return <AdminProfileSection />
     default: return <OverviewSection />
   }
 }
@@ -2374,6 +2377,330 @@ function AffiliatesSection() {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================================
+// Admin Bookings section — list all bookings, view detail, cancel, complete
+// ============================================================================
+
+function AdminBookingsSection() {
+  const { t, locale } = useT()
+  const goMessages = useApp((s) => s.goMessages)
+  const [statusFilter, setStatusFilter] = React.useState<string>('all')
+  const { data, loading, error, refetch } = useApi<{ bookings: any[] }>(
+    `/api/bookings${statusFilter !== 'all' ? `?status=${statusFilter}` : ''}`
+  )
+  const [detail, setDetail] = React.useState<any | null>(null)
+  const [busy, setBusy] = React.useState(false)
+
+  async function adminCancel(bookingId: string) {
+    setBusy(true)
+    try {
+      await apiPost('/api/bookings/cancel', { bookingId, reason: 'Cancelled by admin' })
+      toast.success('Booking cancelled')
+      setDetail(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to cancel')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function adminComplete(bookingId: string) {
+    setBusy(true)
+    try {
+      await apiPost('/api/bookings/complete', { bookingId })
+      toast.success('Booking marked complete')
+      setDetail(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to complete')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const bookings = data?.bookings || []
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">{t('admin.allBookings')}</h1>
+        <p className="text-sm text-muted-foreground">{t('admin.allBookingsDesc')}</p>
+      </div>
+
+      <div className="flex gap-2">
+        {['all', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED'].map((s) => (
+          <Button
+            key={s}
+            variant={statusFilter === s ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter(s)}
+          >
+            {s === 'all' ? t('common.all') : t(`common.${s.toLowerCase()}` as any)}
+          </Button>
+        ))}
+      </div>
+
+      {loading ? (
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      ) : error ? (
+        <Card><CardContent className="p-6 text-error">{error}</CardContent></Card>
+      ) : bookings.length === 0 ? (
+        <Card><CardContent className="p-12 text-center text-muted-foreground">{t('admin.noBookings')}</CardContent></Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-divider bg-surface-secondary">
+                  <TableHead className="ps-4">{t('booking.patient')}</TableHead>
+                  <TableHead>{t('booking.provider')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('common.date')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead className="text-end">{t('common.amount')}</TableHead>
+                  <TableHead className="pe-4 text-end">{t('common.actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bookings.map((b) => (
+                  <TableRow key={b.id} className="border-divider">
+                    <TableCell className="ps-4 text-sm">{b.patient?.name || '—'}</TableCell>
+                    <TableCell className="text-sm">
+                      {b.doctor?.user?.name || b.hospital?.name || b.hotel?.name || b.translator?.user?.name || '—'}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{formatDate(b.startDate, locale)}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={b.status} />
+                    </TableCell>
+                    <TableCell className="text-end text-sm font-medium tabular-nums">{formatCurrency(b.amount, 'USD', locale)}</TableCell>
+                    <TableCell className="pe-4 text-end">
+                      <Button variant="outline" size="sm" onClick={() => setDetail(b)}>
+                        {t('common.view')}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Booking detail dialog */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('booking.detailTitle')}</DialogTitle>
+            <DialogDescription>
+              {detail?.patient?.name || '—'} · {formatDate(detail?.startDate, locale)}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('common.status')}</span>
+                <StatusBadge status={detail.status} />
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('common.amount')}</span>
+                <span className="font-medium">{formatCurrency(detail.amount, 'USD', locale)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('booking.visitType')}</span>
+                <span>{detail.visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('booking.provider')}</span>
+                <span>{detail.doctor?.user?.name || detail.hospital?.name || detail.hotel?.name || detail.translator?.user?.name || '—'}</span>
+              </div>
+              {detail.notes && (
+                <div>
+                  <p className="mb-1 text-muted-foreground">{t('common.notes')}</p>
+                  <p className="rounded-lg border border-divider bg-surface p-2">{detail.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button variant="outline" className="gap-1.5" onClick={() => goMessages(detail?.id)} disabled={!detail}>
+              <Icon name="forum" size={16} fill />
+              {t('chat.openChat')}
+            </Button>
+            {detail?.status === 'CONFIRMED' && (
+              <Button variant="success" className="gap-1.5" onClick={() => adminComplete(detail.id)} disabled={busy}>
+                <Icon name="task_alt" size={16} />
+                {t('booking.markComplete')}
+              </Button>
+            )}
+            {(detail?.status === 'PENDING' || detail?.status === 'CONFIRMED') && (
+              <Button variant="outline" className="gap-1.5 text-error hover:bg-error/5" onClick={() => adminCancel(detail.id)} disabled={busy}>
+                <Icon name="close" size={16} />
+                {t('common.cancel')}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setDetail(null)}>{t('booking.close')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ============================================================================
+// Admin Settings section — platform-wide configuration
+// ============================================================================
+
+function AdminSettingsSection() {
+  const { t } = useT()
+  const { data, loading, error, refetch } = useApi<{ settings: Record<string, string> }>('/api/admin/settings')
+  const [values, setValues] = React.useState<Record<string, string>>({})
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (data?.settings) setValues(data.settings)
+  }, [data])
+
+  async function save() {
+    setSaving(true)
+    try {
+      await apiPut('/api/admin/settings', { settings: values })
+      toast.success(t('admin.settingsSaved'))
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const knownKeys = [
+    { key: 'platformName', label: t('admin.platformName'), type: 'text' },
+    { key: 'defaultCurrency', label: t('admin.defaultCurrency'), type: 'text' },
+    { key: 'payoutScheduleDays', label: t('admin.payoutScheduleDays'), type: 'number' },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">{t('admin.platformSettings')}</h1>
+        <p className="text-sm text-muted-foreground">{t('admin.platformSettingsDesc')}</p>
+      </div>
+
+      {loading ? (
+        <Skeleton className="h-48 w-full rounded-2xl" />
+      ) : error ? (
+        <Card><CardContent className="p-6 text-error">{error}</CardContent></Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('admin.generalSettings')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {knownKeys.map(({ key, label, type }) => (
+              <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-center">
+                <Label className="text-sm font-medium">{label}</Label>
+                <Input
+                  type={type}
+                  value={values[key] || ''}
+                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                  className="sm:col-span-2"
+                />
+              </div>
+            ))}
+            <Separator />
+            <div className="flex justify-end">
+              <Button onClick={save} disabled={saving} className="gap-2">
+                {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+                {t('common.save')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Admin Profile section — edit own account
+// ============================================================================
+
+function AdminProfileSection() {
+  const { t, locale } = useT()
+  const session = useApp((s) => s.session)
+  const { data, loading, error, refetch } = useApi<{ user: any }>('/api/profile')
+  const [name, setName] = React.useState('')
+  const [phone, setPhone] = React.useState('')
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (data?.user) {
+      setName(data.user.name || '')
+      setPhone(data.user.phone || '')
+    }
+  }, [data])
+
+  async function save() {
+    setSaving(true)
+    try {
+      await apiPut('/api/profile', { name, phone })
+      toast.success(t('profile.updated'))
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <Skeleton className="h-64 w-full rounded-2xl" />
+  if (error) return <Card><CardContent className="p-6 text-error">{error}</CardContent></Card>
+
+  const initials = (session?.name || session?.email || 'A').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">{t('dash.profile')}</h1>
+        <p className="text-sm text-muted-foreground">{t('profile.adminDesc')}</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('profile.accountInfo')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-xl font-semibold text-primary">
+              {initials}
+            </div>
+            <div>
+              <p className="font-medium text-foreground">{session?.name || '—'}</p>
+              <p className="text-sm text-muted-foreground">{session?.email}</p>
+              <Badge variant="outline" className="mt-1 rounded-full border-primary/20 bg-primary/5 text-primary">{t('role.admin')}</Badge>
+            </div>
+          </div>
+          <Separator />
+          <div className="grid gap-2 sm:grid-cols-3 sm:items-center">
+            <Label className="text-sm font-medium">{t('common.name')}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="sm:col-span-2" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3 sm:items-center">
+            <Label className="text-sm font-medium">{t('common.phone')}</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="sm:col-span-2" />
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={save} disabled={saving} className="gap-2">
+              {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+              {t('common.save')}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
