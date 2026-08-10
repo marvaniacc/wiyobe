@@ -123,6 +123,8 @@ model User {
   ticketMessages    TicketMessage[] @relation("ticketMessages")
   chatMessages      ChatMessage[] @relation("chatSender")
   itineraries       Itinerary[]  @relation("PatientItineraries")
+  // In-app CMS blog posts authored by this user (admin).
+  blogPosts         BlogPost[]
 }
 
 model OtpCode {
@@ -765,4 +767,23 @@ model ItineraryItem {
   createdAt    DateTime     @default(now())
 
   @@index([itineraryId])
+}
+
+/// In-app CMS blog posts. Content is stored as TipTap JSON (not HTML) to
+/// prevent XSS when rendered publicly. Phase 12.2 will render this JSON.
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique                        // kebab-case URL slug
+  excerpt     String                                   // short summary for blog cards
+  content     Json                                      // TipTap JSON structure
+  coverImage  String?                                  // optional cover image URL
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  status      String   @default("DRAFT")               // "DRAFT" | "PUBLISHED"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([authorId])
 }
