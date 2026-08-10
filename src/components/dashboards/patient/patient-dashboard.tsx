@@ -2723,6 +2723,16 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
             </Button>
           )}
 
+          {/* Download Invoice — for CONFIRMED or COMPLETED bookings */}
+          {(booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && (
+            <Button asChild variant="outline" className="w-full gap-2">
+              <a href={`/api/invoices/${booking.id}`} target="_blank" rel="noopener noreferrer">
+                <Icon name="receipt_long" size={18} />
+                {t('common.downloadInvoice')}
+              </a>
+            </Button>
+          )}
+
           {/* Notes */}
           {booking.notes && (
             <div>

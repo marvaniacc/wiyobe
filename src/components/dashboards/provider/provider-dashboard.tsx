@@ -940,7 +940,14 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
             <span className="text-xs text-muted-foreground">—</span>
           )}
           {booking.status === 'COMPLETED' && (
-            <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+            <>
+              {/* Download Invoice */}
+              <Button asChild variant="outline" size="sm" className="gap-1.5" title="Download Invoice">
+                <a href={`/api/invoices/${booking.id}`} target="_blank" rel="noopener noreferrer">
+                  <Icon name="receipt_long" size={14} />
+                </a>
+              </Button>
+              <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1.5 text-error hover:bg-error/5" title={t('dispute.openDispute')}>
                   <Icon name="gavel" size={14} />
@@ -989,6 +996,7 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </>
           )}
         </div>
       </TableCell>
