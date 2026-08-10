@@ -160,7 +160,7 @@ function StatusBadge({ status }: { status: string }) {
     CONFIRMED: { label: t('common.confirmed'), cls: 'bg-info/15 text-info border-info/30', icon: 'check_circle' },
     COMPLETED: { label: t('common.completed'), cls: 'bg-success/15 text-success border-success/30', icon: 'check_circle' },
     CANCELLED: { label: t('common.cancelled'), cls: 'bg-error/10 text-error border-error/30', icon: 'cancel' },
-    NO_SHOW: { label: t('common.cancelled'), cls: 'bg-error/10 text-error border-error/30', icon: 'cancel' },
+    NO_SHOW: { label: t('common.noShow'), cls: 'bg-error/10 text-error border-error/30', icon: 'person_off' },
     REFUNDED: { label: t('common.refund'), cls: 'bg-muted text-muted-foreground border-divider', icon: 'undo' },
   }
   const conf = map[status] || map.PENDING

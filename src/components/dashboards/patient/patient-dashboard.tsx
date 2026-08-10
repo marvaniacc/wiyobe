@@ -197,7 +197,7 @@ function statusLabelKey(status: BookingStatus): string {
     case 'CANCELLED': return 'common.cancelled'
     case 'REFUNDED': return 'common.cancelled'
     case 'PENDING': return 'common.pending'
-    case 'NO_SHOW': return 'common.cancelled'
+    case 'NO_SHOW': return 'common.noShow'
     default: return 'common.pending'
   }
 }
