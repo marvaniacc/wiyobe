@@ -875,23 +875,21 @@ function CommissionSection() {
   const { t, locale } = useT()
   const { data, loading, error, refetch } = useApi<{ rates: CommissionRate[] }>('/api/admin/commission')
   const [rates, setRates] = React.useState<Record<ProviderType, string>>({ DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' })
-  const [affRates, setAffRates] = React.useState<Record<ProviderType, string>>({ DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' })
   const [saving, setSaving] = React.useState(false)
 
   React.useEffect(() => {
     if (data?.rates) {
       const map: Record<ProviderType, string> = { DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' }
-      const affMap: Record<ProviderType, string> = { DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' }
-      data.rates.forEach((r) => { map[r.providerType] = r.rate; affMap[r.providerType] = r.affiliateRate })
+      data.rates.forEach((r) => { map[r.providerType] = r.rate })
       setRates(map)
-      setAffRates(affMap)
     }
   }, [data])
 
   async function save() {
     setSaving(true)
     try {
-      const payload = { rates: (Object.keys(rates) as ProviderType[]).map((pt) => ({ providerType: pt, rate: rates[pt] || '0', affiliateRate: affRates[pt] || '0' })) }
+      // Only send platform rate — affiliate rate is managed separately
+      const payload = { rates: (Object.keys(rates) as ProviderType[]).map((pt) => ({ providerType: pt, rate: rates[pt] || '0' })) }
       await apiPut('/api/admin/commission', payload)
       toast.success(t('admin.commissionUpdated'))
       refetch()
@@ -925,27 +923,23 @@ function CommissionSection() {
             <CardDescription>{t('admin.commissionDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {/* Header row */}
-            <div className="hidden grid-cols-[1fr_120px_120px_60px] items-center gap-3 px-1 sm:grid">
+            <div className="hidden grid-cols-[1fr_120px_60px] items-center gap-3 px-1 sm:grid">
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Provider type</span>
               <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Platform %</span>
-              <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Affiliate %</span>
-              <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</span>
+              <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Rate</span>
             </div>
 
             {types.map((pt) => {
               const platform = parseFloat(rates[pt]) || 0
-              const affiliate = parseFloat(affRates[pt]) || 0
-              const total = platform + affiliate
               return (
-                <div key={pt} className="grid grid-cols-1 items-center gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:grid-cols-[1fr_120px_120px_60px]">
+                <div key={pt} className="grid grid-cols-1 items-center gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:grid-cols-[1fr_120px_60px]">
                   <div className="flex items-center gap-3">
                     <div className="flex size-10 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
                       <Icon name={iconFor(pt)} size={22} fill />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</p>
-                      <p className="text-xs text-muted-foreground">Total: {total}%</p>
+                      <p className="text-xs text-muted-foreground">Platform commission rate</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -957,17 +951,8 @@ function CommissionSection() {
                     />
                     <span className="text-sm text-muted-foreground">%</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number" min="0" max="100" step="0.5"
-                      value={affRates[pt]}
-                      onChange={(e) => setAffRates((s) => ({ ...s, [pt]: e.target.value }))}
-                      className="h-10 text-end"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
                   <div className="text-center">
-                    <span className="text-lg font-bold text-foreground tabular-nums">{total}%</span>
+                    <span className="text-lg font-bold text-foreground tabular-nums">{platform}%</span>
                   </div>
                 </div>
               )
@@ -980,7 +965,7 @@ function CommissionSection() {
           </CardContent>
         </Card>
 
-        {/* Info card explaining the commission system */}
+        {/* Info card explaining the platform commission system */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -991,27 +976,146 @@ function CommissionSection() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="flex items-start gap-2">
               <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
-              <span>Platform % goes to the platform from each booking.</span>
+              <span>Platform % is deducted from each booking amount.</span>
             </div>
             <div className="flex items-start gap-2">
               <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
-              <span>Affiliate % goes to the affiliate who referred the patient or provider.</span>
+              <span>The provider receives the booking amount minus the platform commission.</span>
             </div>
             <div className="flex items-start gap-2">
               <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
-              <span>If no affiliate referred the user, the affiliate share goes to the platform.</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
-              <span>Total % is deducted from the booking amount; the provider receives the rest.</span>
+              <span>Affiliate commission comes out of the platform&rsquo;s share, not the provider&rsquo;s.</span>
             </div>
             <Separator className="my-2" />
             <div className="rounded-[12px] bg-surface-secondary p-3">
               <p className="text-xs font-medium text-foreground">Example</p>
-              <p className="mt-1 text-xs">Booking: $100, Platform: 12%, Affiliate: 3%</p>
-              <p className="text-xs">Platform gets: $12 · Affiliate gets: $3</p>
-              <p className="text-xs">Provider receives: $85</p>
-              <p className="mt-1 text-xs text-muted-foreground">If no affiliate: Platform gets $15, Provider gets $85</p>
+              <p className="mt-1 text-xs">Booking: $100, Platform: 30%</p>
+              <p className="text-xs">Platform commission: $30</p>
+              <p className="text-xs">Provider receives: $70</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Affiliate Rates section — separate from platform commission rates
+// ============================================================================
+
+function AffiliateRatesSection() {
+  const { t } = useT()
+  const { data, loading, error, refetch } = useApi<{ rates: CommissionRate[] }>('/api/admin/commission')
+  const [affRates, setAffRates] = React.useState<Record<ProviderType, string>>({ DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' })
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (data?.rates) {
+      const affMap: Record<ProviderType, string> = { DOCTOR: '', HOSPITAL: '', HOTEL: '', TRANSLATOR: '' }
+      data.rates.forEach((r) => { affMap[r.providerType] = r.affiliateRate })
+      setAffRates(affMap)
+    }
+  }, [data])
+
+  async function save() {
+    setSaving(true)
+    try {
+      // Only send affiliate rate — platform rate is managed separately
+      const payload = { rates: (Object.keys(affRates) as ProviderType[]).map((pt) => ({ providerType: pt, affiliateRate: affRates[pt] || '0' })) }
+      await apiPut('/api/admin/commission', payload)
+      toast.success('Affiliate rates updated')
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div><LoadingCard lines={4} /></div>
+  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+
+  const types: ProviderType[] = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']
+  const iconFor = (pt: ProviderType) => pt === 'DOCTOR' ? 'medical_services' : pt === 'HOSPITAL' ? 'local_hospital' : pt === 'HOTEL' ? 'hotel' : 'translate'
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader title="Affiliate Program Settings" description="Set the affiliate commission rate for each provider type. This is the percentage of the PLATFORM'S commission that the affiliate receives." icon="campaign" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Affiliate Commission Rates</CardTitle>
+            <CardDescription>Percentage of platform commission paid to affiliates</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {types.map((pt) => {
+              const platformRate = data.rates.find(r => r.providerType === pt)?.rate || '0'
+              const affRate = parseFloat(affRates[pt]) || 0
+              const platformCut = parseFloat(platformRate)
+              const affDollar = (platformCut * affRate / 100).toFixed(2)
+              return (
+                <div key={pt} className="grid grid-cols-1 items-center gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:grid-cols-[1fr_120px_1fr]">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+                      <Icon name={iconFor(pt)} size={22} fill />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{t(PROVIDER_TYPE_LABEL_KEY[pt])}</p>
+                      <p className="text-xs text-muted-foreground">Platform: {platformRate}% → Affiliate: {affRate}% = ${affDollar} on $100</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" min="0" max="100" step="0.5"
+                      value={affRates[pt]}
+                      onChange={(e) => setAffRates((s) => ({ ...s, [pt]: e.target.value }))}
+                      className="h-10 text-end"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                  <div className="text-center text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">${affDollar}</span> per $100 booking
+                  </div>
+                </div>
+              )
+            })}
+            <div className="flex justify-end pt-2">
+              <Button onClick={save} disabled={saving} className="gap-1.5">
+                <Icon name="save" size={16} /> Save affiliate rates
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Icon name="info" size={18} className="text-primary" />
+              How affiliate commission works
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex items-start gap-2">
+              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
+              <span>Affiliate rate is a percentage of the PLATFORM&rsquo;S commission, not the booking amount.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
+              <span>The affiliate commission comes out of the platform&rsquo;s pocket — the provider&rsquo;s earnings are unaffected.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <Icon name="check_circle" size={16} className="mt-0.5 shrink-0 text-success" fill />
+              <span>If no affiliate is attributed, the platform keeps the full commission.</span>
+            </div>
+            <Separator className="my-2" />
+            <div className="rounded-[12px] bg-surface-secondary p-3">
+              <p className="text-xs font-medium text-foreground">Example</p>
+              <p className="mt-1 text-xs">Booking: $100, Platform: 30%, Affiliate: 25%</p>
+              <p className="text-xs">Platform commission: $30</p>
+              <p className="text-xs">Affiliate gets: $30 × 25% = $7.50</p>
+              <p className="text-xs">Platform keeps: $30 - $7.50 = $22.50</p>
+              <p className="text-xs">Provider receives: $70</p>
             </div>
           </CardContent>
         </Card>
@@ -1800,6 +1904,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'users': return <UsersSection />
     case 'moderation': return <ModerationSection />
     case 'commission': return <CommissionSection />
+    case 'affiliate-rates': return <AffiliateRatesSection />
     case 'cancellations': return <CancellationsSection />
     case 'payouts': return <PayoutsSection />
     case 'ledger': return <LedgerSection />
