@@ -2210,55 +2210,22 @@ function DisputesSection() {
 }
 
 // ============================================================================
-// Affiliates section — manage affiliate marketers + commission tier settings
+// Affiliates section — manage affiliate marketers
 // ============================================================================
-
-const AFFILIATE_TIER_CLS: Record<string, string> = {
-  BRONZE: 'bg-amber-700/10 text-amber-700',
-  SILVER: 'bg-gray-500/10 text-gray-500',
-  GOLD: 'bg-warning/10 text-warning',
-  PLATINUM: 'bg-primary/10 text-primary',
-}
 
 function AffiliatesSection() {
   const { t, locale } = useT()
-  const { data, loading, error, refetch } = useApi<{ affiliates: any[]; tierSettings: any[] }>('/api/admin/affiliates')
+  const { data, loading, error, refetch } = useApi<{ affiliates: any[] }>('/api/admin/affiliates')
   const [busy, setBusy] = React.useState<string | null>(null)
-  const [tierForm, setTierForm] = React.useState<Record<string, { minReferrals: string; minEarnings: string; bonusRate: string }>>({})
   const { data: payoutData, refetch: refetchPayouts } = useApi<{ balances: any[]; payouts: any[] }>('/api/admin/affiliate-payouts')
   const [payDialog, setPayDialog] = React.useState<any | null>(null)
   const [payRef, setPayRef] = React.useState('')
-
-  React.useEffect(() => {
-    if (data?.tierSettings) {
-      const map: Record<string, { minReferrals: string; minEarnings: string; bonusRate: string }> = {}
-      data.tierSettings.forEach((s: any) => {
-        map[s.tier] = { minReferrals: String(s.minReferrals), minEarnings: s.minEarnings, bonusRate: s.bonusRate }
-      })
-      setTierForm(map)
-    }
-  }, [data?.tierSettings])
 
   async function handleAction(affiliateId: string, action: string, extra?: any) {
     setBusy(affiliateId + action)
     try {
       await apiPost('/api/admin/affiliates', { affiliateId, action, ...extra })
       toast.success(action === 'approve' ? t('admin.approve') : action === 'suspend' ? t('admin.suspend') : 'Updated')
-      refetch()
-    } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
-  }
-
-  async function saveTierSettings() {
-    setBusy('tierSettings')
-    try {
-      const tierSettings = Object.entries(tierForm).map(([tier, v]) => ({
-        tier,
-        minReferrals: parseInt(v.minReferrals) || 0,
-        minEarnings: v.minEarnings || '0',
-        bonusRate: v.bonusRate || '0',
-      }))
-      await apiPut('/api/admin/affiliates', { tierSettings })
-      toast.success(t('admin.tierSettingsSaved'))
       refetch()
     } catch (e: any) { toast.error(e.message) } finally { setBusy(null) }
   }
@@ -2290,8 +2257,6 @@ function AffiliatesSection() {
   const affiliates = data?.affiliates || []
   const pending = affiliates.filter((a: any) => !a.verified)
   const active = affiliates.filter((a: any) => a.verified)
-  const tierSettings = data?.tierSettings || []
-  const tiers = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
 
   return (
     <div className="flex flex-col gap-6">
@@ -2304,72 +2269,8 @@ function AffiliatesSection() {
             <Icon name="info" size={20} fill />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">Affiliate commission = base rate (per provider type) + tier bonus</p>
-            <p className="text-xs text-muted-foreground">Base rates are set in <span className="font-medium text-primary">Commission rates</span>. Tier bonuses are configured below and auto-applied based on affiliate performance.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tier threshold & bonus settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Icon name="workspace_premium" size={18} className="text-primary" />
-            {t('admin.tierSettings')}
-          </CardTitle>
-          <CardDescription>{t('admin.tierSettingsDesc')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="hidden grid-cols-[100px_1fr_1fr_1fr] items-center gap-3 px-1 sm:grid">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tier</span>
-            <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.minReferrals')}</span>
-            <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.minEarnings')}</span>
-            <span className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.bonusRate')}</span>
-          </div>
-          <div className="mt-2 space-y-3">
-            {tiers.map((tier) => {
-              const cfg = tierForm[tier] || { minReferrals: '', minEarnings: '', bonusRate: '' }
-              return (
-                <div key={tier} className="grid grid-cols-1 items-center gap-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4 sm:grid-cols-[100px_1fr_1fr_1fr]">
-                  <div className="flex items-center gap-2">
-                    <div className={cn('flex size-8 items-center justify-center rounded-[8px]', AFFILIATE_TIER_CLS[tier])}>
-                      <Icon name="workspace_premium" size={16} fill />
-                    </div>
-                    <span className="text-sm font-medium capitalize text-foreground">{tier.toLowerCase()}</span>
-                  </div>
-                  <Input
-                    type="number" min="0"
-                    value={cfg.minReferrals}
-                    onChange={(e) => setTierForm((prev) => ({ ...prev, [tier]: { ...prev[tier], minReferrals: e.target.value } }))}
-                    className="h-10 text-center"
-                    placeholder="0"
-                  />
-                  <Input
-                    type="number" min="0" step="0.01"
-                    value={cfg.minEarnings}
-                    onChange={(e) => setTierForm((prev) => ({ ...prev, [tier]: { ...prev[tier], minEarnings: e.target.value } }))}
-                    className="h-10 text-center"
-                    placeholder="0"
-                  />
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number" min="0" step="0.5"
-                      value={cfg.bonusRate}
-                      onChange={(e) => setTierForm((prev) => ({ ...prev, [tier]: { ...prev[tier], bonusRate: e.target.value } }))}
-                      className="h-10 text-center"
-                      placeholder="0"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button onClick={saveTierSettings} disabled={busy === 'tierSettings'} className="gap-1.5">
-              {busy === 'tierSettings' ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
-              {t('common.save')}
-            </Button>
+            <p className="text-sm font-medium text-foreground">Affiliate commission = percentage of platform commission</p>
+            <p className="text-xs text-muted-foreground">Affiliates earn a flat percentage of the platform&rsquo;s commission on referred bookings. Rate is configured per provider type in <span className="font-medium text-primary">Commission rates</span>.</p>
           </div>
         </CardContent>
       </Card>
@@ -2433,9 +2334,9 @@ function AffiliatesSection() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="ps-4 text-xs uppercase tracking-wide text-muted-foreground">Name</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Code</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Tier</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Clicks</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Signups</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Bookings</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Earnings</TableHead>
                   <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Status</TableHead>
                   <TableHead className="pe-4 text-end text-xs uppercase tracking-wide text-muted-foreground">Actions</TableHead>
@@ -2449,13 +2350,9 @@ function AffiliatesSection() {
                       <p className="text-xs text-muted-foreground">{a.user.email}</p>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-foreground">{a.referralCode}</TableCell>
-                    <TableCell>
-                      <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium capitalize', AFFILIATE_TIER_CLS[a.tier] || AFFILIATE_TIER_CLS.BRONZE)}>
-                        {a.tier.toLowerCase()}
-                      </span>
-                    </TableCell>
                     <TableCell className="text-sm text-foreground tabular-nums">{a.totalClicks}</TableCell>
                     <TableCell className="text-sm text-foreground tabular-nums">{a.totalSignups}</TableCell>
+                    <TableCell className="text-sm text-foreground tabular-nums">{a.totalBookings}</TableCell>
                     <TableCell className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(a.totalEarnings, 'USD', locale)}</TableCell>
                     <TableCell>
                       {a.verified ? (
@@ -2466,15 +2363,6 @@ function AffiliatesSection() {
                     </TableCell>
                     <TableCell className="pe-4">
                       <div className="flex items-center justify-end gap-1.5">
-                        <Select value={a.tier} onValueChange={(v) => handleAction(a.id, 'setTier', { tier: v })} disabled={!!busy}>
-                          <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="BRONZE">Bronze</SelectItem>
-                            <SelectItem value="SILVER">Silver</SelectItem>
-                            <SelectItem value="GOLD">Gold</SelectItem>
-                            <SelectItem value="PLATINUM">Platinum</SelectItem>
-                          </SelectContent>
-                        </Select>
                         {a.verified ? (
                           <Button size="sm" variant="ghost" onClick={() => handleAction(a.id, 'suspend')} disabled={!!busy} className="text-error hover:bg-error/5" title={t('admin.suspendAffiliate')}>
                             <Icon name="block" size={14} />
@@ -2518,7 +2406,6 @@ function AffiliatesSection() {
                   <div key={b.id} className="flex items-center justify-between rounded-[12px] bg-surface-secondary/60 px-4 py-2.5">
                     <div>
                       <span className="text-sm font-medium text-foreground">{b.name}</span>
-                      <span className={cn('ms-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize', AFFILIATE_TIER_CLS[b.tier] || AFFILIATE_TIER_CLS.BRONZE)}>{b.tier.toLowerCase()}</span>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                       <span className="text-muted-foreground">Pending: <span className="font-medium text-foreground">{formatCurrency(b.pendingBalance, 'USD', locale)}</span></span>
