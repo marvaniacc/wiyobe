@@ -1,10 +1,11 @@
 import { db } from '@/lib/db'
 import { json, handleError } from '@/lib/api'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
 // Public endpoint — track a referral click when someone visits via ?ref=CODE
-// No auth required. Creates an AffiliateClick record.
+// No auth required. Creates an AffiliateClick record and sets a 30-day cookie.
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
@@ -35,6 +36,15 @@ export async function POST(req: Request) {
     await db.affiliate.update({
       where: { id: affiliate.id },
       data: { totalClicks: { increment: 1 } },
+    })
+
+    // Set HTTP-only cookie with 30-day expiry for attribution
+    const c = await cookies()
+    c.set('ref_code', referralCode, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
     })
 
     return json({ tracked: true, referralCode })

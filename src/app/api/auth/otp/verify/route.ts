@@ -3,6 +3,7 @@ import { hashPassword, setSessionCookie } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
 import crypto from 'crypto'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -116,17 +117,23 @@ export async function POST(req: Request) {
           data: {
             userId: user.id,
             referralCode,
-            commissionRate: '10',
           },
         })
       }
 
       // Process referral code — link new user to the affiliate who referred them
-      if (data.referralCode && data.role !== 'AFFILIATE' && data.role !== 'ADMIN') {
+      // Read from ref_code cookie (30-day, set by /api/affiliate/track) or from signup data
+      const c = await cookies()
+      const cookieRefCode = c.get('ref_code')?.value
+      const refCode = data.referralCode || cookieRefCode
+
+      // Affiliates cannot be referred (no MLM). Admins cannot be referred.
+      if (refCode && data.role !== 'AFFILIATE' && data.role !== 'ADMIN') {
         const affiliate = await db.affiliate.findUnique({
-          where: { referralCode: data.referralCode },
+          where: { referralCode: refCode },
         })
-        if (affiliate && affiliate.verified) {
+        // Self-referral prevention: if the new user IS the affiliate, skip
+        if (affiliate && affiliate.verified && affiliate.userId !== user.id) {
           // Find the latest CLICKED click from this affiliate and update it
           const latestClick = await db.affiliateClick.findFirst({
             where: { affiliateId: affiliate.id, status: 'CLICKED' },
@@ -153,8 +160,18 @@ export async function POST(req: Request) {
             where: { id: affiliate.id },
             data: { totalSignups: { increment: 1 } },
           })
+
+          // If the new user is a provider, link them to the affiliate via referredByAffiliateId
+          // This enables automatic affiliate commission attribution on their bookings
+          if (['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'].includes(data.role)) {
+            await db.user.update({
+              where: { id: user.id },
+              data: { referredByAffiliateId: affiliate.id },
+            })
+          }
         }
-        // Clear the referral code from storage (client-side, but we can't do that here)
+        // Clear the ref_code cookie (attribution is complete)
+        c.delete('ref_code')
       }
 
       if (status === 'ACTIVE') {
