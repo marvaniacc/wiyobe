@@ -106,6 +106,8 @@ model User {
   disputesResolved  Dispute[]    @relation("disputesResolved")
   affiliate         Affiliate?
   affiliateReferrals AffiliateClick[] @relation("affiliateReferrals")
+  referredByAffiliateId String?
+  referredByAffiliate  Affiliate? @relation("ReferredProviders", fields: [referredByAffiliateId], references: [id])
   kycDocuments      KycDocument[] @relation("kycDocuments")
   kycReviewed       KycDocument[] @relation("kycReviewed")
   ticketsRaised     Ticket[]    @relation("ticketsRaised")
@@ -411,7 +413,7 @@ model CommissionRate {
   id           String       @id @default(cuid())
   providerType ProviderType @unique
   rate         String       @default("12") // platform commission percentage
-  affiliateRate String      @default("3")  // affiliate commission percentage (from provider revenue, not platform share)
+  affiliateRate String      @default("25") // percentage of the PLATFORM'S COMMISSION that the affiliate receives
   updatedAt    DateTime     @updatedAt
 }
 
@@ -481,12 +483,7 @@ model Dispute {
 // Affiliate Marketing System
 // ============================================================================
 
-enum AffiliateTier {
-  BRONZE
-  SILVER
-  GOLD
-  PLATINUM
-}
+// AffiliateTier enum removed — tier system eliminated in affiliate redesign.
 
 enum AffiliateClickStatus {
   CLICKED
@@ -500,9 +497,6 @@ model Affiliate {
   userId          String   @unique
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   referralCode    String   @unique
-  tier            AffiliateTier @default(BRONZE)
-  tierBonusRate   String   @default("0") // bonus % on top of base affiliate rate from CommissionRate
-  commissionRate  String   @default("10") // legacy field, not used in new system
   website         String?
   socialMedia     String?
   description     String?
@@ -517,8 +511,9 @@ model Affiliate {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  clicks          AffiliateClick[]
-  payouts         AffiliatePayout[]
+  clicks            AffiliateClick[]
+  payouts           AffiliatePayout[]
+  referredProviders User[]  @relation("ReferredProviders")
 }
 
 model AffiliateClick {
@@ -551,14 +546,7 @@ model AffiliatePayout {
   completedAt  DateTime?
 }
 
-model AffiliateSetting {
-  id              String         @id @default(cuid())
-  tier            AffiliateTier  @unique
-  minReferrals    Int            @default(0)   // minimum total referrals to reach this tier
-  minEarnings     String         @default("0") // minimum total earnings to reach this tier
-  bonusRate       String         @default("0") // bonus % added on top of base affiliate rate
-  updatedAt       DateTime       @updatedAt
-}
+// AffiliateSetting model removed — tier system eliminated in affiliate redesign.
 
 // ============================================================================
 // KYC (Know Your Customer) — Doctor document verification
