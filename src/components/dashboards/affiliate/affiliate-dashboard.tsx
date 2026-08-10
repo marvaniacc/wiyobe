@@ -38,8 +38,6 @@ interface AffiliateData {
   affiliate: {
     id: string
     referralCode: string
-    tier: string
-    commissionRate: string
     verified: boolean
     website: string | null
     socialMedia: string | null
@@ -73,8 +71,6 @@ interface StatsData {
     availableBalance: string
     pendingBalance: string
     paidOut: string
-    tier: string
-    commissionRate: string
     conversionRate: number
     bookingRate: number
     verified: boolean
@@ -83,13 +79,6 @@ interface StatsData {
   funnel: { clicks: number; signups: number; bookings: number; completed: number }
   recentClicks: any[]
   payouts: any[]
-}
-
-const TIER_CONFIG: Record<string, { label: string; icon: string; cls: string }> = {
-  BRONZE: { label: 'affiliate.tierBronze', icon: 'workspace_premium', cls: 'bg-amber-700/10 text-amber-700' },
-  SILVER: { label: 'affiliate.tierSilver', icon: 'workspace_premium', cls: 'bg-gray-500/10 text-gray-500' },
-  GOLD: { label: 'affiliate.tierGold', icon: 'workspace_premium', cls: 'bg-warning/10 text-warning' },
-  PLATINUM: { label: 'affiliate.tierPlatinum', icon: 'workspace_premium', cls: 'bg-primary/10 text-primary' },
 }
 
 const CLICK_STATUS: Record<string, { label: string; cls: string; icon: string }> = {
@@ -273,7 +262,6 @@ function OverviewSection() {
   if (error || !data) return <div className="py-10 text-center text-sm text-muted-foreground">{error || t('common.error')}</div>
 
   const s = data.stats
-  const tierCfg = TIER_CONFIG[s.tier] || TIER_CONFIG.BRONZE
   const referralLink = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${s.referralCode}` : ''
 
   function copyLink() {
@@ -399,7 +387,7 @@ function OverviewSection() {
         ))}
       </div>
 
-      {/* Earnings + tier */}
+      {/* Earnings + commission info */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -437,56 +425,33 @@ function OverviewSection() {
           </CardContent>
         </Card>
 
-        {/* Tier card with progress */}
+        {/* Commission info card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Icon name={tierCfg.icon} size={18} className="text-primary" />
-              {t('affiliate.tier')}
+              <Icon name="percent" size={18} className="text-primary" />
+              {t('affiliate.howItWorks')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <div className={cn('flex size-20 items-center justify-center rounded-full', tierCfg.cls)}>
-              <Icon name="workspace_premium" size={40} fill />
+          <CardContent className="space-y-3">
+            <div className="rounded-[14px] bg-primary/5 p-4">
+              <p className="text-sm font-medium text-foreground">{t('affiliate.commissionModel')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('affiliate.commissionModelDesc')}</p>
             </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-foreground">{t(tierCfg.label)}</p>
-              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{t('affiliate.tierBonus')}: <span className="font-semibold text-foreground">+{s.tierBonusRate || '0'}%</span></span>
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <Icon name="check_circle" size={14} className="mt-0.5 shrink-0 text-success" />
+                <span>{t('affiliate.step1')}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Icon name="check_circle" size={14} className="mt-0.5 shrink-0 text-success" />
+                <span>{t('affiliate.step2')}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Icon name="check_circle" size={14} className="mt-0.5 shrink-0 text-success" />
+                <span>{t('affiliate.step3')}</span>
               </div>
             </div>
-
-            {/* Tier progress to next tier */}
-            {(() => {
-              const tierOrder = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
-              const currentIdx = tierOrder.indexOf(s.tier)
-              const nextTierKey = currentIdx < tierOrder.length - 1 ? tierOrder[currentIdx + 1] : null
-              if (!nextTierKey) {
-                return (
-                  <div className="w-full rounded-[14px] bg-success/5 p-3 text-center">
-                    <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-success">
-                      <Icon name="emoji_events" size={16} fill />
-                      {t('affiliate.maxTier')}
-                    </p>
-                  </div>
-                )
-              }
-              const nextTierCfg = TIER_CONFIG[nextTierKey] || TIER_CONFIG.BRONZE
-              return (
-                <div className="w-full space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{t('affiliate.tierProgress')}</span>
-                    <span className="font-medium text-foreground">{t(nextTierCfg.label)}</span>
-                  </div>
-                  <Progress value={Math.min(100, Math.round((s.totalSignups / Math.max(1, [0, 5, 20, 50][currentIdx + 1])) * 100))} className="h-2" />
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{s.totalSignups} {t('affiliate.signups').toLowerCase()}</span>
-                    <span>{[0, 5, 20, 50][currentIdx + 1]} {t('affiliate.referralsToNext')}</span>
-                  </div>
-                  <p className="text-[11px] text-center text-muted-foreground">{t('affiliate.tierAutoPromotion')}</p>
-                </div>
-              )
-            })()}
           </CardContent>
         </Card>
       </div>
@@ -710,7 +675,6 @@ function AnalyticsSection() {
   if (error || !data) return <div className="py-10 text-center text-sm text-muted-foreground">{error || t('common.error')}</div>
 
   const s = data.stats
-  const tierCfg = TIER_CONFIG[s.tier] || TIER_CONFIG.BRONZE
 
   const funnelData = [
     { stage: t('affiliate.clicks'), value: data.funnel.clicks, fill: '#9AA0A6' },
@@ -919,8 +883,6 @@ function ProfileSection() {
   if (loading) return <div className="py-10"><Skeleton className="h-96 rounded-[16px]" /></div>
   if (error || !data) return <div className="py-10 text-center text-sm text-muted-foreground">{error}</div>
 
-  const tierCfg = TIER_CONFIG[data.affiliate?.tier || 'BRONZE'] || TIER_CONFIG.BRONZE
-
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
@@ -940,10 +902,17 @@ function ProfileSection() {
               <p className="text-base font-semibold text-foreground">{form.name || data.user.email}</p>
               <p className="text-sm text-muted-foreground">{data.user.email}</p>
             </div>
-            <Badge variant="outline" className={cn('rounded-full', tierCfg.cls)}>
-              <Icon name={tierCfg.icon} size={12} fill />
-              {t(tierCfg.label)}
-            </Badge>
+            {data.affiliate?.verified ? (
+              <Badge variant="outline" className="rounded-full border-success/20 bg-success/5 text-success">
+                <Icon name="verified" size={12} fill />
+                {t('affiliate.verified')}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="rounded-full border-warning/20 bg-warning/5 text-warning">
+                <Icon name="hourglass_top" size={12} />
+                {t('affiliate.pendingApproval')}
+              </Badge>
+            )}
             <div className="w-full rounded-[14px] bg-surface-secondary p-3 text-start">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">{t('affiliate.referralCode')}</span>
