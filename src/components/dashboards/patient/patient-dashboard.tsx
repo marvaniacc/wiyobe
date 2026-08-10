@@ -1536,7 +1536,7 @@ function CompareSection() {
 
 function BookingsSection() {
   const { t, locale } = useT()
-  const [tab, setTab] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all')
+  const [tab, setTab] = useState<'all' | 'pending' | 'upcoming' | 'completed' | 'cancelled'>('all')
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null)
   const [cancelKey, setCancelKey] = useState(0)
   const [reviewTarget, setReviewTarget] = useState<Booking | null>(null)
@@ -1549,7 +1549,7 @@ function BookingsSection() {
   const [disputeKey, setDisputeKey] = useState(0)
   const [tick, setTick] = useState(0)
 
-  const statusParam = tab === 'upcoming' ? 'CONFIRMED' : tab === 'completed' ? 'COMPLETED' : tab === 'cancelled' ? 'CANCELLED' : ''
+  const statusParam = tab === 'pending' ? 'PENDING' : tab === 'upcoming' ? 'CONFIRMED' : tab === 'completed' ? 'COMPLETED' : tab === 'cancelled' ? 'CANCELLED' : ''
   const url = `/api/bookings${statusParam ? `?status=${statusParam}` : ''}`
   const { data, loading, error, refetch } = useApi<{ bookings: Booking[] }>(url, { deps: [url, tick] })
 
@@ -1585,6 +1585,7 @@ function BookingsSection() {
 
   const tabs: { key: typeof tab; label: string; icon: string }[] = [
     { key: 'all', label: t('bookings.all'), icon: 'list' },
+    { key: 'pending', label: t('common.pending'), icon: 'pending' },
     { key: 'upcoming', label: t('bookings.upcoming'), icon: 'event_upcoming' },
     { key: 'completed', label: t('bookings.completed'), icon: 'task_alt' },
     { key: 'cancelled', label: t('bookings.cancelled'), icon: 'cancel' },
