@@ -41,6 +41,7 @@ import { AvatarUpload } from '@/components/shared/avatar-upload'
 import { MessagesSection } from '@/components/chat/messages-section'
 import { ItinerariesSection } from '@/components/dashboards/patient/itineraries-list'
 import { Progress } from '@/components/ui/progress'
+import { ManageAccessDialog, type MedicalDocument as VaultDocument } from '@/components/dashboards/patient/medical-vault'
 
 /* =========================================================================
  * Types
@@ -3008,11 +3009,18 @@ function formatFileSize(bytes: number): string {
 
 function DocumentsSection() {
   const { t, locale } = useT()
-  const { data, loading, error, refetch } = useApi<{ documents: any[] }>('/api/documents')
+  const { data, loading, error, refetch } = useApi<{ documents: VaultDocument[] }>('/api/medical-records')
   const [uploadOpen, setUploadOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [accessTarget, setAccessTarget] = useState<VaultDocument | null>(null)
 
   const documents = data?.documents || []
+
+  function handleAccessUpdated(updated: VaultDocument) {
+    // Optimistically patch the local cache so the share count updates
+    // immediately without a full refetch.
+    refetch()
+  }
 
   // Group by category
   const grouped: Record<string, any[]> = {}
@@ -3100,6 +3108,21 @@ function DocumentsSection() {
                             <Icon name="download" size={14} />
                             {t('documents.download')}
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setAccessTarget(doc as VaultDocument)}
+                            className="gap-1.5 flex-1"
+                            title={t('vault.manageAccess', 'Manage Access')}
+                          >
+                            <Icon name="share" size={14} />
+                            {t('vault.share', 'Share')}
+                            {doc.accessGrants && doc.accessGrants.length > 0 && (
+                              <Badge variant="secondary" className="ml-0.5 h-4 min-w-4 justify-center px-1 text-[10px]">
+                                {doc.accessGrants.length}
+                              </Badge>
+                            )}
+                          </Button>
                           <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(doc.id)} className="text-error hover:bg-error/5" title={t('documents.delete')}>
                             <Icon name="delete" size={14} />
                           </Button>
@@ -3133,6 +3156,14 @@ function DocumentsSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Manage Access dialog — grant/revoke doctor access to a document */}
+      <ManageAccessDialog
+        open={!!accessTarget}
+        onOpenChange={(o) => !o && setAccessTarget(null)}
+        document={accessTarget}
+        onUpdated={handleAccessUpdated}
+      />
     </div>
   )
 }
