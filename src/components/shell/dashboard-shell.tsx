@@ -27,6 +27,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'compare', labelKey: 'dash.compare', icon: 'compare' },
     { key: 'favorites', labelKey: 'dash.favorites', icon: 'favorite' },
     { key: 'bookings', labelKey: 'dash.bookings', icon: 'event' },
+    { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'documents', labelKey: 'dash.documents', icon: 'folder_shared' },
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
@@ -36,6 +37,7 @@ const NAV: Record<string, NavItem[]> = {
   DOCTOR: [
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
     { key: 'appointments', labelKey: 'dash.appointments', icon: 'event' },
+    { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'services', labelKey: 'dash.services', icon: 'medical_services' },
     { key: 'availability', labelKey: 'dash.availability', icon: 'calendar_month' },
     { key: 'kyc', labelKey: 'dash.kyc', icon: 'badge' },
@@ -48,6 +50,7 @@ const NAV: Record<string, NavItem[]> = {
   HOSPITAL: [
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
     { key: 'appointments', labelKey: 'dash.appointments', icon: 'event' },
+    { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'services', labelKey: 'dash.services', icon: 'local_hospital' },
     { key: 'availability', labelKey: 'dash.availability', icon: 'calendar_month' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
@@ -59,6 +62,7 @@ const NAV: Record<string, NavItem[]> = {
   HOTEL: [
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
     { key: 'bookings', labelKey: 'dash.bookings', icon: 'event' },
+    { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'services', labelKey: 'dash.services', icon: 'hotel' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
@@ -69,6 +73,7 @@ const NAV: Record<string, NavItem[]> = {
   TRANSLATOR: [
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
     { key: 'appointments', labelKey: 'dash.appointments', icon: 'event' },
+    { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'services', labelKey: 'dash.services', icon: 'translate' },
     { key: 'availability', labelKey: 'dash.availability', icon: 'calendar_month' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
@@ -79,6 +84,8 @@ const NAV: Record<string, NavItem[]> = {
   ADMIN: [
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
     { key: 'analytics', labelKey: 'dash.analytics', icon: 'monitoring' },
+    { key: 'bookings', labelKey: 'dash.bookings', icon: 'event_available' },
+    { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'providers', labelKey: 'dash.providers', icon: 'verified' },
     { key: 'users', labelKey: 'dash.users', icon: 'group' },
     { key: 'moderation', labelKey: 'dash.moderation', icon: 'manage_accounts' },
@@ -91,6 +98,8 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'affiliates', labelKey: 'admin.affiliates', icon: 'campaign' },
     { key: 'kyc', labelKey: 'admin.kyc', icon: 'badge' },
     { key: 'tickets', labelKey: 'admin.tickets', icon: 'support_agent' },
+    { key: 'settings', labelKey: 'dash.settings', icon: 'settings' },
+    { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
   ],
   AFFILIATE: [
     { key: 'overview', labelKey: 'dash.affiliateOverview', icon: 'space_dashboard' },
