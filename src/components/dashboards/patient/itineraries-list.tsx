@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate } from '@/lib/money'
 import { toast } from 'sonner'
 import { ItineraryBuilder } from './itinerary-builder'
+import { ItineraryTripTracker } from './trip-tracker'
 
 interface ItineraryItem {
   id: string
@@ -212,6 +213,11 @@ export function ItinerariesSection() {
                       )}
                     </div>
                   </div>
+
+                  {/* Trip Tracker — simplified 3-stage timeline for booked itineraries */}
+                  {itin.status === 'BOOKED' && itin.bookings.length > 0 && (
+                    <ItineraryTripTracker bookings={itin.bookings} />
+                  )}
 
                   {/* Linked bookings */}
                   {itin.status === 'BOOKED' && itin.bookings.length > 0 && (
