@@ -42,6 +42,7 @@ import { MessagesSection } from '@/components/chat/messages-section'
 import { ItinerariesSection } from '@/components/dashboards/patient/itineraries-list'
 import { Progress } from '@/components/ui/progress'
 import { ManageAccessDialog, type MedicalDocument as VaultDocument } from '@/components/dashboards/patient/medical-vault'
+import { TripTracker } from '@/components/dashboards/patient/trip-tracker'
 
 /* =========================================================================
  * Types
@@ -2664,6 +2665,9 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
             </Badge>
             <span className="text-xs text-muted-foreground">{formatDateTime(booking.startDate, locale)}</span>
           </div>
+
+          {/* Trip Tracker — visual progress timeline */}
+          <TripTracker booking={booking} />
 
           {/* PENDING info banner */}
           {booking.status === 'PENDING' && (
