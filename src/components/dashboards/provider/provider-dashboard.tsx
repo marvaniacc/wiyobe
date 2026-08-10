@@ -138,6 +138,7 @@ type ProfileUser = {
   city: string | null
   preferredLanguage: string
   avatarUrl: string | null
+  calendarToken?: string | null
   doctor?: any
   hospital?: any
   hotel?: any
@@ -2380,7 +2381,171 @@ function ProfileForm({ user, role, t, locale, onSaved }: {
           </Button>
         </div>
       </form>
+
+      {/* Calendar Sync — read-only iCal feed subscription URL */}
+      <CalendarSyncCard t={t} />
     </div>
+  )
+}
+
+/* -------------------------------------------------------------------------
+ * CalendarSyncCard — provider subscribes their external calendar
+ * (Google / Apple / Outlook) to a read-only iCal feed of their bookings.
+ * ----------------------------------------------------------------------- */
+function CalendarSyncCard({ t }: { t: (k: string, fb?: string) => string }) {
+  const [data, setData] = useState<{ token: string; feedUrl: string } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [regenerating, setRegenerating] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [confirmRegen, setConfirmRegen] = useState(false)
+
+  // Fetch the feed token + URL on mount (auto-creates the token if missing).
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/provider/calendar')
+        if (!res.ok) throw new Error('Failed to load calendar feed')
+        const json = await res.json()
+        if (alive) setData({ token: json.token, feedUrl: json.feedUrl })
+      } catch {
+        // non-fatal — card just stays in empty state
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  async function handleCopy() {
+    if (!data?.feedUrl) return
+    try {
+      await navigator.clipboard.writeText(data.feedUrl)
+      setCopied(true)
+      toast.success(t('common.copied', 'Copied to clipboard'))
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error(t('common.copyFailed', 'Could not copy'))
+    }
+  }
+
+  async function handleRegenerate() {
+    setRegenerating(true)
+    try {
+      const res = await fetch('/api/provider/calendar', { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to regenerate')
+      const json = await res.json()
+      setData({ token: json.token, feedUrl: json.feedUrl })
+      toast.success(t('provider.calendarRegenerated', 'Calendar link regenerated'))
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setRegenerating(false)
+      setConfirmRegen(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <Skeleton className="h-32 w-full" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="overflow-hidden border-primary/20">
+      <CardContent className="p-0">
+        {/* Header band */}
+        <div className="flex items-start gap-4 border-b border-divider bg-primary/5 p-6">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+            <Icon name="calendar_sync" size={26} fill />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold text-foreground">{t('provider.calendarSync', 'Calendar Sync')}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{t('provider.calendarSyncDesc', 'Add this URL to your Google Calendar or Apple Calendar to see your bookings automatically.')}</p>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-col gap-4 p-6">
+          {/* Feed URL row */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t('provider.calendarFeedUrl', 'Feed URL')}
+            </Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[14px] border border-divider bg-surface-secondary px-3.5 py-2.5">
+                <Icon name="link" size={16} className="shrink-0 text-muted-foreground" />
+                <input
+                  readOnly
+                  value={data?.feedUrl || ''}
+                  className="min-w-0 flex-1 truncate bg-transparent text-sm text-foreground outline-none"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="default"
+                className="shrink-0 gap-2"
+                onClick={handleCopy}
+                disabled={!data?.feedUrl}
+              >
+                <Icon name={copied ? 'check' : 'content_copy'} size={16} />
+                <span className="hidden sm:inline">{copied ? t('common.copied', 'Copied') : t('common.copyLink', 'Copy Link')}</span>
+                <span className="sm:hidden">{copied ? t('common.copied', 'Copied') : t('common.copyLink', 'Copy')}</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="rounded-[12px] border border-info/20 bg-info/5 p-3.5">
+            <div className="flex items-start gap-2">
+              <Icon name="info" size={16} className="mt-0.5 shrink-0 text-info" />
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">{t('provider.calendarHowTo', 'How to use this feed')}</p>
+                <p>{t('provider.calendarHowToGoogle', 'Google Calendar: Other calendars → + → From URL → paste the link above.')}</p>
+                <p>{t('provider.calendarHowToApple', 'Apple Calendar: File → New Calendar Subscription → paste the link above.')}</p>
+                <p className="text-muted-foreground/80">{t('provider.calendarReadonly', 'This feed is read-only and updates automatically every 30 minutes. Only confirmed and completed appointments are shown.')}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Regenerate / revoke */}
+          <div className="flex items-center justify-between gap-3 rounded-[12px] border border-divider bg-surface-secondary p-3.5">
+            <div className="flex min-w-0 items-start gap-2">
+              <Icon name="shield_lock" size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{t('provider.calendarRegenerate', 'Regenerate link')}</p>
+                <p className="text-xs text-muted-foreground">{t('provider.calendarRegenerateDesc', 'Creates a new URL and invalidates the old one. Use if the link was shared accidentally.')}</p>
+              </div>
+            </div>
+            <AlertDialog open={confirmRegen} onOpenChange={setConfirmRegen}>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 text-error hover:bg-error/5" disabled={regenerating || !data?.token}>
+                  <Icon name="autorenew" size={14} className={regenerating ? 'animate-spin' : ''} />
+                  <span className="hidden sm:inline">{t('provider.calendarRegenerate', 'Regenerate')}</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('provider.calendarRegenerateConfirm', 'Regenerate calendar link?')}</AlertDialogTitle>
+                  <AlertDialogDescription>{t('provider.calendarRegenerateConfirmDesc', 'The current link will stop working immediately. You will need to update any external calendars subscribed to the old link.')}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRegenerate} className="bg-error text-error-foreground hover:bg-error/90">
+                    {t('provider.calendarRegenerate', 'Regenerate')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
