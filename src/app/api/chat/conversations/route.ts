@@ -21,17 +21,24 @@ export async function GET() {
     const session = await getSession()
     if (!session) return error(401, 'Unauthorized')
 
+    const isAdmin = session.role === 'ADMIN'
+
     // Find all bookings where the current user is the patient or the provider.
+    // Admin sees all bookings (no patient/provider filter).
     const bookings = await db.booking.findMany({
       where: {
-        OR: [
-          { patientId: session.id },
-          { doctor: { userId: session.id } },
-          { hospital: { userId: session.id } },
-          { hotel: { userId: session.id } },
-          { translator: { userId: session.id } },
-        ],
-        status: { in: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED'] },
+        ...(isAdmin
+          ? { status: { in: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED'] } }
+          : {
+              OR: [
+                { patientId: session.id },
+                { doctor: { userId: session.id } },
+                { hospital: { userId: session.id } },
+                { hotel: { userId: session.id } },
+                { translator: { userId: session.id } },
+              ],
+              status: { in: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED'] },
+            }),
       },
       include: {
         doctor: { include: { user: { select: { id: true, name: true, avatarUrl: true, role: true } } } },
@@ -48,21 +55,32 @@ export async function GET() {
     // Resolve the "other participant" for each booking from the caller's perspective
     const participantByBooking = bookings.map((b) => {
       let puid: string | null = null
+      const providerUser = b.doctor?.user || b.hospital?.user || b.hotel?.user || b.translator?.user || null
       if (b.providerType === 'DOCTOR' && b.doctor) puid = b.doctor.userId
       else if (b.providerType === 'HOSPITAL' && b.hospital) puid = b.hospital.userId
       else if (b.providerType === 'HOTEL' && b.hotel) puid = b.hotel.userId
       else if (b.providerType === 'TRANSLATOR' && b.translator) puid = b.translator.userId
       const isPatient = b.patientId === session.id
       let other: { id: string | null; name: string | null; avatarUrl: string | null; role: string }
-      if (isPatient) {
-        const u = b.doctor?.user || b.hospital?.user || b.hotel?.user || b.translator?.user || null
+      let serviceTitle: string | null = b.service?.name || null
+      if (isAdmin) {
+        // Admin oversees the conversation — show the patient as the primary participant
+        // and append the provider name to the service title for context.
+        const u = b.patient || null
+        other = { id: b.patientId, name: u?.name ?? null, avatarUrl: u?.avatarUrl ?? null, role: 'PATIENT' }
+        const providerName = providerUser?.name || b.hospital?.name || b.hotel?.name || '—'
+        serviceTitle = serviceTitle
+          ? `${serviceTitle} · ${providerName}`
+          : `${b.providerType.toLowerCase()} · ${providerName}`
+      } else if (isPatient) {
+        const u = providerUser
         other = { id: u?.id ?? puid, name: u?.name ?? null, avatarUrl: u?.avatarUrl ?? null, role: b.providerType }
       } else {
         // patient is the User directly
         const u = b.patient || null
         other = { id: b.patientId, name: u?.name ?? null, avatarUrl: u?.avatarUrl ?? null, role: 'PATIENT' }
       }
-      return { bookingId: b.id, other }
+      return { bookingId: b.id, other, serviceTitle }
     })
 
     const bookingIds = bookings.map((b) => b.id)
@@ -101,7 +119,8 @@ export async function GET() {
     const unreadByBooking = new Map(unread.map((u) => [u.bookingId, u._count.id]))
 
     const conversations = bookings.map((b) => {
-      const { other } = participantByBooking.find((p) => p.bookingId === b.id)!
+      const p = participantByBooking.find((p) => p.bookingId === b.id)!
+      const { other, serviceTitle } = p
       const lastRow = lastMessageRows.find((r) => r.bookingId === b.id)
       const preview = lastRow
         ? (lastRow.message
@@ -116,7 +135,7 @@ export async function GET() {
         startDate: b.startDate.toISOString(),
         visitType: b.visitType,
         providerType: b.providerType,
-        serviceTitle: b.service?.name || null,
+        serviceTitle,
         amount: b.amount,
         currency: b.currency,
         participant: other,

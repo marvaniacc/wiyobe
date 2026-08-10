@@ -19,20 +19,27 @@ export async function GET() {
 
     // Count unread messages where the sender is NOT the current user
     // (messages sent TO the current user that they haven't read yet)
+    // Admin sees unread across all bookings (for oversight), but only
+    // messages NOT sent by admin count.
+    const isAdmin = session.role === 'ADMIN'
     const unread = await db.chatMessage.groupBy({
       by: ['bookingId'],
       where: {
         read: false,
         senderId: { not: session.id },
-        booking: {
-          OR: [
-            { patientId: session.id },
-            { doctor: { userId: session.id } },
-            { hospital: { userId: session.id } },
-            { hotel: { userId: session.id } },
-            { translator: { userId: session.id } },
-          ],
-        },
+        ...(isAdmin
+          ? {} // admin: no booking filter — count across all bookings
+          : {
+              booking: {
+                OR: [
+                  { patientId: session.id },
+                  { doctor: { userId: session.id } },
+                  { hospital: { userId: session.id } },
+                  { hotel: { userId: session.id } },
+                  { translator: { userId: session.id } },
+                ],
+              },
+            }),
       },
       _count: { id: true },
     })
