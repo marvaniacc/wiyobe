@@ -540,7 +540,7 @@ model AffiliatePayout {
   affiliate    Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   amount       String   @default("0")
   currency     String   @default("USD")
-  status       String   @default("PENDING") // PENDING | COMPLETED
+  status       PayoutStatus @default(PENDING)
   method       String   @default("bank_transfer")
   reference    String?
   periodStart  DateTime
