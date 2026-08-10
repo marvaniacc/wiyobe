@@ -46,9 +46,9 @@ export function NotificationBell() {
     deps: [open],
   })
 
-  // Auto-seed demo notifications on first load
+  // Auto-seed demo notifications on first load (dev only — never in production)
   useEffect(() => {
-    if (data && data.notifications.length === 0 && data.unreadCount === 0) {
+    if (process.env.NODE_ENV !== 'production' && data && data.notifications.length === 0 && data.unreadCount === 0) {
       apiPost('/api/notifications/seed').then(() => refetch()).catch(() => {})
     }
   }, [data?.notifications.length]) // eslint-disable-line react-hooks/exhaustive-deps
