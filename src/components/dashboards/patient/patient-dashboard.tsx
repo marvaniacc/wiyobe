@@ -39,6 +39,7 @@ import { downloadICal } from '@/lib/ical'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
 import { MessagesSection } from '@/components/chat/messages-section'
+import { ItinerariesSection } from '@/components/dashboards/patient/itineraries-list'
 import { Progress } from '@/components/ui/progress'
 
 /* =========================================================================
@@ -3292,6 +3293,7 @@ export function PatientDashboard({ section }: { section: string }) {
     case 'compare': return <CompareSection />
     case 'favorites': return <FavoritesSection />
     case 'bookings': return <BookingsSection />
+    case 'itineraries': return <ItinerariesSection />
     case 'messages': return <MessagesSection />
     case 'documents': return <DocumentsSection />
     case 'disputes': return <PatientDisputesSection />
