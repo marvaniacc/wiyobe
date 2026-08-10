@@ -126,43 +126,60 @@ export async function POST(req: Request) {
     const platformRate = commissionRateRow?.rate || '12'
     const affiliateRate = commissionRateRow?.affiliateRate || '25' // % of platform commission
 
-    // Check if the provider was referred by an affiliate
+    // Affiliate attribution — Patient Referral Priority (Strategy A) with time limit:
+    // 1. If the patient has a referredByAffiliateId, attribute to that affiliate (priority).
+    // 2. If the patient has NO affiliate, check the provider's referredByAffiliateId.
+    //    The provider's affiliate only qualifies if the provider signed up within the last 365 days.
+    // 3. Self-referral prevention: if the affiliate.userId === session.id, skip attribution.
     let affiliateUserId: string | null = null
     let affiliateClickId: string | null = null
 
-    // Check provider's referral via referredByAffiliateId on User (new system)
-    const providerUser = await db.user.findUnique({
-      where: { id: providerUserId },
+    const REFERRAL_TTL_MS = 365 * 24 * 60 * 60 * 1000 // 365 days
+
+    // Step 1: Check patient's referral first (priority)
+    const patientUser = await db.user.findUnique({
+      where: { id: session.id },
       select: { referredByAffiliateId: true },
     })
 
-    if (providerUser?.referredByAffiliateId) {
-      const providerAff = await db.affiliate.findUnique({
-        where: { id: providerUser.referredByAffiliateId },
+    if (patientUser?.referredByAffiliateId) {
+      const patientAff = await db.affiliate.findUnique({
+        where: { id: patientUser.referredByAffiliateId },
       })
-      // Self-referral prevention: if the provider IS the affiliate, skip
-      if (providerAff && providerAff.verified && providerAff.userId !== session.id) {
-        affiliateUserId = providerAff.userId
-        // Find the affiliate click for this provider
-        const providerAffClick = await db.affiliateClick.findFirst({
-          where: { affiliateId: providerAff.id, referredUserId: providerUserId, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
+      // Self-referral prevention: if the patient IS the affiliate, skip
+      if (patientAff && patientAff.verified && patientAff.userId !== session.id) {
+        affiliateUserId = patientAff.userId
+        const patientAffClick = await db.affiliateClick.findFirst({
+          where: { affiliateId: patientAff.id, referredUserId: session.id, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
           orderBy: { clickedAt: 'desc' },
         })
-        affiliateClickId = providerAffClick?.id || null
+        affiliateClickId = patientAffClick?.id || null
       }
     }
 
-    // If no provider referral, check patient's referral via AffiliateClick
+    // Step 2: If patient has no affiliate, check provider's referral with 365-day time limit
     if (!affiliateUserId) {
-      const patientAffClick = await db.affiliateClick.findFirst({
-        where: { referredUserId: session.id, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
-        include: { affiliate: true },
-        orderBy: { clickedAt: 'desc' },
+      const providerUser = await db.user.findUnique({
+        where: { id: providerUserId },
+        select: { referredByAffiliateId: true, referredAt: true },
       })
-      // Self-referral prevention: if the patient IS the affiliate, skip
-      if (patientAffClick?.affiliate && patientAffClick.affiliate.verified && patientAffClick.affiliate.userId !== session.id) {
-        affiliateUserId = patientAffClick.affiliate.userId
-        affiliateClickId = patientAffClick.id
+
+      if (providerUser?.referredByAffiliateId && providerUser.referredAt) {
+        const daysSinceReferral = Date.now() - new Date(providerUser.referredAt).getTime()
+        if (daysSinceReferral <= REFERRAL_TTL_MS) {
+          const providerAff = await db.affiliate.findUnique({
+            where: { id: providerUser.referredByAffiliateId },
+          })
+          // Self-referral prevention: if the provider IS the affiliate (shouldn't happen but guard)
+          if (providerAff && providerAff.verified && providerAff.userId !== session.id) {
+            affiliateUserId = providerAff.userId
+            const providerAffClick = await db.affiliateClick.findFirst({
+              where: { affiliateId: providerAff.id, referredUserId: providerUserId, status: { in: ['SIGNED_UP', 'BOOKED', 'COMPLETED'] } },
+              orderBy: { clickedAt: 'desc' },
+            })
+            affiliateClickId = providerAffClick?.id || null
+          }
+        }
       }
     }
 
