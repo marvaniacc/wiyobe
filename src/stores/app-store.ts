@@ -5,7 +5,7 @@ import type { Locale } from '@/lib/i18n'
 
 export type AppView =
   | { name: 'landing' }
-  | { name: 'auth'; mode: 'signin' | 'signup'; role: string }
+  | { name: 'auth'; mode: 'signin' | 'signup'; role: string; roleLocked?: boolean }
   | { name: 'dashboard'; section: string }
   | { name: 'public-profile'; providerId: string; providerType: string }
 
@@ -28,7 +28,7 @@ interface AppState {
   view: AppView
   setView: (v: AppView) => void
   goLanding: () => void
-  goAuth: (mode: 'signin' | 'signup', role: string) => void
+  goAuth: (mode: 'signin' | 'signup', role: string, roleLocked?: boolean) => void
   goDashboard: (section?: string) => void
   goPublicProfile: (providerId: string, providerType: string) => void
 
@@ -62,7 +62,7 @@ export const useApp = create<AppState>()(
       view: { name: 'landing' },
       setView: (v) => set({ view: v }),
       goLanding: () => set({ view: { name: 'landing' } }),
-      goAuth: (mode, role) => set({ view: { name: 'auth', mode, role } }),
+      goAuth: (mode, role, roleLocked = false) => set({ view: { name: 'auth', mode, role, roleLocked } }),
       goDashboard: (section = 'overview') => set({ view: { name: 'dashboard', section } }),
       goPublicProfile: (providerId, providerType) => set({ view: { name: 'public-profile', providerId, providerType } }),
 

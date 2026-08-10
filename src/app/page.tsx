@@ -72,6 +72,23 @@ export default function Home() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Handle ?auth=signup&role=X or ?auth=signin&role=X — role-locked auth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const authMode = params.get('auth')
+    const roleParam = params.get('role')?.toUpperCase()
+    if (authMode && roleParam) {
+      const validRoles = ['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR', 'AFFILIATE', 'ADMIN']
+      if (validRoles.includes(roleParam)) {
+        const mode = authMode === 'signup' ? 'signup' : 'signin'
+        useApp.getState().goAuth(mode, roleParam, true) // roleLocked = true
+      }
+      // Clean URL
+      const newUrl = window.location.pathname + window.location.hash
+      window.history.replaceState({}, document.title, newUrl)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // sync locale from session once
   useEffect(() => {
     if (session?.preferredLanguage) setLocale(session.preferredLanguage as Locale)

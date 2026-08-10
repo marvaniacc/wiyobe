@@ -43,6 +43,7 @@ export function AuthScreen() {
 
   const mode = view.name === 'auth' ? view.mode : 'signin'
   const role = view.name === 'auth' ? view.role : 'PATIENT'
+  const roleLocked = view.name === 'auth' ? view.roleLocked : false
 
   // form state
   const [email, setEmail] = useState('')
@@ -296,22 +297,24 @@ export function AuthScreen() {
 
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
-          {/* Role tabs */}
-          <div className="mb-6 flex flex-wrap items-center justify-center gap-1.5">
-            {ROLES.map((r) => (
-              <button
-                key={r.role}
-                onClick={() => goAuth(mode, r.role)}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                  role === r.role ? 'bg-primary text-primary-foreground' : 'bg-surface-secondary text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Icon name={r.icon} size={15} fill={role === r.role} />
-                {t(r.labelKey)}
-              </button>
-            ))}
-          </div>
+          {/* Role tabs — hidden when roleLocked (e.g. ?auth=signup&role=doctor) */}
+          {!roleLocked && (
+            <div className="mb-6 flex flex-wrap items-center justify-center gap-1.5">
+              {ROLES.map((r) => (
+                <button
+                  key={r.role}
+                  onClick={() => goAuth(mode, r.role)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                    role === r.role ? 'bg-primary text-primary-foreground' : 'bg-surface-secondary text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Icon name={r.icon} size={15} fill={role === r.role} />
+                  {t(r.labelKey)}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="rounded-[24px] border border-divider bg-surface p-7 shadow-[0_1px_3px_rgba(60,64,67,0.08)] md:p-8">
             {isOtpStep ? (
