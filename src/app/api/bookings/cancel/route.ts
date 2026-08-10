@@ -95,6 +95,58 @@ export async function POST(req: Request) {
       })
     }
 
+    // === Affiliate commission reversal ===
+    if (booking.affiliateId && booking.affiliateAmount && parseFloat(booking.affiliateAmount) > 0) {
+      const aff = await db.affiliate.findUnique({ where: { userId: booking.affiliateId } })
+      if (aff) {
+        const commissionAmount = parseFloat(booking.affiliateAmount)
+
+        // Determine whether to reverse from pendingBalance or availableBalance
+        // If booking was COMPLETED, the commission was already moved to availableBalance
+        // Otherwise it's still in pendingBalance
+        if (booking.status === 'COMPLETED') {
+          const newAvailable = Math.max(0, parseFloat(aff.availableBalance) - commissionAmount).toFixed(2)
+          await db.affiliate.update({
+            where: { userId: booking.affiliateId },
+            data: { availableBalance: newAvailable },
+          })
+        } else {
+          const newPending = Math.max(0, parseFloat(aff.pendingBalance) - commissionAmount).toFixed(2)
+          await db.affiliate.update({
+            where: { userId: booking.affiliateId },
+            data: { pendingBalance: newPending },
+          })
+        }
+
+        // Decrement totalEarnings
+        const newTotalEarnings = Math.max(0, parseFloat(aff.totalEarnings) - commissionAmount).toFixed(2)
+        await db.affiliate.update({
+          where: { userId: booking.affiliateId },
+          data: { totalEarnings: newTotalEarnings },
+        })
+
+        // Create reversal ledger entry
+        if (booking.payment) {
+          await db.ledgerEntry.create({
+            data: {
+              bookingId: booking.id,
+              paymentId: booking.payment.id,
+              userId: booking.affiliateId,
+              type: 'AFFILIATE_COMMISSION_REVERSAL',
+              amount: `-${booking.affiliateAmount}`,
+              description: `Affiliate commission reversed — booking cancelled`,
+            },
+          })
+        }
+
+        // Update affiliate click status to CANCELLED
+        await db.affiliateClick.updateMany({
+          where: { bookingId: booking.id, affiliateId: aff.id },
+          data: { status: 'CANCELLED' as any },
+        })
+      }
+    }
+
     // Notifications — notify both parties about cancellation
     const otherUserId = isPatient ? providerUserId : booking.patientId
     const cancelledBy = isPatient ? 'Patient' : isProvider ? 'Provider' : 'Admin'

@@ -90,6 +90,41 @@ export async function POST(req: Request) {
       })
     }
 
+    // === Affiliate commission reversal ===
+    if (booking.affiliateId && booking.affiliateAmount && parseFloat(booking.affiliateAmount) > 0) {
+      const aff = await db.affiliate.findUnique({ where: { userId: booking.affiliateId } })
+      if (aff) {
+        const commissionAmount = parseFloat(booking.affiliateAmount)
+        // Booking was PENDING (not COMPLETED), so reverse from pendingBalance
+        const newPending = Math.max(0, parseFloat(aff.pendingBalance) - commissionAmount).toFixed(2)
+        const newTotalEarnings = Math.max(0, parseFloat(aff.totalEarnings) - commissionAmount).toFixed(2)
+        await db.affiliate.update({
+          where: { userId: booking.affiliateId },
+          data: { pendingBalance: newPending, totalEarnings: newTotalEarnings },
+        })
+
+        // Create reversal ledger entry
+        if (booking.payment) {
+          await db.ledgerEntry.create({
+            data: {
+              bookingId: booking.id,
+              paymentId: booking.payment.id,
+              userId: booking.affiliateId,
+              type: 'AFFILIATE_COMMISSION_REVERSAL',
+              amount: `-${booking.affiliateAmount}`,
+              description: `Affiliate commission reversed — booking declined by provider`,
+            },
+          })
+        }
+
+        // Update affiliate click status
+        await db.affiliateClick.updateMany({
+          where: { bookingId: booking.id, affiliateId: aff.id },
+          data: { status: 'CANCELLED' as any },
+        })
+      }
+    }
+
     // Notify the patient
     const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
     await notify({
