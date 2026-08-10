@@ -110,6 +110,10 @@ model User {
   referredByAffiliateId String?
   referredByAffiliate  Affiliate? @relation("ReferredProviders", fields: [referredByAffiliateId], references: [id])
   referredAt           DateTime?
+  // Cryptographically secure token used to authenticate read-only iCal feed
+  // access (/api/calendar/[token]) for providers (DOCTOR, HOSPITAL, HOTEL,
+  // TRANSLATOR) without requiring a login session. NULL for non-providers.
+  calendarToken        String?      @unique
   kycDocuments      KycDocument[] @relation("kycDocuments")
   kycReviewed       KycDocument[] @relation("kycReviewed")
   ticketsRaised     Ticket[]    @relation("ticketsRaised")
