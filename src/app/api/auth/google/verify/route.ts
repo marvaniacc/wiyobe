@@ -60,8 +60,9 @@ export async function POST(req: Request) {
       if (!googleInfo || !googleInfo.email) {
         return error(401, 'Google authentication failed. Invalid or expired token.')
       }
-    } else if (body.demoEmail) {
-      // Demo mode — no Google credentials configured. Simulate a Google sign-in.
+    } else if (body.demoEmail && process.env.NODE_ENV !== 'production') {
+      // Demo mode — ONLY available in non-production environments for development/testing.
+      // In production, demoEmail is ignored entirely to prevent authentication bypass.
       isDemo = true
       googleInfo = {
         sub: `demo_${Buffer.from(body.demoEmail).toString('hex')}`,
@@ -71,6 +72,10 @@ export async function POST(req: Request) {
         picture: null,
         locale: 'en',
       }
+    } else if (body.demoEmail && process.env.NODE_ENV === 'production') {
+      // Reject demoEmail in production — this is a security measure to prevent
+      // authentication bypass by impersonating any email address.
+      return error(403, 'Demo authentication is not available in production.')
     } else {
       return error(400, 'Either idToken or demoEmail is required.')
     }
