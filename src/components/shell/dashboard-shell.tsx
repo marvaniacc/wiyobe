@@ -299,9 +299,9 @@ export function DashboardShell() {
           <div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
             <span>© {new Date().getFullYear()} {t('brand.name')}. {t('footer.rights')}</span>
             <div className="flex gap-4">
-              <span className="hover:text-foreground cursor-pointer">{t('footer.privacy')}</span>
-              <span className="hover:text-foreground cursor-pointer">{t('footer.terms')}</span>
-              <span className="hover:text-foreground cursor-pointer">{t('footer.support')}</span>
+              <a href="#" className="transition-colors hover:text-foreground">{t('footer.privacy')}</a>
+              <a href="#" className="transition-colors hover:text-foreground">{t('footer.terms')}</a>
+              <a href="#" className="transition-colors hover:text-foreground" onClick={(e) => { e.preventDefault(); goDashboard('tickets') }}>{t('footer.support')}</a>
             </div>
           </div>
         </footer>
