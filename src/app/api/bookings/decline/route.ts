@@ -120,7 +120,7 @@ export async function POST(req: Request) {
         // Update affiliate click status
         await db.affiliateClick.updateMany({
           where: { bookingId: booking.id, affiliateId: aff.id },
-          data: { status: 'CANCELLED' as any },
+          data: { status: 'CANCELLED' },
         })
       }
     }

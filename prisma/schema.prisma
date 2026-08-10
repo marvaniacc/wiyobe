@@ -491,6 +491,7 @@ enum AffiliateClickStatus {
   SIGNED_UP
   BOOKED
   COMPLETED
+  CANCELLED
 }
 
 model Affiliate {
