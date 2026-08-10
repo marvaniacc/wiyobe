@@ -1193,3 +1193,18 @@ Stage Summary:
 - Slug auto-generation: kebab-case from title, de-duplicated with numeric suffix.
 - Phase 12.2 (public rendering) deferred — will render the JSON content safely with a TipTap renderer or custom JSON-to-React mapper.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 12.1-fix
+Agent: main (Lead Architect)
+Task: Fix — blog article titles in admin were not clickable, so admin couldn't see posts rendered in action.
+
+Work Log:
+- Created `src/components/admin/tiptap-preview.tsx` — a read-only TipTap editor instance (`editable: false`) that renders the stored JSON content exactly as it will appear publicly. Uses the same extensions (StarterKit with headings 1-3, Link with openOnClick, Image) so every node type renders correctly. Syncs content changes via useEffect.
+- Updated `BlogSection` in admin-dashboard.tsx:
+  - Added `previewPost` state.
+  - Made the post title in the table a `<button>` (clickable) styled as primary-colored text with hover underline — clicking opens the preview dialog.
+  - Added a preview `Dialog` that renders: cover image (16:9), title (h1), author + date + status badge, excerpt (styled callout), and the full rendered content via `TiptapPreview`. Footer has "Close" and "Edit Post" buttons — the Edit button transitions directly from preview to the editor dialog for a seamless workflow.
+- Added i18n keys `blog.preview` and `blog.previewDesc` in all 4 locales (en, tr, fa, ar).
+- Verification (agent-browser): Logged in as admin → Blog Posts → clicked "Welcome to Wishubest" title → preview dialog opened showing the rendered content ("Welcome bold text." with bold mark correctly applied), cover image placeholder, author, date, Published badge, and excerpt. Clicked "Edit Post" → seamlessly transitioned to the editor dialog with title and content pre-filled. No errors.
+- Commit: `c073c0c feat(ui): make blog post titles clickable to preview rendered content`. Pushed to origin/main.
