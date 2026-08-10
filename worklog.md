@@ -1107,3 +1107,30 @@ Stage Summary:
 - Grant pool restricted to doctors the patient has a booking with (prevents granting access to arbitrary doctors).
 - Files stored as base64 data URLs in the DB (per existing MVP pattern; would be S3 in production). 5MB cap.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 11.2
+Agent: main (Lead Architect)
+Task: Phase 11.2 — Trip Tracker UI. A visual timeline (stepper) showing patients which stage their booking/itinerary is at. UI-only; no new DB models.
+
+Work Log:
+- Step 1 (component): Created `src/components/dashboards/patient/trip-tracker.tsx` with two exports:
+  - `TripTracker` — full 4-stage stepper for a single booking: Request Sent (PENDING) → Confirmed (CONFIRMED) → Appointment Day (startDate reached) → Completed (COMPLETED). Each stage resolves to `done`/`current`/`upcoming` based on booking.status + startDate. CANCELLED/NO_SHOW/REFUNDED render a distinct red error state (single marker with `event_busy`/`person_off` icon) instead of the stepper. Responsive: horizontal stepper on sm+ (connecting lines, animated ping on current node), vertical stack on mobile. Uses existing Icon, useT, cn, formatDateTime utilities — no new dependencies.
+  - `ItineraryTripTracker` — simplified 3-stage timeline for booked itineraries: Trip Booked → In Progress → Completed. Computes current stage from the itinerary's bookings array (all done = Completed, some done/ongoing = In Progress, otherwise = Trip Booked). Shows progress text "X / Y bookings completed". Compact horizontal layout on mobile.
+  Commit: `e88cbca`.
+- Step 2 (booking detail integration): Imported `TripTracker` into `patient-dashboard.tsx` and rendered it at the top of the `BookingDetailDialog` content (right after the status badge row, before the PENDING banner and existing timeline). The existing simple timeline is kept below it for detailed date info. Commit: `b004790`.
+- Step 3 (itineraries integration): Imported `ItineraryTripTracker` into `itineraries-list.tsx` and rendered it for BOOKED itineraries (between the header and the linked-bookings badges). Commit: `d99b6fc`.
+- Step 4 (i18n): Added 12 keys × 4 locales (en, tr, fa, ar) in `src/lib/i18n.ts`: `tracker.title`, `tracker.requestSent`, `tracker.confirmed`, `tracker.appointmentDay`, `tracker.completed`, `tracker.cancelled`, `tracker.noShow`, `tracker.today`, `tracker.itineraryBooked`, `tracker.itineraryInProgress`, `tracker.itineraryCompleted`, `tracker.bookingsCompleted`. Fixed a typo in the Farsi `tracker.cancelled` line. Commit: `254e498`.
+- Verification (agent-browser): Logged in as patient (Sara Ahmadi), navigated to Bookings, opened booking details for three different statuses:
+  - **Completed**: TripTracker shows "TRIP PROGRESS" header with all 4 stages (Request Sent, Confirmed, Appointment Day, Completed) showing checkmarks. Verified via `innerText` containing all stage labels.
+  - **Cancelled**: TripTracker renders the red error state with `event_busy` icon and "Cancelled" text (no stepper shown).
+  - **Pending**: TripTracker shows "Request Sent" as the current stage (send icon, not checkmark) with the other 3 stages upcoming (stage icons, not checkmarks). PENDING info banner still shows below.
+  - No page errors, no dev log errors. Lint: 0 errors.
+  - Itineraries: No booked itineraries exist in the test data, so the `ItineraryTripTracker` couldn't be visually verified in-browser, but the component is correctly conditionally rendered (`itin.status === 'BOOKED' && itin.bookings.length > 0`) and the itineraries API returns 200.
+
+Stage Summary:
+- 4 commits pushed to origin/main: e88cbca (component), b004790 (booking detail), d99b6fc (itineraries), 254e498 (i18n).
+- TripTracker is responsive (horizontal on desktop, vertical on mobile), uses existing shadcn/ui + Tailwind primitives, and handles all booking states (PENDING, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW, REFUNDED).
+- The "Appointment Day" stage intelligently activates only when the startDate has actually arrived (for CONFIRMED bookings), so patients see accurate progress.
+- No new API endpoints created (constraint met) — component uses only the booking object passed as a prop.
+- Lint: 0 errors. Dev server running cleanly.
