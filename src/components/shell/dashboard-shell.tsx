@@ -41,6 +41,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'services', labelKey: 'dash.services', icon: 'medical_services' },
     { key: 'availability', labelKey: 'dash.availability', icon: 'calendar_month' },
+    { key: 'patient-records', labelKey: 'dash.patientRecords', icon: 'folder_shared' },
     { key: 'kyc', labelKey: 'dash.kyc', icon: 'badge' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },

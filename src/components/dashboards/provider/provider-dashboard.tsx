@@ -41,6 +41,7 @@ import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate, formatDateTime, relativeTime } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { PatientRecordsSection } from '@/components/dashboards/provider/patient-records'
 
 /* =========================================================================
  * Types
@@ -2675,6 +2676,8 @@ export function ProviderDashboard({ section, role }: { section: string; role: st
       return <AnalyticsSection />
     case 'kyc':
       return <KycSection />
+    case 'patient-records':
+      return <PatientRecordsSection />
     case 'payouts':
       return <PayoutsSection />
     case 'profile':
