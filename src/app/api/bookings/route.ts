@@ -66,6 +66,7 @@ const createSchema = z.object({
   startDate: z.string(),
   endDate: z.string().optional(),
   notes: z.string().optional(),
+  promoCode: z.string().optional(), // optional promo code to apply at checkout
 })
 
 export async function POST(req: Request) {
@@ -188,16 +189,52 @@ export async function POST(req: Request) {
     // Affiliate gets affiliateRate% of the PLATFORM'S COMMISSION (not the booking amount).
     // Provider pays only platformRate% (affiliate commission comes out of platform's pocket).
     //
-    // Example: amount=$100, platform=12%, affiliate=25%
-    //   Platform commission = $100 * 12% = $12
-    //   Affiliate commission = $12 * 25% = $3.00
-    //   Platform keeps = $12 - $3 = $9.00
-    //   Provider gets = $100 - $12 = $88.00
-    const platformCut = (parseFloat(amount) * (parseFloat(platformRate) / 100)).toFixed(2)
+    // With a promo code: the discount is deducted from the PLATFORM's commission.
+    // The provider ALWAYS receives their full net share (unchanged).
+    // The affiliate commission is recalculated on the REDUCED platform commission.
+    //
+    // Example: amount=$100, platform=12%, affiliate=25%, promo=10% ($10)
+    //   Original platform commission = $100 * 12% = $12
+    //   Discount (capped at platformCut) = min($10, $12) = $10
+    //   New platform commission = $12 - $10 = $2.00
+    //   Affiliate commission = $2 * 25% = $0.50
+    //   Platform keeps = $2 - $0.50 = $1.50
+    //   Provider gets = $100 - $12 = $88.00 (UNCHANGED)
+    //   Patient pays = $100 - $10 = $90.00
+    const basePlatformCut = (parseFloat(amount) * (parseFloat(platformRate) / 100))
+
+    // === Promo code validation + discount calculation ===
+    let promoCodeId: string | null = null
+    let discountAmount = 0
+    let promoCodeRecord: any = null
+    if (body.promoCode) {
+      const code = body.promoCode.toUpperCase().trim()
+      promoCodeRecord = await db.promoCode.findUnique({ where: { code } })
+      if (promoCodeRecord) {
+        // Validate: active, not expired, under maxUses
+        const isValid = promoCodeRecord.isActive
+          && (!promoCodeRecord.expiryDate || new Date(promoCodeRecord.expiryDate) >= new Date())
+          && (promoCodeRecord.maxUses === null || promoCodeRecord.usedCount < promoCodeRecord.maxUses)
+        if (isValid) {
+          let rawDiscount: number
+          if (promoCodeRecord.discountType === 'PERCENTAGE') {
+            rawDiscount = parseFloat(amount) * (promoCodeRecord.discountValue / 100)
+          } else {
+            rawDiscount = promoCodeRecord.discountValue / 100 // cents → dollars
+          }
+          // Cap at platform commission — provider revenue is NEVER reduced.
+          discountAmount = Math.min(rawDiscount, basePlatformCut)
+          promoCodeId = promoCodeRecord.id
+        }
+      }
+    }
+
+    const platformCut = (basePlatformCut - discountAmount).toFixed(2)
+    const patientCharge = (parseFloat(amount) - discountAmount).toFixed(2)
     const affiliateCommission = affiliateUserId
       ? (parseFloat(platformCut) * (parseFloat(affiliateRate) / 100)).toFixed(2)
       : '0'
-    const providerNet = subDec(amount, platformCut)
+    const providerNet = subDec(amount, basePlatformCut.toFixed(2)) // UNCHANGED — full net share
 
     // Video session URL for online visits — uses configured video provider
     // Generate with a temp ID (booking ID not yet created); the URL is room-based, not ID-dependent
@@ -225,30 +262,41 @@ export async function POST(req: Request) {
         endDate: body.endDate ? new Date(body.endDate) : null,
         amount: toDec(amount),
         commissionRate: platformRate,
-        commissionAmount: platformCut,
+        commissionAmount: platformCut,           // reduced platform commission (after promo discount)
         affiliateRate: affiliateRate,
         affiliateAmount: affiliateUserId ? affiliateCommission : '0',
         affiliateId: affiliateUserId,
-        providerNetAmount: providerNet,
+        providerNetAmount: providerNet,           // UNCHANGED — full net share
+        promoCodeId: promoCodeId,                // null if no code applied
+        discountAmount: discountAmount.toFixed(2), // snapshot of the discount applied
         videoSessionUrl,
         notes: body.notes,
       },
-      include: { patient: { select: { name: true } }, service: true },
+      include: { patient: { select: { name: true } }, service: true, promoCode: { select: { code: true } } },
     })
+
+    // Increment promo code usedCount — only on successful booking creation.
+    if (promoCodeId) {
+      await db.promoCode.update({
+        where: { id: promoCodeId },
+        data: { usedCount: { increment: 1 } },
+      })
+    }
 
     // mark slot booked
     if (slot) {
       await db.slot.update({ where: { id: slot.id }, data: { isBooked: true } })
     }
 
-    // Payment — real Stripe charge if configured, otherwise mock for dev
+    // Payment — real Stripe charge if configured, otherwise mock for dev.
+    // The patient is charged the DISCOUNTED amount (amount - discountAmount).
     const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
     let stripeChargeId = `ch_mock_${booking.id.slice(-8)}`
     let paymentStatus = 'SUCCEEDED'
 
     if (isStripeConfigured()) {
       const charge = await createCharge(
-        parseFloat(amount),
+        parseFloat(patientCharge),
         'usd',
         `MedTravel booking - ${providerName} - ${body.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`,
         { bookingId: booking.id, patientId: session.id, providerType: pt }
@@ -263,26 +311,28 @@ export async function POST(req: Request) {
       data: {
         bookingId: booking.id,
         stripeChargeId,
-        amount: toDec(amount),
+        amount: patientCharge,  // discounted amount the patient actually paid
         status: paymentStatus as any,
       },
     })
 
-    // Ledger entries — PATIENT_CHARGE, COMMISSION (platform), AFFILIATE_COMMISSION (if affiliate), PROVIDER_CREDIT
+    // Ledger entries — PATIENT_CHARGE (discounted), COMMISSION (reduced platform cut),
+    // AFFILIATE_COMMISSION (based on reduced platform cut), PROVIDER_CREDIT (full net).
+    // The discount comes out of the platform's commission, not the provider's revenue.
     const ledgerEntries: any[] = [
       {
         type: 'PATIENT_CHARGE',
         bookingId: booking.id,
         paymentId: payment.id,
-        amount: toDec(amount),
-        description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}`,
+        amount: patientCharge,
+        description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}${promoCodeId ? ` (promo: ${booking.promoCode?.code || ''})` : ''}`,
       },
       {
         type: 'COMMISSION',
         bookingId: booking.id,
         paymentId: payment.id,
         amount: platformCut,
-        description: `Platform commission (${platformRate}%)`,
+        description: `Platform commission (${platformRate}%${discountAmount > 0 ? `, promo discount -$${discountAmount.toFixed(2)}` : ''})`,
       },
     ]
 
@@ -339,7 +389,7 @@ export async function POST(req: Request) {
       title: 'Booking confirmed!',
       body: `Your ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with ${providerName} has been confirmed.`,
       link: 'bookings',
-      meta: { bookingId: booking.id, amount: toDec(amount) },
+      meta: { bookingId: booking.id, amount: patientCharge },
     })
     await notify({
       userId: providerUserId,
@@ -350,10 +400,11 @@ export async function POST(req: Request) {
       meta: { bookingId: booking.id, amount: toDec(amount) },
     })
 
-    // Send confirmation emails
+    // Send confirmation emails — patient sees the discounted amount they paid;
+    // provider sees the full booking amount (their revenue is unaffected by promos).
     const { sendEmail, bookingConfirmationEmail } = await import('@/lib/email')
     const bookingDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(booking.startDate))
-    const patientEmailTemplate = bookingConfirmationEmail(patientName, providerName, bookingDate, toDec(amount), body.visitType)
+    const patientEmailTemplate = bookingConfirmationEmail(patientName, providerName, bookingDate, patientCharge, body.visitType)
     await sendEmail({ to: session.email, subject: patientEmailTemplate.subject, html: patientEmailTemplate.html })
 
     const providerUser = await db.user.findUnique({ where: { id: providerUserId }, select: { email: true } })
