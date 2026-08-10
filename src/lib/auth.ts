@@ -2,7 +2,10 @@ import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
-const SECRET = process.env.AUTH_SECRET || 'medtour-dev-secret-change-me-please-9f2k4'
+const SECRET = process.env.AUTH_SECRET
+if (!SECRET) {
+  throw new Error('AUTH_SECRET environment variable is required. Set it in your .env file.')
+}
 const COOKIE_NAME = 'mt_session'
 
 export function hashPassword(password: string): string {
