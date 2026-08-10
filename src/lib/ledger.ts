@@ -154,12 +154,20 @@ export async function getProviderBalance(providerUserId: string) {
       if (e.booking?.status === 'COMPLETED') {
         available += amt
       } else if (e.booking?.status === 'CANCELLED' || e.booking?.status === 'REFUNDED') {
-        // skip — reversed by refund debit
+        // skip — credit is reversed by the refund debit, so neither is counted
       } else {
         pending += amt
       }
     } else if (e.type === 'REFUND_PROVIDER_DEBIT') {
-      available += amt // negative, reduces available
+      // For cancelled bookings, both PROVIDER_CREDIT and REFUND_PROVIDER_DEBIT
+      // are skipped. The net effect of a cancelled booking on available is zero.
+      // This prevents the double-counting bug where the credit was skipped but
+      // the debit was still subtracted from available.
+      if (e.booking?.status === 'CANCELLED' || e.booking?.status === 'REFUNDED') {
+        // skip — paired with the skipped PROVIDER_CREDIT above
+      } else {
+        available += amt // negative, reduces available (for partial refunds on active bookings)
+      }
     }
   }
   return {
