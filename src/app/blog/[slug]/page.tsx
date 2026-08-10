@@ -1,11 +1,8 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { generateHTML } from '@tiptap/core'
-import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
-import TiptapLink from '@tiptap/extension-link'
 import { formatDate } from '@/lib/money'
+import { renderTiptapToHtml } from '@/lib/tiptap-render'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -36,31 +33,6 @@ async function getPost(slug: string): Promise<PostDetail | null> {
   // Only published posts are publicly accessible.
   if (!post || post.status !== 'PUBLISHED') return null
   return post as PostDetail
-}
-
-/**
- * Convert the stored TipTap JSON content to an HTML string for SSR rendering.
- * Uses the same extensions as the admin editor (StarterKit, Image, Link) so
- * every node type renders consistently. Malformed JSON falls back to a
- * simple paragraph so the page never crashes.
- */
-function renderContent(content: unknown): string {
-  try {
-    if (!content || typeof content !== 'object') {
-      return '<p><em>This post has no content.</em></p>'
-    }
-    return generateHTML(content as any, [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Image.configure({ inline: false, allowBase64: true }),
-      TiptapLink.configure({
-        openOnClick: true,
-        HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank', class: 'text-primary underline' },
-      }),
-    ])
-  } catch (e) {
-    console.error('[blog render] Failed to generate HTML from TipTap JSON:', e)
-    return '<p><em>This post content could not be displayed.</em></p>'
-  }
 }
 
 /**
@@ -117,7 +89,7 @@ export default async function BlogDetailPage({
   const post = await getPost(slug)
   if (!post) notFound()
 
-  const contentHtml = renderContent(post.content)
+  const contentHtml = renderTiptapToHtml(post.content)
   const authorName = post.author?.name || post.author?.email || 'Wishubest'
 
   return (
