@@ -166,7 +166,7 @@ export async function POST(req: Request) {
           if (['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'].includes(data.role)) {
             await db.user.update({
               where: { id: user.id },
-              data: { referredByAffiliateId: affiliate.id },
+              data: { referredByAffiliateId: affiliate.id, referredAt: new Date() },
             })
           }
         }
