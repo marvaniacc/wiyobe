@@ -2656,21 +2656,9 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
             )}
           </div>
 
-          {/* Content editor with prominent Insert Media button */}
+          {/* Content editor — image insertion is via the TipTap toolbar's Add Image button */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{t('admin.content', 'Content')}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setMediaPickerOpen(true)}
-                className="gap-1.5"
-              >
-                <Icon name="perm_media" size={14} />
-                {t('media.insert', 'Insert Media')}
-              </Button>
-            </div>
+            <Label className="text-sm font-medium">{t('admin.content', 'Content')}</Label>
             <TiptapEditor content={content} onChange={setContent} />
           </div>
 

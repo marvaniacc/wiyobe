@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Icon } from '@/components/shared/icon'
 import { useT } from '@/hooks/use-t'
 import { apiDelete } from '@/hooks/use-api'
@@ -86,25 +86,13 @@ export function MediaPicker({
     }
   }, [filter])
 
-  // Reset + fetch when dialog opens
-  useState(() => {
+  // When the dialog opens, reset the selection and fetch the latest assets.
+  useEffect(() => {
     if (open) {
       setSelected(null)
       fetchAssets()
     }
-  })
-
-  // Use an effect-like pattern: fetch whenever `open` transitions to true
-  // (the useState trick above only runs once, so we also handle it here).
-  const lastOpen = useRef(false)
-  if (open && !lastOpen.current) {
-    lastOpen.current = true
-    setSelected(null)
-    fetchAssets()
-  }
-  if (!open && lastOpen.current) {
-    lastOpen.current = false
-  }
+  }, [open, fetchAssets])
 
   async function handleUpload(file: File) {
     if (file.size > 5 * 1024 * 1024) {
