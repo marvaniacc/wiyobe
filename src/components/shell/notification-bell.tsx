@@ -3,13 +3,40 @@ import { useState, useRef, useEffect } from 'react'
 import { useApp } from '@/stores/app-store'
 import { Icon } from '@/components/shared/icon'
 import { Button } from '@/components/ui/button'
-import { useApi, apiPost } from '@/hooks/use-api'
+import { useApi, apiPost, apiPatch } from '@/hooks/use-api'
 import { useT } from '@/hooks/use-t'
 import { cn } from '@/lib/utils'
 import { relativeTime } from '@/lib/money'
 import { toast } from 'sonner'
 
-const NOTIF_ICON: Record<string, string> = {
+// Category-based icon + color mapping (uses the new `category` field,
+// with fallback to the legacy `type` field for backward compat).
+const CATEGORY_ICON: Record<string, string> = {
+  BOOKING: 'event_available',
+  KYC: 'badge',
+  CHAT: 'forum',
+  SYSTEM: 'settings',
+  ANNOUNCEMENT: 'campaign',
+  PAYOUT: 'payments',
+  REVIEW: 'reviews',
+  MEDICAL: 'medical_information',
+  PROMO: 'local_offer',
+}
+
+const CATEGORY_COLOR: Record<string, string> = {
+  BOOKING: 'bg-primary/10 text-primary',
+  KYC: 'bg-warning/10 text-warning',
+  CHAT: 'bg-info/10 text-info',
+  SYSTEM: 'bg-surface-secondary text-muted-foreground',
+  ANNOUNCEMENT: 'bg-[#9334E6]/10 text-[#9334E6]',
+  PAYOUT: 'bg-success/10 text-success',
+  REVIEW: 'bg-warning/10 text-warning',
+  MEDICAL: 'bg-error/10 text-error',
+  PROMO: 'bg-info/10 text-info',
+}
+
+// Legacy type-based fallback (for notifications created before the upgrade)
+const TYPE_ICON: Record<string, string> = {
   booking_created: 'event_available',
   booking_accepted: 'check_circle',
   booking_declined: 'cancel',
@@ -20,19 +47,6 @@ const NOTIF_ICON: Record<string, string> = {
   payout_sent: 'payments',
   review_received: 'reviews',
   system: 'campaign',
-}
-
-const NOTIF_COLOR: Record<string, string> = {
-  booking_created: 'bg-success/10 text-success',
-  booking_accepted: 'bg-success/10 text-success',
-  booking_declined: 'bg-error/10 text-error',
-  booking_cancelled: 'bg-error/10 text-error',
-  booking_completed: 'bg-primary/10 text-primary',
-  booking_no_show: 'bg-warning/10 text-warning',
-  chat_message: 'bg-info/10 text-info',
-  payout_sent: 'bg-warning/10 text-warning',
-  review_received: 'bg-[#9334E6]/10 text-[#9334E6]',
-  system: 'bg-surface-secondary text-muted-foreground',
 }
 
 export function NotificationBell() {
@@ -65,7 +79,7 @@ export function NotificationBell() {
   async function markAllRead() {
     setMarkingAll(true)
     try {
-      await apiPost('/api/notifications')
+      await apiPatch('/api/notifications/read-all')
       refetch()
     } catch (e: any) {
       toast.error(e.message)
@@ -76,19 +90,30 @@ export function NotificationBell() {
 
   async function markOneRead(id: string) {
     try {
-      await apiPost('/api/notifications/read', { id })
+      await apiPatch('/api/notifications/read', { id })
       refetch()
     } catch {}
   }
 
   function handleNotifClick(n: any) {
-    if (!n.read) markOneRead(n.id)
+    const isRead = n.isRead ?? n.read
+    if (!isRead) markOneRead(n.id)
     if (n.link) goDashboard(n.link)
     setOpen(false)
   }
 
   const notifications = data?.notifications || []
   const unread = data?.unreadCount || 0
+
+  function getIcon(n: any): string {
+    return CATEGORY_ICON[n.category] || TYPE_ICON[n.type] || 'notifications'
+  }
+  function getColor(n: any): string {
+    return CATEGORY_COLOR[n.category] || 'bg-surface-secondary text-muted-foreground'
+  }
+  function isRead(n: any): boolean {
+    return n.isRead ?? n.read ?? false
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -120,9 +145,10 @@ export function NotificationBell() {
               <button
                 onClick={markAllRead}
                 disabled={markingAll}
-                className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50"
               >
-                {t('notifications.markAllRead')}
+                {markingAll ? <Icon name="progress_activity" size={12} className="animate-spin" /> : <Icon name="done_all" size={14} />}
+                {t('notifications.markAllRead', 'Mark all as read')}
               </button>
             )}
           </div>
@@ -152,27 +178,33 @@ export function NotificationBell() {
             ) : (
               <ul className="divide-y divide-divider">
                 {notifications.map((n) => {
-                  const icon = NOTIF_ICON[n.type] || 'notifications'
-                  const color = NOTIF_COLOR[n.type] || NOTIF_COLOR.system
+                  const read = isRead(n)
                   return (
                     <li key={n.id}>
                       <button
                         onClick={() => handleNotifClick(n)}
                         className={cn(
                           'flex w-full gap-3 px-4 py-3 text-start transition-colors hover:bg-surface-secondary',
-                          !n.read && 'bg-primary/[0.03]'
+                          !read && 'bg-primary/[0.03]'
                         )}
                       >
-                        <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-full', color)}>
-                          <Icon name={icon} size={18} fill />
+                        <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-full', getColor(n))}>
+                          <Icon name={getIcon(n)} size={18} fill />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-medium text-foreground">{n.title}</p>
-                            {!n.read && <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" />}
+                            {!read && <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" />}
                           </div>
                           <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
-                          <p className="mt-1 text-[11px] text-muted-foreground/70">{relativeTime(n.createdAt, locale)}</p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <p className="text-[11px] text-muted-foreground/70">{relativeTime(n.createdAt, locale)}</p>
+                            {n.category && n.category !== 'SYSTEM' && (
+                              <span className="rounded-full bg-surface-secondary px-1.5 py-0.5 text-[9px] font-medium uppercase text-muted-foreground">
+                                {n.category}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </button>
                     </li>
