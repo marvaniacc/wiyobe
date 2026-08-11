@@ -42,6 +42,7 @@ import { formatCurrency, formatDate, formatDateTime, relativeTime } from '@/lib/
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { PatientRecordsSection } from '@/components/dashboards/provider/patient-records'
+import { KycVerificationSection } from '@/components/dashboards/provider/kyc-section'
 
 /* =========================================================================
  * Types
@@ -2675,7 +2676,7 @@ export function ProviderDashboard({ section, role }: { section: string; role: st
     case 'analytics':
       return <AnalyticsSection />
     case 'kyc':
-      return <KycSection />
+      return <KycVerificationSection />
     case 'patient-records':
       return <PatientRecordsSection />
     case 'payouts':
