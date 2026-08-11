@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { TriageBot } from '@/components/shared/triage-bot'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,10 +34,10 @@ export default async function LocaleHomePage({
     )
   }
 
-  // Default landing — link to dashboard
+  // Default landing — link to dashboard + AI symptom checker
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-      <div className="flex max-w-md flex-col items-center gap-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+      <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
         <div className="flex size-16 items-center justify-center rounded-[16px] bg-primary text-primary-foreground">
           <span className="material-symbols-outlined" style={{ fontSize: 36 }} aria-hidden>
             monitor_heart
@@ -55,6 +56,11 @@ export default async function LocaleHomePage({
         >
           Go to Dashboard
         </Link>
+
+        {/* AI Symptom Checker */}
+        <div className="w-full pt-4">
+          <TriageBot />
+        </div>
       </div>
     </div>
   )

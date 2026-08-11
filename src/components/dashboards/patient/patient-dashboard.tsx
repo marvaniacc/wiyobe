@@ -43,6 +43,7 @@ import { ItinerariesSection } from '@/components/dashboards/patient/itineraries-
 import { Progress } from '@/components/ui/progress'
 import { ManageAccessDialog, type MedicalDocument as VaultDocument } from '@/components/dashboards/patient/medical-vault'
 import { TripTracker } from '@/components/dashboards/patient/trip-tracker'
+import { TriageBot } from '@/components/shared/triage-bot'
 
 /* =========================================================================
  * Types
@@ -478,6 +479,9 @@ function OverviewSection() {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Symptom Checker */}
+      <TriageBot />
     </div>
   )
 }
