@@ -42,8 +42,6 @@ export function TiptapEditor({
 }) {
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
-  const [imageOpen, setImageOpen] = useState(false)
-  const [imageUrl, setImageUrl] = useState('')
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
 
   const editor = useEditor({
@@ -102,19 +100,9 @@ export function TiptapEditor({
 
   const addImage = useCallback(() => {
     if (!editor) return
-    setImageUrl('')
-    setImageOpen(true)
+    // Directly open the MediaPicker — no intermediate dialog needed.
+    setMediaPickerOpen(true)
   }, [editor])
-
-  const confirmImage = useCallback(() => {
-    if (!editor) return
-    const url = imageUrl.trim()
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run()
-    }
-    setImageOpen(false)
-    setImageUrl('')
-  }, [editor, imageUrl])
 
   if (!editor) return null
 
@@ -198,49 +186,6 @@ export function TiptapEditor({
           <DialogFooter>
             <Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
             <Button onClick={confirmLink}>Apply</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Image dialog — choose from Media Library or enter URL manually */}
-      <Dialog open={imageOpen} onOpenChange={setImageOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Add Image</DialogTitle>
-            <DialogDescription>Choose from the Media Library or enter an image URL manually.</DialogDescription>
-          </DialogHeader>
-
-          {/* Browse Media Library button */}
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full gap-2"
-            onClick={() => {
-              setImageOpen(false)
-              setMediaPickerOpen(true)
-            }}
-          >
-            <Icon name="perm_media" size={18} />
-            Browse Media Library
-          </Button>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-divider" />
-            <span className="text-xs text-muted-foreground">or paste URL</span>
-            <span className="h-px flex-1 bg-divider" />
-          </div>
-
-          {/* Manual URL input */}
-          <Input
-            placeholder="https://example.com/image.jpg"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmImage() } }}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setImageOpen(false)}>Cancel</Button>
-            <Button onClick={confirmImage} disabled={!imageUrl.trim()}>Insert</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
