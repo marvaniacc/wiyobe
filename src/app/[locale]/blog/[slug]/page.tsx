@@ -51,15 +51,15 @@ async function getPost(slug: string): Promise<PostDetail | null> {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ locale: string; slug: string }>
 }): Promise<Metadata> {
-  const { slug } = await params
+  const { locale, slug } = await params
   const post = await getPost(slug)
   if (!post) {
     return { title: 'Post not found — Wishubest Blog' }
   }
 
-  const url = `/blog/${post.slug}`
+  const url = `/${locale}/blog/${post.slug}`
   const metaTitle = post.seoTitle || post.title
   const metaDescription = post.seoDescription || post.excerpt || post.title
   const images = post.coverImage ? [{ url: post.coverImage, width: 1200, height: 630, alt: post.title }] : undefined
@@ -92,9 +92,9 @@ export async function generateMetadata({
 export default async function BlogDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ locale: string; slug: string }>
 }) {
-  const { slug } = await params
+  const { locale, slug } = await params
   const post = await getPost(slug)
   if (!post) notFound()
 
@@ -106,12 +106,12 @@ export default async function BlogDetailPage({
       {/* Header */}
       <header className="border-b border-divider bg-surface">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-5 sm:px-6">
-          <Link href="/blog" className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+          <Link href={`/${locale}/blog`} className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
             <span>←</span>
             <span>All articles</span>
           </Link>
           <Link
-            href="/"
+            href="/dashboard"
             className="rounded-full border border-divider px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
           >
             Wishubest
@@ -143,7 +143,7 @@ export default async function BlogDetailPage({
           <span className="text-divider">·</span>
           <span className="flex items-center gap-1.5">
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>event</span>
-            <time dateTime={post.createdAt.toISOString()}>{formatDate(post.createdAt.toISOString(), 'en')}</time>
+            <time dateTime={post.createdAt.toISOString()}>{formatDate(post.createdAt.toISOString(), locale)}</time>
           </span>
         </div>
 
@@ -163,7 +163,7 @@ export default async function BlogDetailPage({
         {/* Back to blog */}
         <div className="mt-12 border-t border-divider pt-8">
           <Link
-            href="/blog"
+            href={`/${locale}/blog`}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <span>←</span>

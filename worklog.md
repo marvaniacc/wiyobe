@@ -1545,3 +1545,22 @@ Stage Summary:
 - Hotel: individual property → location-specific entity → independent reviews/rating/booking.
 - Translator's spokenLanguages is a separate business attribute from URL locale.
 - All new fields are optional/nullable with defaults — no data loss, no breaking changes.
+
+---
+Task ID: 17.2-step2
+Agent: general-purpose
+Task: Move public pages into [locale] directory structure
+
+Work Log:
+- Created src/app/[locale]/blog/page.tsx — moved from src/app/blog/page.tsx; added `params: Promise<{ locale: string }>`; brand link → `/${locale}`, "Back to app" → `/dashboard`, post links → `/${locale}/blog/${slug}`; `formatDate(..., locale)` instead of hardcoded 'en'.
+- Created src/app/[locale]/blog/[slug]/page.tsx — moved from src/app/blog/[slug]/page.tsx; added locale to both component and generateMetadata params; "All articles" / "Back to all articles" → `/${locale}/blog`, "Wishubest" → `/dashboard`; canonical URL now `/${locale}/blog/${slug}`; `formatDate(..., locale)`; TipTap rendering (renderTiptapToHtml) preserved.
+- Created src/app/[locale]/[slug]/page.tsx — moved from src/app/[slug]/page.tsx; added locale to both component and generateMetadata params; brand link → `/dashboard`, Blog link → `/${locale}/blog`; canonical URL now `/${locale}/${slug}`; raw HTML rendering via dangerouslySetInnerHTML preserved.
+- Rewrote src/app/page.tsx — replaced the SSR/landing logic with a simple `redirect('/dashboard')` using `next/navigation`. Imports `db` and `DefaultLanding` removed.
+- Deleted old files: src/app/blog/page.tsx, src/app/blog/[slug]/page.tsx, src/app/[slug]/page.tsx, and the now-empty src/app/blog/, src/app/blog/[slug]/, src/app/[slug]/ directories.
+- Did NOT modify src/app/layout.tsx, src/app/dashboard/page.tsx, src/app/robots.ts, src/app/sitemap.ts, or src/app/[locale]/layout.tsx.
+
+Stage Summary:
+- All public SSR pages (blog list, blog detail, custom landing pages) are now served under /{locale}/... and respect the locale for date formatting and internal link generation.
+- The bare root path `/` now redirects to `/dashboard`, where the SPA shell (auth, dashboard, default landing) lives.
+- `bun run lint` passes with 0 errors (26 pre-existing "Unused eslint-disable directive" warnings, matching the codebase baseline; the 2 warnings in the new [locale]/blog files mirror the same `@next/next/no-img-element` pattern used elsewhere).
+- TypeScript: no new errors introduced in the moved files; remaining `tsc` errors are pre-existing and unrelated (i18n duplicate keys, layout `lang` metadata, admin API typing).

@@ -27,7 +27,13 @@ type PostCard = {
   author: { name: string | null } | null
 }
 
-export default async function BlogListPage() {
+export default async function BlogListPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const { locale } = await params
+
   // Fetch only published, non-soft-deleted posts, newest first. Select only
   // the fields needed for the card grid — the full TipTap JSON content is NOT
   // loaded here.
@@ -50,12 +56,12 @@ export default async function BlogListPage() {
       {/* Header */}
       <header className="border-b border-divider bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5 sm:px-6">
-          <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-foreground transition-colors hover:text-primary">
+          <Link href={`/${locale}`} className="flex items-center gap-2 text-lg font-semibold text-foreground transition-colors hover:text-primary">
             <span className="text-primary">↩</span>
             <span>Wishubest</span>
           </Link>
           <Link
-            href="/"
+            href="/dashboard"
             className="rounded-full border border-divider px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
           >
             Back to app
@@ -93,7 +99,7 @@ export default async function BlogListPage() {
             {posts.map((post) => (
               <Link
                 key={post.id}
-                href={`/blog/${post.slug}`}
+                href={`/${locale}/blog/${post.slug}`}
                 className="group flex flex-col overflow-hidden rounded-[16px] border border-divider bg-surface transition-all hover:border-primary/30 hover:shadow-lg"
               >
                 {/* Cover image */}
@@ -124,7 +130,7 @@ export default async function BlogListPage() {
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
                       event
                     </span>
-                    <time dateTime={post.createdAt.toISOString()}>{formatDate(post.createdAt.toISOString(), 'en')}</time>
+                    <time dateTime={post.createdAt.toISOString()}>{formatDate(post.createdAt.toISOString(), locale)}</time>
                     {post.author?.name && (
                       <>
                         <span className="text-divider">·</span>

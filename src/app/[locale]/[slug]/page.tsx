@@ -38,9 +38,9 @@ async function getPage(slug: string): Promise<CustomPage | null> {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ locale: string; slug: string }>
 }): Promise<Metadata> {
-  const { slug } = await params
+  const { locale, slug } = await params
   const page = await getPage(slug)
   if (!page) {
     return { title: 'Page not found — Wishubest' }
@@ -48,7 +48,7 @@ export async function generateMetadata({
 
   const metaTitle = page.seoTitle || page.title
   const metaDescription = page.seoDescription || page.title
-  const url = `/${page.slug}`
+  const url = `/${locale}/${page.slug}`
 
   return {
     title: metaTitle,
@@ -79,9 +79,9 @@ export async function generateMetadata({
 export default async function CustomPageRoute({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ locale: string; slug: string }>
 }) {
-  const { slug } = await params
+  const { locale, slug } = await params
   const page = await getPage(slug)
   if (!page) notFound()
 
@@ -90,12 +90,12 @@ export default async function CustomPageRoute({
       {/* Minimal header — brand + back to app */}
       <header className="border-b border-divider bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+          <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
             <span>←</span>
             <span>Wishubest</span>
           </Link>
           <Link
-            href="/blog"
+            href={`/${locale}/blog`}
             className="rounded-full border border-divider px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
           >
             Blog

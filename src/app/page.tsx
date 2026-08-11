@@ -1,32 +1,14 @@
-import { db } from '@/lib/db'
-import { DefaultLanding } from '@/components/landing/default-landing'
-
-export const dynamic = 'force-dynamic'
+import { redirect } from 'next/navigation'
 
 /**
- * Root page — Server Component.
+ * Root page — redirects to the SPA dashboard.
  *
- * Dynamic homepage override:
- *  - If a CustomPage with slug "home" exists and is published, render its
- *    htmlContent via dangerouslySetInnerHTML (admin-trusted, no sanitization).
- *  - Otherwise, render the default client-side SPA landing (Zustand shell,
- *    auth, dashboard) via the DefaultLanding client component.
+ * The public SSR pages now live under /{locale}/... (see src/app/[locale]/).
+ * The interactive SPA shell (auth, dashboard, landing) lives at /dashboard.
  *
- * The DB query runs on the server so the homepage can be fully SSR'd for
- * SEO when a custom home page is configured.
+ * Hitting the bare `/` path redirects to /dashboard so existing bookmarks
+ * and links keep working.
  */
-export default async function Home() {
-  const homePage = await db.customPage.findUnique({
-    where: { slug: 'home', deletedAt: null },
-    select: { htmlContent: true, isPublished: true },
-  })
-
-  if (homePage?.isPublished && homePage.htmlContent) {
-    return (
-      <div dangerouslySetInnerHTML={{ __html: homePage.htmlContent }} />
-    )
-  }
-
-  // Default — client-side SPA shell (auth, dashboard, landing)
-  return <DefaultLanding />
+export default function RootPage() {
+  redirect('/dashboard')
 }
