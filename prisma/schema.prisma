@@ -117,6 +117,9 @@ model User {
   // access (/api/calendar/[token]) for providers (DOCTOR, HOSPITAL, HOTEL,
   // TRANSLATOR) without requiring a login session. NULL for non-providers.
   calendarToken        String?      @unique
+  // KYC status: PENDING (not started), IN_REVIEW (submitted, awaiting admin),
+  // APPROVED (all required docs approved), REJECTED (at least one rejected).
+  kycStatus            String       @default("PENDING")
   kycDocuments      KycDocument[] @relation("kycDocuments")
   kycReviewed       KycDocument[] @relation("kycReviewed")
   ticketsRaised     Ticket[]    @relation("ticketsRaised")
@@ -624,23 +627,55 @@ enum KycStatus {
   REJECTED
 }
 
+/// Admin-defined KYC requirement — defines what documents each provider type
+/// must submit. Created/managed by admins, used by providers during KYC upload.
+model KycRequirement {
+  id           String       @id @default(cuid())
+  providerType String                        // DOCTOR | HOSPITAL | HOTEL | TRANSLATOR
+  documentName String                        // e.g. "Medical License"
+  description  String?                       // instructions for the provider
+  isRequired   Boolean      @default(true)
+  order        Int          @default(0)      // staging/display order
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  documents    KycDocument[]
+
+  @@index([providerType])
+}
+
 model KycDocument {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation("kycDocuments", fields: [userId], references: [id], onDelete: Cascade)
-  docType     String    // "medical_license" | "id_card" | "diploma" | "passport" | "other"
-  fileName    String
-  fileType    String
-  fileSize    Int
-  dataUrl     String    // base64 data URL
-  notes       String?
-  status      KycStatus @default(NOT_SUBMITTED)
-  adminNote   String?
-  reviewedById String?
-  reviewedBy  User?     @relation("kycReviewed", fields: [reviewedById], references: [id])
-  reviewedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation("kycDocuments", fields: [userId], references: [id], onDelete: Cascade)
+  // Link to the requirement this document fulfills (optional for backward
+  // compat with pre-existing documents that weren't tied to a requirement).
+  requirementId   String?
+  requirement     KycRequirement? @relation(fields: [requirementId], references: [id])
+  // Copied from the requirement at upload time for historical record (in case
+  // the requirement is later edited or deleted).
+  documentName    String    @default("")
+  // Legacy docType field — kept for backward compat with existing records.
+  docType         String    @default("other")
+  fileName        String
+  fileType        String
+  fileSize        Int
+  dataUrl         String    // base64 data URL
+  notes           String?
+  status          KycStatus @default(NOT_SUBMITTED)
+  // New string-based status for the upgraded workflow: PENDING | APPROVED | REJECTED
+  reviewStatus    String    @default("PENDING")
+  rejectionReason String?
+  adminNote       String?
+  reviewedById    String?
+  reviewedBy      User?     @relation("kycReviewed", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  uploadedAt      DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([requirementId])
 }
 
 // ============================================================================
