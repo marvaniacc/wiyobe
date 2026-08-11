@@ -1397,3 +1397,29 @@ Stage Summary:
 - Permanent deletion frees DB space (the base64 dataUrl is in the same row, so deleting the row removes the data).
 - 30-day auto-purge: the GET filters to items with deletedAt >= 30 days ago.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 15.3
+Agent: main (Lead Architect)
+Task: Phase 15.3 — Advanced Notifications System & Admin Broadcast. Upgraded notifications with categories, metadata, read/unread management, and admin broadcast to specific roles.
+
+Work Log:
+- Step 1 (schema): Upgraded `Notification` model: added `category String @default("SYSTEM")` (BOOKING/KYC/CHAT/SYSTEM/ANNOUNCEMENT/PAYOUT/REVIEW/MEDICAL/PROMO), `isRead Boolean @default(false)`, `metadata Json?`. Kept legacy `type`, `read`, `meta` fields for backward compat. Added `@@index([userId, isRead])` and `@@index([category])`. Commit: `5806dfd`.
+- Step 2 (helper): Upgraded `src/lib/notify.ts` with a new `sendNotification({ userId, title, message, category, type, link, metadata })` function. Errors are caught and logged (best-effort — never breaks the calling flow). Kept the legacy `notify()` function as a thin wrapper that maps old type strings to categories. Commit: `3ca1042`.
+- Step 3 (APIs): Upgraded `src/app/api/notifications/route.ts` — GET supports `?unread=true` filter, uses `isRead` field. POST still marks all as read (legacy compat). Created `src/app/api/notifications/read/route.ts` (PATCH — mark one as read, ownership-checked) and `src/app/api/notifications/read-all/route.ts` (PATCH — mark all as read). Commit: `7a4db99`.
+- Step 4 (broadcast API): Created `src/app/api/admin/notifications/broadcast/route.ts` — POST accepts title, message, category, targetRole (PATIENT/DOCTOR/HOSPITAL/HOTEL/TRANSLATOR/AFFILIATE/ADMIN/ALL). Queries users by role (excluding SUSPENDED), uses `db.notification.createMany` for efficient bulk insertion in a single DB hit. Returns recipient count. Commit: `7478f07`.
+- Step 5 (bell UI): Upgraded `src/components/shell/notification-bell.tsx` — category-based icon/color mapping (BOOKING=event_available, ANNOUNCEMENT=campaign, etc.), uses `isRead` field with fallback to legacy `read`, PATCH endpoints for mark-read and mark-all-read, "Mark all as read" button with done_all icon, category badge on each notification. Commit: `879f35d`.
+- Step 6 (broadcast UI): Added `BroadcastSection` to admin-dashboard.tsx — form with Title, Message (2000-char counter), Category dropdown, Target Role dropdown (All/Patients/Doctors/Hospitals/Hotels/Translators/Affiliates). Send button calls broadcast API. Success message shows recipient count. Added "Send Notification" nav item (`campaign` icon). Commit: `139b651`.
+- Step 7 (i18n): Added 15 keys × 4 locales (en, tr, fa, ar): `admin.broadcast`, `admin.broadcastDesc`, `admin.targetRole`, `admin.sentSuccessfully`, `admin.message`, `admin.category`, `admin.send`, `admin.broadcastTitlePlaceholder`, `admin.broadcastMsgPlaceholder`, `role.all`, `notifications.cat.announcement`, `notifications.cat.system`, `notifications.cat.booking`, `notifications.cat.promo`, `notifications.cat.medical`. Commit: `483de02`.
+- Verification (curl + agent-browser):
+  - curl: Broadcast to ALL → 28 recipients. Patient received it (category=ANNOUNCEMENT). Mark one as read → unread 13→12. Mark all as read → unread 0. All endpoints returned {ok: true}.
+  - agent-browser (admin): "Send Notification" nav item present. Broadcast section has Title, Message, Category, Target Role dropdowns, Send button. Filled form, clicked Send → "Sent successfully · 28 recipients". No errors.
+  - Lint: 0 errors.
+
+Stage Summary:
+- 7 commits pushed to origin/main: 5806dfd (schema), 3ca1042 (helper), 7a4db99 (APIs), 7478f07 (broadcast API), 879f35d (bell UI), 139b651 (broadcast UI), 483de02 (i18n).
+- Broadcast uses `createMany` for O(1) database hits regardless of recipient count.
+- `sendNotification` helper handles errors gracefully (catches + logs, never throws).
+- Backward compatible: legacy `notify()` still works, old `type`/`read`/`meta` fields preserved.
+- Category-based icons and colors in the notification bell.
+- Lint: 0 errors. Dev server running cleanly.
