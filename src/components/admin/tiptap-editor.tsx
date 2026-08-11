@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
+import { MediaPicker } from '@/components/shared/media-picker'
 import { useState } from 'react'
 
 /* -------------------------------------------------------------------------
@@ -43,6 +44,7 @@ export function TiptapEditor({
   const [linkUrl, setLinkUrl] = useState('')
   const [imageOpen, setImageOpen] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -200,26 +202,60 @@ export function TiptapEditor({
         </DialogContent>
       </Dialog>
 
-      {/* Image dialog */}
+      {/* Image dialog — choose from Media Library or enter URL manually */}
       <Dialog open={imageOpen} onOpenChange={setImageOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Add Image</DialogTitle>
-            <DialogDescription>Enter the image URL. The image will be inserted at the cursor position.</DialogDescription>
+            <DialogDescription>Choose from the Media Library or enter an image URL manually.</DialogDescription>
           </DialogHeader>
+
+          {/* Browse Media Library button */}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => {
+              setImageOpen(false)
+              setMediaPickerOpen(true)
+            }}
+          >
+            <Icon name="perm_media" size={18} />
+            Browse Media Library
+          </Button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-divider" />
+            <span className="text-xs text-muted-foreground">or paste URL</span>
+            <span className="h-px flex-1 bg-divider" />
+          </div>
+
+          {/* Manual URL input */}
           <Input
             placeholder="https://example.com/image.jpg"
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmImage() } }}
-            autoFocus
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setImageOpen(false)}>Cancel</Button>
-            <Button onClick={confirmImage}>Insert</Button>
+            <Button onClick={confirmImage} disabled={!imageUrl.trim()}>Insert</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Media Picker — selecting an image inserts it directly into the editor */}
+      <MediaPicker
+        open={mediaPickerOpen}
+        onOpenChange={setMediaPickerOpen}
+        filter="image"
+        onSelected={(path) => {
+          if (editor) {
+            editor.chain().focus().setImage({ src: path }).run()
+          }
+        }}
+      />
     </div>
   )
 }
