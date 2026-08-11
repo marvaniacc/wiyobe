@@ -922,3 +922,10 @@ model ProviderLocation {
   @@index([translatorId])
   @@index([country])
 }
+
+/// Key-Value site settings for dynamic configuration.
+/// Keys: siteName, tagline, logoUrl, defaultSeoTitle, defaultSeoDescription
+model SiteSetting {
+  key   String  @id
+  value String?
+}
