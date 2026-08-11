@@ -486,6 +486,7 @@ model MedicalDocument {
   // authorization queries (a doctor can fetch only documents where a row
   // with their userId exists here).
   accessGrants MedicalRecordAccess[]
+  deletedAt  DateTime?  // soft delete — null = active, non-null = in recycle bin
 }
 
 /// Junction table — grants a single doctor access to a single medical document.
@@ -790,9 +791,11 @@ model BlogPost {
   noIndex         Boolean  @default(false)                 // exclude from search engines
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?                                 // soft delete
 
   @@index([status])
   @@index([authorId])
+  @@index([deletedAt])
 }
 
 /// Custom landing pages with raw HTML/CSS content. Admin-authored, so the
@@ -811,8 +814,10 @@ model CustomPage {
   isPublished     Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?                        // soft delete
 
   @@index([isPublished])
+  @@index([deletedAt])
 }
 
 /// Internal media library — files uploaded to public/uploads/ and tracked
@@ -826,6 +831,8 @@ model MediaAsset {
   mimeType   String
   fileSize   Int                           // bytes
   createdAt  DateTime @default(now())
+  deletedAt  DateTime?                     // soft delete
 
   @@index([uploaderId])
+  @@index([deletedAt])
 }
