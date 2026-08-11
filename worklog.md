@@ -1281,3 +1281,30 @@ Stage Summary:
 - Homepage can be overridden by publishing a CustomPage with slug "home"; otherwise the default Zustand SPA landing renders.
 - The `[slug]` catch-all does NOT conflict with `/blog`, `/api`, or `/_next` (Next.js prioritizes static folders).
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 14
+Agent: main (Lead Architect)
+Task: Phase 14 — Internal Media Library System. Centralized file storage in public/uploads/ tracked in DB. Reusable MediaPicker component integrated into blog and custom page editors.
+
+Work Log:
+- Step 1 (schema): Added `MediaAsset` model: `id`, `uploaderId` (FK to User with onDelete: Cascade), `fileName` (original), `filePath` (relative: /uploads/uuid.ext), `mimeType`, `fileSize`, `createdAt`. `@@index([uploaderId])` for fast "my uploads" queries. Added `mediaAssets MediaAsset[]` back-relation to User. Pushed via `bun run db:push`. Commit: `ee0f6f6`.
+- Step 2 (API): Created `src/app/api/media/route.ts` (GET list, POST upload) and `src/app/api/media/[id]/route.ts` (DELETE). POST accepts multipart/form-data, validates MIME type (allowed set: images, PDFs, docs, spreadsheets, text) and max 5MB, saves to `public/uploads/` with UUID+extension filename, creates DB record. GET: Admins see all, others see own. DELETE: removes file from disk (gracefully handles ENOENT) + DB record; ownership-checked (admins bypass). File system errors handled gracefully with try/catch + console.error. Commit: `e258f7f`.
+- Step 3 (MediaPicker component): Created `src/components/shared/media-picker.tsx` — a reusable Dialog. Shows a grid of uploaded files (image thumbnails or file-type icons), drag-and-drop upload area + file input, delete button per file (on hover), select-to-confirm flow. Accepts `filter` prop ('all' or 'image' — for blog cover image we filter to images only). `onSelected(filePath)` callback returns the public path. Fetches from /api/media on open, prepends new uploads optimistically. Commit: `9bb5a8f`.
+- Step 4 (integration): Integrated MediaPicker into both admin editors:
+  - BlogEditorDialog: Cover Image field now has an input + "Media Library" button (perm_media icon). Clicking opens MediaPicker (filter='image'). Selecting fills the coverImage state. Shows a thumbnail preview with a remove (close) button when a URL is set.
+  - CustomPageEditorDialog: Added "Insert Media" button next to the HTML Content label. Selecting a file inserts an `<img src="..." style="max-width:100%; height:auto;" />` tag at the end of the htmlContent textarea.
+  Commit: `780f3ee`.
+- Step 5 (i18n): Added 15 keys × 4 locales (en, tr, fa, ar): `media.library`, `media.upload`, `media.uploading`, `media.select`, `media.selectDesc`, `media.delete`, `media.deleted`, `media.noFiles`, `media.noFilesDesc`, `media.noSelection`, `media.dragDrop`, `media.uploaded`, `media.uploadError`, `media.tooLarge`, `media.insert`. Commit: `361921d`.
+- Verification (curl + agent-browser):
+  - curl: Uploaded test.png (1x1, 70 bytes) → 201 with asset data (filePath=/uploads/uuid.png). Listed 2 assets. Invalid MIME (.exe) rejected. Files exist on disk in public/uploads/.
+  - agent-browser (admin): Blog > New Post > Cover Image field has "Media Library" button. Clicking opens MediaPicker dialog showing uploaded files (test.png, 70 B) with drag-drop upload area. Clicked an image → "Select" button enabled → clicked Select → MediaPicker closed → Cover Image field filled with `/uploads/uuid.png` + thumbnail preview with remove button. No errors.
+  - Lint: 0 errors. Dev server running cleanly.
+
+Stage Summary:
+- 5 commits pushed to origin/main: ee0f6f6 (schema), e258f7f (API), 9bb5a8f (MediaPicker), 780f3ee (integration), 361921d (i18n).
+- Files stored locally in public/uploads/ with UUID filenames (no name collisions). Tracked in DB with uploader, MIME type, size.
+- Safe MIME types only (images, PDFs, documents); 5MB max. Invalid types rejected at the API level.
+- Reusable MediaPicker component can be integrated into any form (TipTap, custom pages, blog, etc.) — accepts filter prop and onSelected callback.
+- Existing TipTap JSON rendering is NOT affected (media library is a separate system).
+- Lint: 0 errors. Dev server running cleanly.
