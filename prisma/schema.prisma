@@ -787,3 +787,19 @@ model BlogPost {
   @@index([status])
   @@index([authorId])
 }
+
+/// Custom landing pages with raw HTML/CSS content. Admin-authored, so the
+/// HTML is NOT sanitized (admin is trusted). Rendered via SSR on /[slug].
+model CustomPage {
+  id             String   @id @default(cuid())
+  title          String
+  slug           String   @unique                // kebab-case URL slug
+  htmlContent    String                          // raw HTML/CSS code
+  seoTitle       String?
+  seoDescription String?
+  isPublished    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isPublished])
+}
