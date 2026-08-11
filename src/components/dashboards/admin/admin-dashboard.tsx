@@ -7,6 +7,7 @@ import { useT } from '@/hooks/use-t'
 import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
 import { TiptapEditor, type TiptapJSON } from '@/components/admin/tiptap-editor'
 import { TiptapPreview } from '@/components/admin/tiptap-preview'
+import { MediaPicker } from '@/components/shared/media-picker'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
@@ -2512,6 +2513,7 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
   const [status, setStatus] = React.useState<'DRAFT' | 'PUBLISHED'>('DRAFT')
   const [content, setContent] = React.useState<TiptapJSON | null>(null)
   const [saving, setSaving] = React.useState(false)
+  const [mediaPickerOpen, setMediaPickerOpen] = React.useState(false)
 
   // Sync form state when the dialog opens (for create or edit).
   React.useEffect(() => {
@@ -2601,12 +2603,35 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
           {/* Cover Image + Status */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">{t('admin.coverImage', 'Cover Image URL')}</Label>
-              <Input
-                placeholder="https://…"
-                value={coverImage}
-                onChange={(e) => setCoverImage(e.target.value)}
-              />
+              <Label className="text-sm font-medium">{t('admin.coverImage', 'Cover Image')}</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://… or /uploads/…"
+                  value={coverImage}
+                  onChange={(e) => setCoverImage(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setMediaPickerOpen(true)}
+                  title={t('media.library', 'Media Library')}
+                  className="shrink-0"
+                >
+                  <Icon name="perm_media" size={18} />
+                </Button>
+              </div>
+              {coverImage && (
+                <div className="flex items-center gap-2 rounded-[8px] border border-divider p-1.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={coverImage} alt="" className="size-8 rounded-[4px] object-cover" />
+                  <span className="truncate text-[11px] text-muted-foreground">{coverImage}</span>
+                  <button type="button" onClick={() => setCoverImage('')} className="ml-auto shrink-0 text-error hover:text-error/80">
+                    <Icon name="close" size={14} />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">{t('common.status', 'Status')}</Label>
@@ -2635,13 +2660,17 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Media Picker — for selecting a cover image */}
+      <MediaPicker
+        open={mediaPickerOpen}
+        onOpenChange={setMediaPickerOpen}
+        onSelected={(path) => setCoverImage(path)}
+        filter="image"
+      />
     </Dialog>
   )
 }
-
-// ============================================================================
-// Section: Custom Pages — raw HTML/CSS landing page builder
-// ============================================================================
 
 type CustomPage = {
   id: string
@@ -2828,6 +2857,7 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
   const [isPublished, setIsPublished] = React.useState(false)
   const [htmlContent, setHtmlContent] = React.useState('')
   const [saving, setSaving] = React.useState(false)
+  const [mediaPickerOpen, setMediaPickerOpen] = React.useState(false)
 
   React.useEffect(() => {
     if (open) {
@@ -2914,7 +2944,19 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
 
           {/* HTML Content */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium">{t('admin.htmlContent', 'HTML Content')}</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">{t('admin.htmlContent', 'HTML Content')}</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMediaPickerOpen(true)}
+                className="gap-1.5"
+              >
+                <Icon name="perm_media" size={14} />
+                {t('media.insert', 'Insert Media')}
+              </Button>
+            </div>
             <textarea
               placeholder={'<div style="padding: 40px;">\n  <h1>Welcome to our page</h1>\n  <p>Custom HTML/CSS here…</p>\n</div>'}
               value={htmlContent}
@@ -2935,6 +2977,17 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Media Picker — inserts an <img> tag at the end of the HTML content */}
+      <MediaPicker
+        open={mediaPickerOpen}
+        onOpenChange={setMediaPickerOpen}
+        onSelected={(path) => {
+          // Insert an <img> tag with the selected file path into the HTML content
+          const imgTag = `<img src="${path}" alt="" style="max-width: 100%; height: auto;" />`
+          setHtmlContent((prev) => prev + '\n' + imgTag)
+        }}
+      />
     </Dialog>
   )
 }
