@@ -14,6 +14,11 @@ type PostDetail = {
   excerpt: string
   content: unknown
   coverImage: string | null
+  seoTitle: string | null
+  seoDescription: string | null
+  focusKeyword: string | null
+  canonicalUrl: string | null
+  noIndex: boolean
   createdAt: Date
   updatedAt: Date
   author: { name: string | null; email: string } | null
@@ -55,15 +60,19 @@ export async function generateMetadata({
   }
 
   const url = `/blog/${post.slug}`
+  const metaTitle = post.seoTitle || post.title
+  const metaDescription = post.seoDescription || post.excerpt || post.title
   const images = post.coverImage ? [{ url: post.coverImage, width: 1200, height: 630, alt: post.title }] : undefined
 
   return {
-    title: `${post.title} — Wishubest Blog`,
-    description: post.excerpt || post.title,
-    alternates: { canonical: url },
+    title: `${metaTitle} — Wishubest Blog`,
+    description: metaDescription,
+    alternates: { canonical: post.canonicalUrl || url },
+    robots: post.noIndex ? { index: false, follow: false } : undefined,
+    keywords: post.focusKeyword ? [post.focusKeyword] : undefined,
     openGraph: {
-      title: post.title,
-      description: post.excerpt || post.title,
+      title: metaTitle,
+      description: metaDescription,
       type: 'article',
       url,
       publishedTime: post.createdAt.toISOString(),
@@ -73,8 +82,8 @@ export async function generateMetadata({
     },
     twitter: {
       card: 'summary_large_image',
-      title: post.title,
-      description: post.excerpt || post.title,
+      title: metaTitle,
+      description: metaDescription,
       images,
     },
   }

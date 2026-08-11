@@ -12,6 +12,9 @@ type CustomPage = {
   htmlContent: string
   seoTitle: string | null
   seoDescription: string | null
+  focusKeyword: string | null
+  canonicalUrl: string | null
+  noIndex: boolean
   isPublished: boolean
   createdAt: Date
   updatedAt: Date
@@ -42,14 +45,21 @@ export async function generateMetadata({
     return { title: 'Page not found — Wishubest' }
   }
 
+  const metaTitle = page.seoTitle || page.title
+  const metaDescription = page.seoDescription || page.title
+  const url = `/${page.slug}`
+
   return {
-    title: page.seoTitle || page.title,
-    description: page.seoDescription || page.title,
+    title: metaTitle,
+    description: metaDescription,
+    alternates: { canonical: page.canonicalUrl || url },
+    robots: page.noIndex ? { index: false, follow: false } : undefined,
+    keywords: page.focusKeyword ? [page.focusKeyword] : undefined,
     openGraph: {
-      title: page.seoTitle || page.title,
-      description: page.seoDescription || page.title,
+      title: metaTitle,
+      description: metaDescription,
       type: 'website',
-      url: `/${page.slug}`,
+      url,
     },
   }
 }
