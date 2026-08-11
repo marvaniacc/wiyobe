@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
 
 /* -------------------------------------------------------------------------
@@ -156,8 +156,8 @@ export function MediaPicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden p-0">
-        <DialogHeader className="border-b border-divider p-5">
+      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-divider p-5">
           <DialogTitle className="flex items-center gap-2">
             <Icon name="perm_media" size={20} className="text-primary" />
             {t('media.library', 'Media Library')}
@@ -166,7 +166,7 @@ export function MediaPicker({
         </DialogHeader>
 
         {/* Upload area */}
-        <div className="border-b border-divider p-4">
+        <div className="shrink-0 border-b border-divider p-4">
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
@@ -192,8 +192,8 @@ export function MediaPicker({
           </div>
         </div>
 
-        {/* Grid of assets */}
-        <div className="max-h-[45vh] overflow-y-auto p-4">
+        {/* Grid of assets — this section scrolls, footer stays fixed below */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="aspect-square rounded-[12px]" />)}
@@ -251,21 +251,19 @@ export function MediaPicker({
           )}
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="border-t border-divider p-4">
-          <div className="flex w-full items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              {selected ? <span className="font-mono">{selected}</span> : t('media.noSelection', 'No file selected')}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
-              <Button onClick={handleConfirm} disabled={!selected} className="gap-1.5">
-                <Icon name="check" size={16} />
-                {t('media.select', 'Select')}
-              </Button>
-            </div>
+        {/* Footer — ALWAYS rendered, pinned to the bottom via shrink-0 */}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-divider bg-surface p-4">
+          <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+            {selected ? <span className="font-mono text-foreground">{selected}</span> : t('media.noSelection', 'No file selected')}
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={handleConfirm} disabled={!selected} className="gap-1.5">
+              <Icon name="check" size={16} />
+              {t('media.insert', 'Insert')}
+            </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
