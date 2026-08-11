@@ -5048,7 +5048,21 @@ function AdminSettingsSection() {
     }
   }
 
-  const knownKeys = [
+  // Site identity settings
+  const siteFields = [
+    { key: 'siteName', label: 'Site Name', placeholder: 'Wishubest', type: 'text' },
+    { key: 'tagline', label: 'Tagline', placeholder: 'Global Medical Tourism Marketplace', type: 'text' },
+    { key: 'logoUrl', label: 'Logo URL', placeholder: 'https://…/logo.svg', type: 'text' },
+  ]
+
+  // Default SEO settings
+  const seoFields = [
+    { key: 'defaultSeoTitle', label: 'Default SEO Title', placeholder: 'Wishubest — Medical Tourism', type: 'text' },
+    { key: 'defaultSeoDescription', label: 'Default SEO Description', placeholder: 'Compare and book verified doctors…', type: 'textarea' },
+  ]
+
+  // Legacy platform settings
+  const platformFields = [
     { key: 'platformName', label: t('admin.platformName'), type: 'text' },
     { key: 'defaultCurrency', label: t('admin.defaultCurrency'), type: 'text' },
     { key: 'payoutScheduleDays', label: t('admin.payoutScheduleDays'), type: 'number' },
@@ -5056,41 +5070,114 @@ function AdminSettingsSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{t('admin.platformSettings')}</h1>
-        <p className="text-sm text-muted-foreground">{t('admin.platformSettingsDesc')}</p>
-      </div>
+      <PageHeader title={t('admin.platformSettings')} description={t('admin.platformSettingsDesc')} icon="settings" />
 
       {loading ? (
-        <Skeleton className="h-48 w-full rounded-2xl" />
+        <LoadingCard lines={4} />
       ) : error ? (
         <Card><CardContent className="p-6 text-error">{error}</CardContent></Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t('admin.generalSettings')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {knownKeys.map(({ key, label, type }) => (
-              <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-center">
-                <Label className="text-sm font-medium">{label}</Label>
-                <Input
-                  type={type}
-                  value={values[key] || ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                  className="sm:col-span-2"
-                />
-              </div>
-            ))}
-            <Separator />
-            <div className="flex justify-end">
-              <Button onClick={save} disabled={saving} className="gap-2">
-                {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
-                {t('common.save')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <>
+          {/* Site Identity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="badge" size={18} className="text-primary" />
+                Site Identity
+              </CardTitle>
+              <CardDescription>Configure the site name, tagline, and logo shown across the platform.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {siteFields.map(({ key, label, placeholder, type }) => (
+                <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-center">
+                  <Label className="text-sm font-medium">{label}</Label>
+                  <Input
+                    type={type}
+                    placeholder={placeholder}
+                    value={values[key] || ''}
+                    onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                    className="sm:col-span-2"
+                  />
+                </div>
+              ))}
+              {/* Logo preview */}
+              {values.logoUrl && (
+                <div className="flex items-center gap-2 rounded-[10px] border border-divider p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={values.logoUrl} alt="Logo preview" className="h-8 w-auto" />
+                  <span className="text-xs text-muted-foreground">Logo preview</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Default SEO */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="search" size={18} className="text-primary" />
+                Default SEO
+              </CardTitle>
+              <CardDescription>Default meta title and description used when individual pages don't override them.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {seoFields.map(({ key, label, placeholder, type }) => (
+                <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-start">
+                  <Label className="pt-2.5 text-sm font-medium">{label}</Label>
+                  {type === 'textarea' ? (
+                    <Textarea
+                      placeholder={placeholder}
+                      value={values[key] || ''}
+                      onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                      rows={2}
+                      maxLength={500}
+                      className="sm:col-span-2"
+                    />
+                  ) : (
+                    <Input
+                      type={type}
+                      placeholder={placeholder}
+                      value={values[key] || ''}
+                      onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                      className="sm:col-span-2"
+                    />
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Platform Settings (legacy) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="tune" size={18} className="text-primary" />
+                {t('admin.generalSettings')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {platformFields.map(({ key, label, type }) => (
+                <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-center">
+                  <Label className="text-sm font-medium">{label}</Label>
+                  <Input
+                    type={type}
+                    value={values[key] || ''}
+                    onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                    className="sm:col-span-2"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Save button */}
+          <div className="flex justify-end">
+            <Button onClick={save} disabled={saving} className="gap-2">
+              {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+              {t('common.save')}
+            </Button>
+          </div>
+        </>
       )}
     </div>
   )
