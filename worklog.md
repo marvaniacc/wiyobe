@@ -1484,3 +1484,37 @@ Stage Summary:
 - kycStatus added to session (SessionUser type, app-store, signup/signin responses) so the lock works immediately on login.
 - Phase 16.3 (Admin Review UI) deferred.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 16.3
+Agent: main (Lead Architect)
+Task: Phase 16.3 — Admin KYC Review UI. Admin can review provider document submissions, approve/reject individual documents, and approve the provider's overall KYC status to unlock their dashboard.
+
+Work Log:
+- Step 1+2 (API + notifications): Created 3 API routes:
+  - `src/app/api/admin/kyc/route.ts` — GET: fetches providers with kycStatus !== APPROVED or pending documents, includes their documents and requirements.
+  - `src/app/api/admin/kyc/[documentId]/route.ts` — PATCH: approve/reject individual document. Sets reviewedById, reviewedAt, rejectionReason. Sends notification to provider (APPROVED: "Document Approved", REJECTED: "Document Rejected" with reason). Category: KYC.
+  - `src/app/api/admin/kyc/approve-user/route.ts` — POST: validates ALL required documents are APPROVED before setting User.kycStatus to APPROVED. Returns 400 with list of pending documents if not all approved. Sends "KYC Verification Complete" notification on success.
+  All endpoints strictly ADMIN-only. Notifications use sendNotification helper (error-safe). Commit: `93b47b5`.
+- Step 3 (UI): Added `KycReviewSection` to admin-dashboard.tsx:
+  - Lists providers with pending KYC, showing name, role, status badge, doc counts (pending/approved).
+  - "Review" button opens a detail dialog showing all requirements with their uploaded documents (file name, date, image preview for image files).
+  - For PENDING documents: "Approve" and "Reject" buttons. Reject opens a dialog with a textarea for the rejection reason (required).
+  - For REJECTED documents: "Approve" button (to undo rejection).
+  - "Approve Provider" master button at the bottom — disabled until ALL required documents are approved. Calls the approve-user endpoint.
+  - Empty state ("No pending KYC reviews").
+  - Added "KYC Review" nav item (`fact_check` icon). Commit: `dbac0b5`.
+- Step 4 (i18n): Added 12 keys × 4 locales (en, tr, fa, ar): admin.kycReview, admin.kycReviewDesc, admin.reviewDocument, admin.rejectReason, admin.rejectReasonPlaceholder, admin.approveDocument, admin.rejectDocument, admin.approveUser, admin.approveUserHint, admin.allDocumentsApproved, admin.kycNoPending, admin.kycNoPendingDesc. Commit: `a99fe3f`.
+- Verification (curl + agent-browser):
+  - curl: GET /api/admin/kyc → 15 providers with pending KYC. Dr. Mehmet Yilmaz has 1 document (legacy, requirementId=null). Correct.
+  - agent-browser (admin): "KYC Review" nav present. Section lists 15 providers with role icons, status badges, doc counts. Clicked "Review" on a provider → detail dialog shows requirements (Business License, Tourism Certificate) with "Not Uploaded" status and disabled "Approve Provider" button with hint "All required documents must be approved first". No errors.
+  - Lint: 0 errors.
+
+Stage Summary:
+- 3 commits pushed to origin/main: 93b47b5 (API + notifications), dbac0b5 (UI), a99fe3f (i18n).
+- Admin can approve/reject individual documents with rejection reasons.
+- "Approve Provider" button only enabled when ALL required documents are approved — validates on both client and server.
+- Every review action (approve document, reject document, approve user) sends a notification to the provider.
+- Legacy documents (uploaded before the requirement system) have requirementId=null and show as "Not Uploaded" — providers need to re-upload using the new flow.
+- Phase 16 (Advanced KYC Workflow) is now COMPLETE: 16.1 (schema + admin requirements), 16.2 (provider upload + lock), 16.3 (admin review).
+- Lint: 0 errors. Dev server running cleanly.
