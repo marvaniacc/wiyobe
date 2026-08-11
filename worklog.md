@@ -1664,3 +1664,43 @@ Stage Summary:
 - Hreflang alternates on all provider detail pages for en, tr, fa, ar, x-default.
 - Sitemap generates URLs for all locales and all provider pages.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 18
+Agent: main (Lead Architect)
+Task: Phase 18 — AI Triage Bot using Google Gemini API. Patients describe symptoms, AI recommends medical specialty + suggested countries for medical tourism.
+
+Work Log:
+- Step 1 (SDK): Installed `@google/generative-ai@0.24.1`. Commit: `7e59104`.
+- Step 2 (API): Created `src/app/api/ai/triage/route.ts`:
+  - POST accepts `symptoms` string (3-2000 chars).
+  - Uses Gemini `gemini-1.5-flash` with strict system prompt: "You are a medical triage assistant... identify the most likely medical specialty... Respond STRICTLY in JSON format with fields: { specialty, reasoning, suggestedCountries }".
+  - Robust error handling: missing API key (503), Gemini timeout (502), non-JSON response (502 with regex fallback extraction), incomplete response (502).
+  - API key accessed server-side only via `process.env.GOOGLE_GEMINI_API_KEY`.
+  - No medical diagnoses — only specialty triage. Emergency symptoms flagged in reasoning.
+  - Authorization: any authenticated user.
+  Commit: `72589bc`.
+- Step 3 (UI): Created `src/components/shared/triage-bot.tsx`:
+  - Card UI with AI icon header, symptoms textarea, quick suggestion chips.
+  - "Analyze Symptoms" button with loading state ("AI is analyzing…").
+  - Result display: Recommended Specialty (with medical_services icon), Reasoning (with lightbulb icon), Suggested Countries (as pill badges).
+  - CTA button: "Find [Specialty] Doctors" linking to /dashboard.
+  - Disclaimer: "This is not a medical diagnosis. Always consult a qualified healthcare professional."
+  - Two variants: `card` (default, with border) and `compact` (no border, for embedding).
+  Commit: `ad2baf7`.
+- Step 4 (integration): Added TriageBot to:
+  - Patient dashboard OverviewSection (below quick actions).
+  - Locale landing page (`/[locale]/page.tsx`) below the dashboard CTA.
+  Commit: `65b4060`.
+- Step 5 (i18n): Added 12 keys × 4 locales (en, tr, fa, ar): ai.triageTitle, ai.triageDesc, ai.enterSymptoms, ai.analyze, ai.findDoctors, ai.doctors, ai.thinking, ai.specialty, ai.reasoning, ai.suggestedCountries, ai.error, ai.disclaimer. Commit: `c8eae94`.
+- Verification (curl + agent-browser):
+  - curl: POST /api/ai/triage without API key → 503 "AI service is not configured. Please contact support." (correct error handling).
+  - agent-browser: /en landing page shows TriageBot with "AI Symptom Checker" header, symptom input, quick suggestions, "Analyze Symptoms" button, and disclaimer. No errors.
+  - Lint: 0 errors.
+
+Stage Summary:
+- 5 commits pushed to origin/main: 7e59104 (SDK), 72589bc (API), ad2baf7 (UI), 65b4060 (integration), c8eae94 (i18n).
+- Gemini API key NOT configured in .env yet — the API returns 503 gracefully. To activate: add `GOOGLE_GEMINI_API_KEY=your-key` to `.env`.
+- No medical diagnoses provided — only specialty triage with reasoning and suggested countries.
+- API key never exposed to client.
+- Lint: 0 errors. Dev server running cleanly.
