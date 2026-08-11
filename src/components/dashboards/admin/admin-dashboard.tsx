@@ -2604,33 +2604,36 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">{t('admin.coverImage', 'Cover Image')}</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="https://… or /uploads/…"
-                  value={coverImage}
-                  onChange={(e) => setCoverImage(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setMediaPickerOpen(true)}
-                  title={t('media.library', 'Media Library')}
-                  className="shrink-0"
-                >
-                  <Icon name="perm_media" size={18} />
-                </Button>
-              </div>
-              {coverImage && (
-                <div className="flex items-center gap-2 rounded-[8px] border border-divider p-1.5">
+              {coverImage ? (
+                <div className="relative overflow-hidden rounded-[12px] border border-divider">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={coverImage} alt="" className="size-8 rounded-[4px] object-cover" />
-                  <span className="truncate text-[11px] text-muted-foreground">{coverImage}</span>
-                  <button type="button" onClick={() => setCoverImage('')} className="ml-auto shrink-0 text-error hover:text-error/80">
-                    <Icon name="close" size={14} />
+                  <img src={coverImage} alt="Cover preview" className="aspect-[16/9] w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setCoverImage('')}
+                    className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-surface/90 text-error shadow-sm transition-colors hover:bg-error hover:text-error-foreground"
+                    title={t('common.remove', 'Remove')}
+                  >
+                    <Icon name="close" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMediaPickerOpen(true)}
+                    className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-surface"
+                  >
+                    <Icon name="swap_horiz" size={14} />
+                    {t('media.change', 'Change')}
                   </button>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMediaPickerOpen(true)}
+                  className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-divider transition-colors hover:border-primary/50 hover:bg-accent/30"
+                >
+                  <Icon name="add_photo_alternate" size={28} className="text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">{t('media.selectCover', 'Select Cover Image')}</span>
+                </button>
               )}
             </div>
             <div className="space-y-1.5">
