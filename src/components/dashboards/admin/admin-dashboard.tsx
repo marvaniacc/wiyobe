@@ -3129,6 +3129,203 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
 }
 
 // ============================================================================
+// Section: Recycle Bin — restore or permanently delete soft-deleted items
+// ============================================================================
+
+type RecycleItem = {
+  id: string
+  title?: string
+  slug?: string
+  fileName?: string
+  filePath?: string
+  mimeType?: string
+  fileType?: string
+  category?: string
+  deletedAt: string
+  updatedAt?: string
+}
+
+type RecycleBinData = {
+  items: {
+    blogPosts: RecycleItem[]
+    customPages: RecycleItem[]
+    mediaAssets: RecycleItem[]
+    medicalDocuments: RecycleItem[]
+  }
+}
+
+const MODEL_TYPE_LABELS: Record<string, { label: string; icon: string; cls: string }> = {
+  blogPost: { label: 'Blog Posts', icon: 'article', cls: 'bg-primary/10 text-primary' },
+  customPage: { label: 'Custom Pages', icon: 'web', cls: 'bg-info/10 text-info' },
+  mediaAsset: { label: 'Media Assets', icon: 'perm_media', cls: 'bg-warning/10 text-warning' },
+  medicalDocument: { label: 'Medical Documents', icon: 'folder_shared', cls: 'bg-success/10 text-success' },
+}
+
+function RecycleBinSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<RecycleBinData>('/api/admin/recycle-bin')
+  const [confirmDelete, setConfirmDelete] = React.useState<{ modelType: string; id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
+
+  const items = data?.items
+
+  async function handleRestore(modelType: string, id: string) {
+    try {
+      await apiPatch('/api/admin/recycle-bin', { modelType, id })
+      toast.success(t('common.restore', 'Restored'))
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (!confirmDelete) return
+    setDeleting(true)
+    try {
+      await apiDelete(`/api/admin/recycle-bin?modelType=${confirmDelete.modelType}&id=${confirmDelete.id}`)
+      toast.success(t('common.deletePermanently', 'Permanently deleted'))
+      setConfirmDelete(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title={t('admin.recycleBin', 'Recycle Bin')} icon="delete_sweep" />
+        <LoadingCard lines={4} />
+      </div>
+    )
+  }
+  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+
+  const totalCount = (items?.blogPosts.length || 0) + (items?.customPages.length || 0) + (items?.mediaAssets.length || 0) + (items?.medicalDocuments.length || 0)
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={t('admin.recycleBin', 'Recycle Bin')}
+        description={t('recycleBin.desc', 'Restore or permanently delete items. Items are automatically purged after 30 days.')}
+        icon="delete_sweep"
+      />
+
+      {/* Warning banner */}
+      <div className="mt-6 flex items-start gap-2 rounded-[12px] border border-warning/20 bg-warning/5 p-3.5">
+        <Icon name="warning" size={16} className="mt-0.5 shrink-0 text-warning" />
+        <p className="text-xs text-muted-foreground">
+          {t('recycleBin.warning', 'Items in the recycle bin are automatically permanently deleted after 30 days. Permanent deletion cannot be undone.')}
+        </p>
+      </div>
+
+      {totalCount === 0 ? (
+        <Card className="mt-6">
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <Icon name="delete_sweep" size={32} className="text-muted-foreground/50" />
+            <p className="text-sm font-medium text-foreground">{t('recycleBin.empty', 'Recycle bin is empty')}</p>
+            <p className="text-xs text-muted-foreground">{t('recycleBin.emptyDesc', 'Deleted items will appear here for 30 days.')}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="mt-6 space-y-6">
+          {(['blogPost', 'customPage', 'mediaAsset', 'medicalDocument'] as const).map((modelType) => {
+            const groupItems = items?.[modelType === 'blogPost' ? 'blogPosts' : modelType === 'customPage' ? 'customPages' : modelType === 'mediaAsset' ? 'mediaAssets' : 'medicalDocuments'] || []
+            if (groupItems.length === 0) return null
+            const cfg = MODEL_TYPE_LABELS[modelType]
+            return (
+              <div key={modelType}>
+                <div className="mb-3 flex items-center gap-2">
+                  <div className={cn('flex size-7 items-center justify-center rounded-[8px]', cfg.cls)}>
+                    <Icon name={cfg.icon} size={16} fill />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">{cfg.label}</h3>
+                  <span className="text-xs text-muted-foreground">({groupItems.length})</span>
+                </div>
+                <div className="overflow-hidden rounded-[16px] border border-divider">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('admin.title', 'Name')}</TableHead>
+                        <TableHead>{t('common.deletedAt', 'Deleted')}</TableHead>
+                        <TableHead className="text-end">{t('common.actions', 'Actions')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupItems.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <span className="max-w-xs truncate text-sm font-medium text-foreground">
+                              {item.title || item.fileName || item.slug || item.id}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{relativeTime(item.deletedAt, locale)}</span>
+                          </TableCell>
+                          <TableCell className="text-end">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRestore(modelType, item.id)}
+                                className="gap-1.5"
+                                title={t('common.restore', 'Restore')}
+                              >
+                                <Icon name="restore" size={14} />
+                                <span className="hidden sm:inline">{t('common.restore', 'Restore')}</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setConfirmDelete({ modelType, id: item.id, name: item.title || item.fileName || item.slug || item.id })}
+                                className="text-error hover:bg-error/5"
+                                title={t('common.deletePermanently', 'Delete Permanently')}
+                              >
+                                <Icon name="delete_forever" size={14} />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Permanent delete confirmation */}
+      <Dialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="warning" size={20} className="text-error" />
+              {t('common.deletePermanently', 'Delete Permanently')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('recycleBin.permanentConfirm', 'Are you sure you want to permanently delete')} <span className="font-semibold text-foreground">{confirmDelete?.name}</span>?
+              {t('recycleBin.permanentWarning', ' This action cannot be undone.')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handlePermanentDelete} disabled={deleting} className="gap-1.5">
+              {deleting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="delete_forever" size={16} />}
+              {t('common.deletePermanently', 'Delete Permanently')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -3155,6 +3352,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'kyc': return <AdminKycSection />
     case 'tickets': return <AdminTicketsSection />
     case 'settings': return <AdminSettingsSection />
+    case 'recycle-bin': return <RecycleBinSection />
     case 'profile': return <AdminProfileSection />
     default: return <OverviewSection />
   }
