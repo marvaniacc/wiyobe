@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const type = searchParams.get('type') || 'all' // doctor|hospital|hotel|translator|all
+    const type = (searchParams.get('type') || 'all').toLowerCase() // doctor|hospital|hotel|translator|all
     const q = (searchParams.get('q') || '').toLowerCase().trim()
     const city = searchParams.get('city') || ''
     const country = searchParams.get('country') || ''
