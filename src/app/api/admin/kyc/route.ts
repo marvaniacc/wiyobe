@@ -1,85 +1,67 @@
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { json, error, handleError, parseBody } from '@/lib/api'
-import { z } from 'zod'
+import { json, error, handleError } from '@/lib/api'
 
 export const dynamic = 'force-dynamic'
 
-// Admin: list all KYC documents
+/**
+ * GET /api/admin/kyc
+ *
+ * Admin only. Returns providers (DOCTOR, HOSPITAL, HOTEL, TRANSLATOR) who
+ * have kycStatus !== 'APPROVED' OR who have KycDocuments with
+ * reviewStatus = 'PENDING'. Each provider includes their KYC documents
+ * (with requirement info) and the requirements for their provider type.
+ */
 export async function GET() {
   try {
     const session = await getSession()
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
-    const docs = await db.kycDocument.findMany({
-      include: { user: { select: { id: true, name: true, email: true, doctor: { select: { specialty: true } } } } },
+
+    const providerRoles = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']
+
+    // Find providers who are not yet approved OR have pending documents
+    const providers = await db.user.findMany({
+      where: {
+        role: { in: providerRoles },
+        OR: [
+          { kycStatus: { not: 'APPROVED' } },
+          {
+            kycDocuments: {
+              some: { reviewStatus: 'PENDING' },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        kycStatus: true,
+        createdAt: true,
+        kycDocuments: {
+          orderBy: { uploadedAt: 'desc' },
+          include: {
+            requirement: {
+              select: { id: true, documentName: true, isRequired: true, order: true },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     })
-    return json({ documents: docs })
-  } catch (e) { return handleError(e) }
-}
 
-const reviewSchema = z.object({
-  documentId: z.string(),
-  action: z.enum(['approve', 'reject']),
-  adminNote: z.string().optional(),
-})
+    // For each provider, also fetch the requirements for their type
+    const result = await Promise.all(
+      providers.map(async (p) => {
+        const requirements = await db.kycRequirement.findMany({
+          where: { providerType: p.role },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        })
+        return { ...p, requirements }
+      })
+    )
 
-// Admin: approve or reject KYC document
-export async function POST(req: Request) {
-  try {
-    const session = await getSession()
-    if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
-    const body = await parseBody(req, reviewSchema)
-
-    const doc = await db.kycDocument.findUnique({ where: { id: body.documentId } })
-    if (!doc) return error(404, 'Document not found')
-
-    await db.kycDocument.update({
-      where: { id: body.documentId },
-      data: {
-        status: body.action === 'approve' ? 'APPROVED' : 'REJECTED',
-        adminNote: body.adminNote || null,
-        reviewedById: session.id,
-        reviewedAt: new Date(),
-      },
-    })
-
-    // If approved, mark doctor as verified
-    if (body.action === 'approve') {
-      const user = await db.user.findUnique({ where: { id: doc.userId }, include: { doctor: true } })
-      if (user?.doctor) {
-        // Check if all required docs are approved
-        const allDocs = await db.kycDocument.findMany({ where: { userId: doc.userId } })
-        const requiredTypes = ['medical_license', 'id_card']
-        const allApproved = requiredTypes.every(t => allDocs.some(d => d.docType === t && d.status === 'APPROVED'))
-        if (allApproved) {
-          await db.doctor.update({ where: { id: user.doctor.id }, data: { verified: true } })
-          await db.user.update({ where: { id: user.id }, data: { status: 'ACTIVE' } })
-        }
-      }
-    }
-
-    // Notify doctor (in-app + email)
-    await db.notification.create({
-      data: {
-        userId: doc.userId,
-        type: 'system',
-        title: body.action === 'approve' ? 'KYC document approved' : 'KYC document rejected',
-        body: body.action === 'approve'
-          ? `Your ${doc.docType.replace(/_/g, ' ')} has been approved.`
-          : `Your ${doc.docType.replace(/_/g, ' ')} was rejected. ${body.adminNote || 'Please resubmit.'}`,
-        link: 'kyc',
-      },
-    })
-
-    // Send email
-    const { sendEmail, kycStatusEmail } = await import('@/lib/email')
-    const doctorUser = await db.user.findUnique({ where: { id: doc.userId }, select: { name: true, email: true } })
-    if (doctorUser?.email) {
-      const tpl = kycStatusEmail(doctorUser.name || 'Doctor', doc.docType, body.action === 'approve', body.adminNote)
-      await sendEmail({ to: doctorUser.email, subject: tpl.subject, html: tpl.html })
-    }
-
-    return json({ ok: true })
+    return json({ providers: result })
   } catch (e) { return handleError(e) }
 }
