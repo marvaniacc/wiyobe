@@ -30,6 +30,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'itineraries', labelKey: 'dash.itineraries', icon: 'luggage' },
     { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'documents', labelKey: 'dash.documents', icon: 'folder_shared' },
+    { key: 'recycle-bin', labelKey: 'admin.recycleBin', icon: 'delete_sweep' },
     { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
     { key: 'reviews', labelKey: 'dash.reviews', icon: 'reviews' },
     { key: 'tickets', labelKey: 'dash.tickets', icon: 'support_agent' },

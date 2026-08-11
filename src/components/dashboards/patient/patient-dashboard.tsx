@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Icon } from '@/components/shared/icon'
 import { StarRating } from '@/components/shared/star-rating'
 import { useT } from '@/hooks/use-t'
-import { useApi, apiPost, apiPut, apiDelete } from '@/hooks/use-api'
+import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -3414,6 +3414,166 @@ function UploadDialog({ open, onOpenChange, onUploaded }: {
 }
 
 /* =========================================================================
+ * Section: Recycle Bin — patient's soft-deleted medical documents
+ * ======================================================================= */
+
+function PatientRecycleBinSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ documents: any[] }>('/api/medical-records/recycle-bin')
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const documents = data?.documents || []
+
+  async function handleRestore(id: string) {
+    try {
+      await apiPatch('/api/medical-records/recycle-bin', { id })
+      toast.success(t('common.restore', 'Restored'))
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (!confirmDelete) return
+    setDeleting(true)
+    try {
+      await apiDelete(`/api/medical-records/recycle-bin?id=${confirmDelete.id}`)
+      toast.success(t('common.deletePermanently', 'Permanently deleted'))
+      setConfirmDelete(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('common.error'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5">
+        <SectionHeader title={t('admin.recycleBin', 'Recycle Bin')} />
+        <Card><CardContent className="p-6"><Skeleton className="h-32 w-full" /></CardContent></Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col gap-5">
+        <SectionHeader title={t('admin.recycleBin', 'Recycle Bin')} />
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{error}</CardContent></Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionHeader
+        title={t('admin.recycleBin', 'Recycle Bin')}
+        subtitle={t('recycleBin.desc', 'Restore or permanently delete items. Items are automatically purged after 30 days.')}
+      />
+
+      {/* Warning banner */}
+      <div className="flex items-start gap-2 rounded-[12px] border border-warning/20 bg-warning/5 p-3.5">
+        <Icon name="warning" size={16} className="mt-0.5 shrink-0 text-warning" />
+        <p className="text-xs text-muted-foreground">
+          {t('recycleBin.warning', 'Items in the recycle bin are automatically permanently deleted after 30 days. Permanent deletion cannot be undone.')}
+        </p>
+      </div>
+
+      {documents.length === 0 ? (
+        <EmptyState
+          icon="delete_sweep"
+          title={t('recycleBin.empty', 'Recycle bin is empty')}
+          description={t('recycleBin.emptyDesc', 'Deleted items will appear here for 30 days.')}
+        />
+      ) : (
+        <div className="space-y-3">
+          {documents.map((doc) => {
+            const cfg = DOC_CATEGORY_CONFIG[doc.category] || DOC_CATEGORY_CONFIG.other
+            return (
+              <Card key={doc.id} className="gap-0">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px]', cfg.cls)}>
+                      <Icon name={cfg.icon} size={20} fill />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{doc.fileName}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>{formatFileSize(doc.fileSize)}</span>
+                        <span>·</span>
+                        <span>{t(cfg.key)}</span>
+                        <span>·</span>
+                        <span className="flex items-center gap-0.5">
+                          <Icon name="delete" size={12} />
+                          {relativeTime(doc.deletedAt, locale)}
+                        </span>
+                      </div>
+                      {doc.accessGrants && doc.accessGrants.length > 0 && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          <Icon name="share" size={10} className="me-0.5 inline" />
+                          {doc.accessGrants.length} doctor(s) had access
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRestore(doc.id)}
+                        className="gap-1.5"
+                      >
+                        <Icon name="restore" size={14} />
+                        <span className="hidden sm:inline">{t('common.restore', 'Restore')}</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete({ id: doc.id, name: doc.fileName })}
+                        className="text-error hover:bg-error/5"
+                        title={t('common.deletePermanently', 'Delete Permanently')}
+                      >
+                        <Icon name="delete_forever" size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Permanent delete confirmation */}
+      <Dialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="warning" size={20} className="text-error" />
+              {t('common.deletePermanently', 'Delete Permanently')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('recycleBin.permanentConfirm', 'Are you sure you want to permanently delete')} <span className="font-semibold text-foreground">{confirmDelete?.name}</span>?
+              {t('recycleBin.permanentWarning', ' This action cannot be undone.')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handlePermanentDelete} disabled={deleting} className="gap-1.5">
+              {deleting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="delete_forever" size={16} />}
+              {t('common.deletePermanently', 'Delete Permanently')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+/* =========================================================================
  * Main component
  * ======================================================================= */
 
@@ -3427,6 +3587,7 @@ export function PatientDashboard({ section }: { section: string }) {
     case 'itineraries': return <ItinerariesSection />
     case 'messages': return <MessagesSection />
     case 'documents': return <DocumentsSection />
+    case 'recycle-bin': return <PatientRecycleBinSection />
     case 'disputes': return <PatientDisputesSection />
     case 'reviews': return <ReviewsSection />
     case 'tickets': return <TicketsSection />
