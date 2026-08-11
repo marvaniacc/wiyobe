@@ -107,6 +107,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'tickets', labelKey: 'admin.tickets', icon: 'support_agent' },
     { key: 'settings', labelKey: 'dash.settings', icon: 'settings' },
     { key: 'recycle-bin', labelKey: 'admin.recycleBin', icon: 'delete_sweep' },
+    { key: 'broadcast', labelKey: 'admin.broadcast', icon: 'campaign' },
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
   ],
   AFFILIATE: [

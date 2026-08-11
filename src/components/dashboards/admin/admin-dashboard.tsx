@@ -3326,6 +3326,132 @@ function RecycleBinSection() {
 }
 
 // ============================================================================
+// Section: Broadcast — send notifications to specific roles
+// ============================================================================
+
+function BroadcastSection() {
+  const { t } = useT()
+  const [title, setTitle] = React.useState('')
+  const [message, setMessage] = React.useState('')
+  const [category, setCategory] = React.useState('ANNOUNCEMENT')
+  const [targetRole, setTargetRole] = React.useState('ALL')
+  const [sending, setSending] = React.useState(false)
+  const [result, setResult] = React.useState<{ recipientCount: number } | null>(null)
+
+  async function handleSend() {
+    if (!title.trim() || !message.trim()) return
+    setSending(true)
+    setResult(null)
+    try {
+      const res = await apiPost<{ ok: boolean; recipientCount: number }>('/api/admin/notifications/broadcast', {
+        title: title.trim(),
+        message: message.trim(),
+        category,
+        targetRole,
+      })
+      setResult({ recipientCount: res.recipientCount })
+      toast.success(t('admin.sentSuccessfully', 'Notification sent successfully') + ` (${res.recipientCount} recipients)`)
+      setTitle('')
+      setMessage('')
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={t('admin.broadcast', 'Send Notification')}
+        description={t('admin.broadcastDesc', 'Broadcast a notification to specific user roles or all users')}
+        icon="campaign"
+      />
+
+      <Card className="mt-6">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            {/* Title */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.title', 'Title')}</Label>
+              <Input
+                placeholder={t('admin.broadcastTitlePlaceholder', 'e.g. Scheduled Maintenance Notice')}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={200}
+              />
+            </div>
+
+            {/* Message */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.message', 'Message')}</Label>
+              <Textarea
+                placeholder={t('admin.broadcastMsgPlaceholder', 'Write your notification message here…')}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={4}
+                maxLength={2000}
+              />
+              <p className="text-[11px] text-muted-foreground">{message.length}/2000</p>
+            </div>
+
+            {/* Category + Target Role */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">{t('admin.category', 'Category')}</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ANNOUNCEMENT">{t('notifications.cat.announcement', 'Announcement')}</SelectItem>
+                    <SelectItem value="SYSTEM">{t('notifications.cat.system', 'System')}</SelectItem>
+                    <SelectItem value="BOOKING">{t('notifications.cat.booking', 'Booking')}</SelectItem>
+                    <SelectItem value="PROMO">{t('notifications.cat.promo', 'Promo')}</SelectItem>
+                    <SelectItem value="MEDICAL">{t('notifications.cat.medical', 'Medical')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">{t('admin.targetRole', 'Target Role')}</Label>
+                <Select value={targetRole} onValueChange={setTargetRole}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{t('role.all', 'All Users')}</SelectItem>
+                    <SelectItem value="PATIENT">{t('role.patient', 'Patients')}</SelectItem>
+                    <SelectItem value="DOCTOR">{t('role.doctor', 'Doctors')}</SelectItem>
+                    <SelectItem value="HOSPITAL">{t('role.hospital', 'Hospitals')}</SelectItem>
+                    <SelectItem value="HOTEL">{t('role.hotel', 'Hotels')}</SelectItem>
+                    <SelectItem value="TRANSLATOR">{t('role.translator', 'Translators')}</SelectItem>
+                    <SelectItem value="AFFILIATE">{t('role.affiliate', 'Affiliates')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Send button */}
+            <div className="flex items-center justify-between gap-3 pt-2">
+              {result && (
+                <p className="flex items-center gap-1.5 text-sm text-success">
+                  <Icon name="check_circle" size={16} fill />
+                  {t('admin.sentSuccessfully', 'Sent successfully')} · {result.recipientCount} recipients
+                </p>
+              )}
+              <Button
+                onClick={handleSend}
+                disabled={!title.trim() || !message.trim() || sending}
+                className="ms-auto gap-1.5"
+              >
+                {sending ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="send" size={16} />}
+                {t('admin.send', 'Send')}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -3353,6 +3479,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'tickets': return <AdminTicketsSection />
     case 'settings': return <AdminSettingsSection />
     case 'recycle-bin': return <RecycleBinSection />
+    case 'broadcast': return <BroadcastSection />
     case 'profile': return <AdminProfileSection />
     default: return <OverviewSection />
   }
