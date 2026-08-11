@@ -1363,3 +1363,37 @@ Stage Summary:
 - 30-day auto-purge: the recycle bin GET filters to items with deletedAt >= 30 days ago. (A cron job to actually purge old items can be added in a future phase.)
 - Public SSR routes filter deletedAt so soft-deleted blog posts and custom pages return 404.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 15.2
+Agent: main (Lead Architect)
+Task: Phase 15.2 — Patient Recycle Bin. Patients can view, restore, and permanently delete their soft-deleted medical documents.
+
+Work Log:
+- Step 1 (API): Created `src/app/api/medical-records/recycle-bin/route.ts` — patient-only endpoints:
+  - GET: returns the caller's soft-deleted MedicalDocuments (deletedAt NOT null, patientId === session.id, within 30 days). Strict authorization — patients cannot see other patients' items.
+  - PATCH: restores a document (sets deletedAt: null). Verifies ownership (patientId === session.id) before restoring.
+  - DELETE: permanently deletes a document (db.medicalDocument.delete). Access grants cascade via onDelete: Cascade. Verifies ownership before deletion.
+  Commit: `ba835e3`.
+- Step 2 (UI): Added `PatientRecycleBinSection` to `src/components/dashboards/patient/patient-dashboard.tsx`:
+  - Fetches from `/api/medical-records/recycle-bin`
+  - Displays deleted documents as cards with file icon, name, size, category, deleted time, and access-grant count
+  - Restore and Delete Permanently buttons per item
+  - Warning banner about 30-day auto-purge
+  - Empty state ("Recycle bin is empty")
+  - Permanent-delete confirmation dialog
+  - Added "Recycle Bin" nav item (`delete_sweep` icon) to the patient nav
+  - Added `apiPatch` to imports
+  Commit: `b4f8b59`.
+- Step 3 (i18n): All needed keys (`admin.recycleBin`, `common.restore`, `common.deletePermanently`, `recycleBin.*`) were already added in Phase 15.1 Step 5. Verified all 10 keys exist × 4 locales. No new keys needed.
+- Verification (curl + agent-browser):
+  - curl: Restored a soft-deleted document via PATCH → document reappeared in medical records list → recycle bin empty. All endpoints returned {ok: true}.
+  - agent-browser (patient): Documents section showed blood_test_result.png → clicked Delete → confirmed → document disappeared from Documents → navigated to Recycle Bin → document appeared with Restore/Delete buttons → clicked Restore → recycle bin empty → document back in Documents. No errors.
+  - Lint: 0 errors.
+
+Stage Summary:
+- 2 commits pushed to origin/main: ba835e3 (API), b4f8b59 (UI).
+- Strict authorization: patients can only see/restore/delete their own documents. Ownership verified in every endpoint.
+- Permanent deletion frees DB space (the base64 dataUrl is in the same row, so deleting the row removes the data).
+- 30-day auto-purge: the GET filters to items with deletedAt >= 30 days ago.
+- Lint: 0 errors. Dev server running cleanly.
