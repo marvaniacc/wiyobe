@@ -1,14 +1,16 @@
-import { redirect } from 'next/navigation'
+import { DefaultLanding } from '@/components/landing/default-landing'
+
+export const dynamic = 'force-dynamic'
 
 /**
- * Root page — redirects to the SPA dashboard.
+ * Root page — renders the SPA directly (no redirect).
  *
- * The public SSR pages now live under /{locale}/... (see src/app/[locale]/).
- * The interactive SPA shell (auth, dashboard, landing) lives at /dashboard.
+ * The IDE Preview panel loads `/` in an iframe. HTTP redirects (307) break
+ * iframe rendering in some environments, so we render the DefaultLanding
+ * client component directly here instead of redirecting to /dashboard.
  *
- * Hitting the bare `/` path redirects to /dashboard so existing bookmarks
- * and links keep working.
+ * The public SSR pages live under /{locale}/... (see src/app/[locale]/).
  */
 export default function RootPage() {
-  redirect('/dashboard')
+  return <DefaultLanding />
 }
