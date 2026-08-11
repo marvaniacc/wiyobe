@@ -1339,3 +1339,27 @@ Stage Summary:
 - Public SSR routes (blog list, blog detail, custom page, homepage override) all exclude soft-deleted records so they 404 (or fall back to default landing for homepage) rather than leaking content.
 - PATCH endpoints (blog, pages, medical-records) were intentionally left unchanged per the task spec — they do not yet filter `deletedAt: null`. This means a soft-deleted record could technically still be PATCHed; if this becomes a concern, the findUnique existence check in those PATCH handlers can be tightened in a follow-up.
 - Lint: 0 errors. TypeScript: 0 errors in modified files.
+
+---
+Task ID: 15.1
+Agent: main (Lead Architect)
+Task: Phase 15.1 — Soft Delete & Recycle Bin. Items are soft-deleted (deletedAt timestamp) instead of permanently removed. Available in a Recycle Bin for 30 days with restore/permanent-delete.
+
+Work Log:
+- Step 1 (schema): Added `deletedAt DateTime?` to BlogPost, CustomPage, MediaAsset, MedicalDocument. Added `@@index([deletedAt])` to BlogPost, CustomPage, MediaAsset for fast recycle-bin queries. Pushed via `bun run db:push`. Commit: `bbc7afe`.
+- Step 2 (API updates): Updated 13 files to filter `deletedAt: null` in all GET queries and change DELETE from hard-delete to soft-delete (`update({ data: { deletedAt: new Date() } })`). Files: admin/blog (route + [id]), admin/pages (route + [id]), media (route + [id]), medical-records (route + [id]), documents (route), public SSR (blog/page, blog/[slug], [slug], page). For media soft-delete, the file stays on disk (removed only on permanent delete from recycle bin). Commit: `8b136c1`.
+- Step 3 (recycle bin API): Created `src/app/api/admin/recycle-bin/route.ts` — GET returns all soft-deleted items (deletedAt NOT null, within 30 days) grouped by model type (blogPosts, customPages, mediaAssets, medicalDocuments). PATCH restores an item (sets deletedAt: null). DELETE permanently deletes (db.model.delete) — for MediaAssets also removes the file from disk via unlink. All endpoints ADMIN-only. Commit: `cf14226`.
+- Step 4 (recycle bin UI): Added `RecycleBinSection` to admin-dashboard.tsx — fetches from /api/admin/recycle-bin, displays items grouped by type (Blog Posts, Custom Pages, Media Assets, Medical Documents) in separate tables with Name, Deleted (relative time), and Restore/Delete-Permanently actions. Warning banner about 30-day auto-purge. Empty state. Permanent-delete confirmation dialog. Added "Recycle Bin" nav item (`delete_sweep` icon). Commit: `24dc314`.
+- Step 5 (i18n): Added 10 keys × 4 locales (en, tr, fa, ar): `admin.recycleBin`, `common.restore`, `common.deletePermanently`, `common.deletedAt`, `recycleBin.desc`, `recycleBin.empty`, `recycleBin.emptyDesc`, `recycleBin.warning`, `recycleBin.permanentConfirm`, `recycleBin.permanentWarning`. Commit: `47c152c`.
+- Verification (curl + agent-browser):
+  - curl: Soft-deleted a blog post → disappeared from blog list → appeared in recycle bin with deletedAt → restored → back in blog list. All endpoints returned {ok: true}.
+  - agent-browser: Deleted "Medical Tourism Tips" from Blog Posts → post disappeared from list → navigated to Recycle Bin → post appeared in "Blog Posts (1)" group with Restore/Delete buttons → clicked Restore → recycle bin empty → post back in Blog Posts list. No errors.
+  - Lint: 0 errors. Dev server running cleanly.
+
+Stage Summary:
+- 5 commits pushed to origin/main: bbc7afe (schema), 8b136c1 (API updates), cf14226 (recycle bin API), 24dc314 (recycle bin UI), 47c152c (i18n).
+- No Prisma middleware — `where: { deletedAt: null }` applied explicitly to all queries.
+- Media files stay on disk during soft delete (for restore); removed only on permanent delete from recycle bin.
+- 30-day auto-purge: the recycle bin GET filters to items with deletedAt >= 30 days ago. (A cron job to actually purge old items can be added in a future phase.)
+- Public SSR routes filter deletedAt so soft-deleted blog posts and custom pages return 404.
+- Lint: 0 errors. Dev server running cleanly.
