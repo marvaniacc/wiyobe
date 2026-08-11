@@ -3736,6 +3736,311 @@ function KycRequirementDialog({ open, requirement, providerType, onOpenChange, o
 }
 
 // ============================================================================
+// Section: KYC Review — review provider document submissions
+// ============================================================================
+
+type KycReviewProvider = {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  kycStatus: string
+  createdAt: string
+  kycDocuments: any[]
+  requirements: any[]
+}
+
+function KycReviewSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ providers: KycReviewProvider[] }>('/api/admin/kyc')
+  const [selectedProvider, setSelectedProvider] = React.useState<KycReviewProvider | null>(null)
+  const [rejectTarget, setRejectTarget] = React.useState<{ docId: string; docName: string } | null>(null)
+  const [rejectReason, setRejectReason] = React.useState('')
+  const [rejecting, setRejecting] = React.useState(false)
+  const [approvingUser, setApprovingUser] = React.useState(false)
+
+  const providers = data?.providers || []
+
+  async function handleApproveDoc(docId: string) {
+    try {
+      await apiPatch(`/api/admin/kyc/${docId}`, { status: 'APPROVED' })
+      toast.success(t('admin.approveDocument', 'Document approved'))
+      refetch()
+      // Refresh the selected provider's data
+      if (selectedProvider) {
+        const res = await fetch('/api/admin/kyc')
+        const d = await res.json()
+        const updated = (d.providers || []).find((p: any) => p.id === selectedProvider.id)
+        if (updated) setSelectedProvider(updated)
+      }
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    }
+  }
+
+  async function handleRejectDoc() {
+    if (!rejectTarget || !rejectReason.trim()) return
+    setRejecting(true)
+    try {
+      await apiPatch(`/api/admin/kyc/${rejectTarget.docId}`, {
+        status: 'REJECTED',
+        rejectionReason: rejectReason.trim(),
+      })
+      toast.success(t('admin.rejectDocument', 'Document rejected'))
+      setRejectTarget(null)
+      setRejectReason('')
+      refetch()
+      if (selectedProvider) {
+        const res = await fetch('/api/admin/kyc')
+        const d = await res.json()
+        const updated = (d.providers || []).find((p: any) => p.id === selectedProvider.id)
+        if (updated) setSelectedProvider(updated)
+      }
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setRejecting(false)
+    }
+  }
+
+  async function handleApproveUser(userId: string) {
+    setApprovingUser(true)
+    try {
+      await apiPost('/api/admin/kyc/approve-user', { userId })
+      toast.success(t('admin.allDocumentsApproved', 'Provider KYC approved — dashboard unlocked'))
+      setSelectedProvider(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setApprovingUser(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title={t('admin.kycReview', 'KYC Review')} icon="verified_user" />
+        <LoadingCard lines={4} />
+      </div>
+    )
+  }
+  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={t('admin.kycReview', 'KYC Review')}
+        description={t('admin.kycReviewDesc', 'Review and approve provider document submissions')}
+        icon="verified_user"
+      />
+
+      {providers.length === 0 ? (
+        <Card className="mt-6">
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <Icon name="verified_user" size={32} className="text-muted-foreground/50" />
+            <p className="text-sm font-medium text-foreground">{t('admin.kycNoPending', 'No pending KYC reviews')}</p>
+            <p className="text-xs text-muted-foreground">{t('admin.kycNoPendingDesc', 'All providers are verified or have no pending submissions.')}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="mt-6 space-y-3">
+          {providers.map((p) => {
+            const pendingDocs = p.kycDocuments.filter((d: any) => d.reviewStatus === 'PENDING').length
+            const approvedDocs = p.kycDocuments.filter((d: any) => d.reviewStatus === 'APPROVED').length
+            const totalRequired = p.requirements.filter((r: any) => r.isRequired).length
+            const allApproved = totalRequired > 0 && p.kycDocuments.filter((d: any) => d.reviewStatus === 'APPROVED' && d.requirement?.isRequired).length >= totalRequired
+
+            return (
+              <Card key={p.id} className="gap-0 transition-all hover:shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+                      <Icon name={p.role === 'DOCTOR' ? 'medical_services' : p.role === 'HOSPITAL' ? 'local_hospital' : p.role === 'HOTEL' ? 'hotel' : 'translate'} size={20} fill />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">{p.name || p.email}</p>
+                          <p className="text-xs text-muted-foreground">{t(`role.${p.role.toLowerCase()}`)} · {relativeTime(p.createdAt, locale)}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'rounded-full border',
+                              p.kycStatus === 'APPROVED' ? 'border-success/20 bg-success/10 text-success'
+                              : p.kycStatus === 'IN_REVIEW' ? 'border-warning/20 bg-warning/10 text-warning'
+                              : 'border-divider text-muted-foreground'
+                            )}
+                          >
+                            {p.kycStatus}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Icon name="description" size={12} />{p.kycDocuments.length} docs</span>
+                        {pendingDocs > 0 && <span className="flex items-center gap-1 text-warning"><Icon name="hourglass_top" size={12} />{pendingDocs} pending</span>}
+                        <span className="flex items-center gap-1 text-success"><Icon name="check_circle" size={12} />{approvedDocs} approved</span>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setSelectedProvider(p)} className="shrink-0 gap-1.5">
+                      <Icon name="visibility" size={14} />
+                      {t('admin.reviewDocument', 'Review')}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Provider detail dialog */}
+      <Dialog open={!!selectedProvider} onOpenChange={(o) => !o && setSelectedProvider(null)}>
+        <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="verified_user" size={20} className="text-primary" />
+              {selectedProvider?.name || selectedProvider?.email}
+            </DialogTitle>
+            <DialogDescription>{t('admin.kycReviewDesc', 'Review and approve provider document submissions')}</DialogDescription>
+          </DialogHeader>
+
+          {selectedProvider && (
+            <div className="space-y-4 py-2">
+              {selectedProvider.requirements.map((req: any) => {
+                const doc = selectedProvider.kycDocuments.find((d: any) => d.requirementId === req.id)
+                const status = doc?.reviewStatus || 'not_uploaded'
+                return (
+                  <div key={req.id} className="rounded-[14px] border border-divider p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground">{req.order}. {req.documentName}</p>
+                        {req.description && <p className="mt-0.5 text-xs text-muted-foreground">{req.description}</p>}
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'shrink-0 rounded-full border',
+                          status === 'APPROVED' ? 'border-success/20 bg-success/10 text-success'
+                          : status === 'PENDING' ? 'border-warning/20 bg-warning/10 text-warning'
+                          : status === 'REJECTED' ? 'border-error/20 bg-error/10 text-error'
+                          : 'border-divider text-muted-foreground'
+                        )}
+                      >
+                        {status === 'not_uploaded' ? 'Not Uploaded' : status}
+                      </Badge>
+                    </div>
+
+                    {/* Document details */}
+                    {doc && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Icon name="description" size={12} />
+                          <span>{doc.fileName}</span>
+                          <span>·</span>
+                          <span>{formatDate(doc.uploadedAt, locale)}</span>
+                        </div>
+
+                        {/* Preview */}
+                        {doc.fileType?.startsWith('image/') && doc.dataUrl?.startsWith('/uploads/') && (
+                          <div className="overflow-hidden rounded-[10px] border border-divider">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={doc.dataUrl} alt={doc.fileName} className="max-h-48 w-full object-contain bg-surface-secondary" />
+                          </div>
+                        )}
+
+                        {/* Rejection reason */}
+                        {status === 'REJECTED' && doc.rejectionReason && (
+                          <div className="rounded-[8px] border-s-2 border-error bg-error/5 p-2">
+                            <p className="text-xs text-error">{doc.rejectionReason}</p>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        {status === 'PENDING' && (
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleApproveDoc(doc.id)} className="gap-1.5 text-success hover:bg-success/5">
+                              <Icon name="check_circle" size={14} />
+                              {t('admin.approveDocument', 'Approve')}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setRejectTarget({ docId: doc.id, docName: req.documentName })} className="gap-1.5 text-error hover:bg-error/5">
+                              <Icon name="cancel" size={14} />
+                              {t('admin.rejectDocument', 'Reject')}
+                            </Button>
+                          </div>
+                        )}
+                        {status === 'REJECTED' && (
+                          <Button size="sm" variant="outline" onClick={() => handleApproveDoc(doc.id)} className="gap-1.5 text-success hover:bg-success/5">
+                            <Icon name="undo" size={14} />
+                            {t('admin.approveDocument', 'Approve')}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Approve user button */}
+              <div className="border-t border-divider pt-4">
+                <Button
+                  onClick={() => handleApproveUser(selectedProvider.id)}
+                  disabled={approvingUser || !selectedProvider.requirements.every((r: any) => {
+                    if (!r.isRequired) return true
+                    const doc = selectedProvider.kycDocuments.find((d: any) => d.requirementId === r.id)
+                    return doc?.reviewStatus === 'APPROVED'
+                  })}
+                  className="w-full gap-2"
+                >
+                  {approvingUser ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="verified_user" size={16} />}
+                  {t('admin.approveUser', 'Approve Provider')}
+                </Button>
+                <p className="mt-1.5 text-center text-xs text-muted-foreground">
+                  {t('admin.approveUserHint', 'All required documents must be approved first')}
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject dialog */}
+      <Dialog open={!!rejectTarget} onOpenChange={(o) => { if (!o) { setRejectTarget(null); setRejectReason('') } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="cancel" size={20} className="text-error" />
+              {t('admin.rejectDocument', 'Reject Document')}
+            </DialogTitle>
+            <DialogDescription>{rejectTarget?.docName}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">{t('admin.rejectReason', 'Rejection Reason')}</Label>
+            <Textarea
+              placeholder={t('admin.rejectReasonPlaceholder', 'Explain why this document is being rejected…')}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              maxLength={500}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRejectTarget(null); setRejectReason('') }}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handleRejectDoc} disabled={!rejectReason.trim() || rejecting} className="gap-1.5">
+              {rejecting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="cancel" size={16} />}
+              {t('admin.rejectDocument', 'Reject')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -3765,6 +4070,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'recycle-bin': return <RecycleBinSection />
     case 'broadcast': return <BroadcastSection />
     case 'kyc-requirements': return <KycRequirementsSection />
+    case 'kyc-review': return <KycReviewSection />
     case 'profile': return <AdminProfileSection />
     default: return <OverviewSection />
   }

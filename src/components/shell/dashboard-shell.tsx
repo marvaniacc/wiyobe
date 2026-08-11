@@ -109,6 +109,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'recycle-bin', labelKey: 'admin.recycleBin', icon: 'delete_sweep' },
     { key: 'broadcast', labelKey: 'admin.broadcast', icon: 'campaign' },
     { key: 'kyc-requirements', labelKey: 'admin.kycRequirements', icon: 'verified_user' },
+    { key: 'kyc-review', labelKey: 'admin.kycReview', icon: 'fact_check' },
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
   ],
   AFFILIATE: [
