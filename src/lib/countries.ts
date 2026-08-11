@@ -98,3 +98,64 @@ export const COUNTRIES = [
   { code: 'MD', name: 'Moldova', flag: '🇲🇩' },
   { code: 'OTHER', name: 'Other', flag: '🌍' },
 ]
+
+// ============================================================================
+// Country slug ↔ code mapping for SEO-friendly URLs
+// ============================================================================
+
+/** Convert a country name to a URL-friendly slug (e.g., "United Arab Emirates" → "uae"). */
+export function countryNameToSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/** Map of country slug → ISO code, built from the COUNTRIES array. */
+const COUNTRY_SLUG_MAP: Record<string, string> = COUNTRIES.reduce((map, c) => {
+  map[countryNameToSlug(c.name)] = c.code
+  return map
+}, {} as Record<string, string>)
+
+/** Reverse map: ISO code → country slug. */
+const COUNTRY_CODE_TO_SLUG: Record<string, string> = COUNTRIES.reduce((map, c) => {
+  map[c.code] = countryNameToSlug(c.name)
+  return map
+}, {} as Record<string, string>)
+
+/**
+ * Convert a URL country slug to an ISO country code.
+ * Returns null if the slug doesn't match any known country.
+ */
+export function getCountryCode(slug: string): string | null {
+  return COUNTRY_SLUG_MAP[slug.toLowerCase()] || null
+}
+
+/**
+ * Convert an ISO country code to a URL-friendly slug.
+ * Returns null if the code is unknown.
+ */
+export function getCountrySlug(code: string): string | null {
+  return COUNTRY_CODE_TO_SLUG[code.toUpperCase()] || null
+}
+
+/**
+ * Get the country name from a URL slug.
+ */
+export function getCountryName(slug: string): string | null {
+  const code = getCountryCode(slug)
+  if (!code) return null
+  return COUNTRIES.find((c) => c.code === code)?.name || null
+}
+
+/**
+ * Get the country flag emoji from a URL slug or ISO code.
+ */
+export function getCountryFlag(slugOrCode: string): string {
+  const code = slugOrCode.length === 2 ? slugOrCode.toUpperCase() : getCountryCode(slugOrCode)
+  if (!code) return '🌍'
+  return COUNTRIES.find((c) => c.code === code)?.flag || '🌍'
+}
