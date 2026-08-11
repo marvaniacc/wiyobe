@@ -10,9 +10,10 @@ const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar']
 /**
  * /{locale} — locale-prefixed landing page.
  *
- * If a CustomPage with slug "home" exists and is published, render its
- * htmlContent (admin-trusted raw HTML/CSS). Otherwise, render a simple
- * landing page with a link to the dashboard.
+ * 1. If a CustomPage with slug "home" exists and is published, render its
+ *    htmlContent (admin-trusted raw HTML/CSS). The TriageBot FAB is also
+ *    rendered on top.
+ * 2. Otherwise, render a default simple landing page.
  */
 export default async function LocaleHomePage({
   params,
@@ -30,7 +31,10 @@ export default async function LocaleHomePage({
 
   if (homePage?.isPublished && homePage.htmlContent) {
     return (
-      <div dangerouslySetInnerHTML={{ __html: homePage.htmlContent }} />
+      <>
+        <div dangerouslySetInnerHTML={{ __html: homePage.htmlContent }} />
+        <TriageBot />
+      </>
     )
   }
 
