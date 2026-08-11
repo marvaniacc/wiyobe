@@ -1423,3 +1423,26 @@ Stage Summary:
 - Backward compatible: legacy `notify()` still works, old `type`/`read`/`meta` fields preserved.
 - Category-based icons and colors in the notification bell.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 16.1
+Agent: main (Lead Architect)
+Task: Phase 16.1 — Advanced KYC Workflow (Schema + Admin Requirements Management). Define what documents each provider type must submit.
+
+Work Log:
+- Step 1 (schema): Added `KycRequirement` model (providerType, documentName, description, isRequired, order, timestamps). Upgraded `KycDocument` model: added `requirementId` (FK to KycRequirement, optional for backward compat), `requirement` relation, `documentName` (copied from requirement at upload time), `reviewStatus String @default("PENDING")`, `rejectionReason`, `uploadedAt`. Kept legacy `docType`, `status`, `adminNote` fields for backward compat. Added `kycStatus String @default("PENDING")` to `User` model (PENDING/IN_REVIEW/APPROVED/REJECTED). Added `@@index([userId])` and `@@index([requirementId])` to KycDocument, `@@index([providerType])` to KycRequirement. Commit: `02c3737`.
+- Step 2 (API): Created `src/app/api/admin/kyc-requirements/route.ts` (GET with ?providerType filter, POST create) and `src/app/api/admin/kyc-requirements/[id]/route.ts` (PATCH update, DELETE with unlink of referenced documents). All admin-only. Commit: `3a3bf7e`.
+- Step 3 (UI): Added `KycRequirementsSection` + `KycRequirementDialog` to admin-dashboard.tsx. Provider type tabs (Doctor, Hospital, Hotel, Translator). Table view with #, Document Name, Description, Required badge, Submissions count, Edit/Delete actions. Create/Edit dialog with Document Name, Description, Required toggle, Order. Delete confirmation. Added "KYC Requirements" nav item (`verified_user` icon). Commit: `5ea5a5d`.
+- Step 4 (seed): Created `scripts/seed-kyc-requirements.ts` with 9 default requirements: DOCTOR (Medical License, ID Card/Passport, Profile Photo), HOSPITAL (Hospital License, Tax Certificate), HOTEL (Business License, Tourism Certificate), TRANSLATOR (Translation Certification, No Criminal Record Certificate). Uses findOrCreate logic (idempotent — safe to run multiple times). Ran the seed: all 9 created. Ran again: all 9 skipped. Commit: `f8cef79`.
+- Step 5 (i18n): Added 17 keys × 4 locales (en, tr, fa, ar): `admin.kycRequirements`, `admin.kycRequirementsDesc`, `admin.documentName`, `admin.documentDesc`, `admin.providerType`, `admin.addRequirement`, `kyc.noRequirements`, `kyc.noRequirementsDesc`, `kyc.required`, `kyc.submissions`, `kyc.deleteConfirm`, `kyc.descPlaceholder`, `kyc.order`, `common.yes`, `common.no`, `common.saved`, `common.created`. Trimmed duplicate common.yes/common.no keys. Commit: `306faaf`.
+- Verification (curl + agent-browser):
+  - curl: GET ?providerType=DOCTOR → 3 requirements (Medical License, ID Card/Passport, Profile Photo). GET ?providerType=HOSPITAL → 2 requirements (Hospital License, Tax Certificate). All correct.
+  - agent-browser (admin): "KYC Requirements" nav present. Section shows provider type tabs (Doctor active by default). Doctor tab shows 3 seeded requirements with descriptions, Required badges, 0 submissions, edit/delete buttons. Switched to Translator tab → shows Translation Certification + No Criminal Record Certificate. No errors.
+  - Lint: 0 errors.
+
+Stage Summary:
+- 5 commits pushed to origin/main: 02c3737 (schema), 3a3bf7e (API), 5ea5a5d (UI), f8cef79 (seed), 306faaf (i18n).
+- Existing KycDocument records preserved — new fields have defaults (requirementId=null, documentName="", reviewStatus="PENDING").
+- Seed script is idempotent (findOrCreate by providerType+documentName).
+- Phase 16.2 (provider upload UI) and 16.3 (admin review flow) deferred.
+- Lint: 0 errors. Dev server running cleanly.
