@@ -53,9 +53,15 @@ const patchSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   slug: z.string().max(200).optional(),
   excerpt: z.string().max(500).optional(),
-  content: z.any().optional(),                 // TipTap JSON
+  content: z.any().optional(),
   coverImage: z.string().url().nullable().optional(),
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
+  // SEO fields
+  seoTitle: z.string().max(200).nullable().optional(),
+  seoDescription: z.string().max(500).nullable().optional(),
+  focusKeyword: z.string().max(100).nullable().optional(),
+  canonicalUrl: z.string().url().nullable().optional(),
+  noIndex: z.boolean().optional(),
 })
 
 /**
@@ -93,6 +99,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(body.content !== undefined ? { content: body.content } : {}),
         ...(body.coverImage !== undefined ? { coverImage: body.coverImage } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.seoTitle !== undefined ? { seoTitle: body.seoTitle } : {}),
+        ...(body.seoDescription !== undefined ? { seoDescription: body.seoDescription } : {}),
+        ...(body.focusKeyword !== undefined ? { focusKeyword: body.focusKeyword } : {}),
+        ...(body.canonicalUrl !== undefined ? { canonicalUrl: body.canonicalUrl } : {}),
+        ...(body.noIndex !== undefined ? { noIndex: body.noIndex } : {}),
       },
       include: { author: { select: { id: true, name: true, email: true } } },
     })

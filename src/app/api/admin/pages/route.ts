@@ -51,6 +51,9 @@ const createSchema = z.object({
   htmlContent: z.string().default(''),
   seoTitle: z.string().max(200).nullable().optional(),
   seoDescription: z.string().max(500).nullable().optional(),
+  focusKeyword: z.string().max(100).nullable().optional(),
+  canonicalUrl: z.string().url().nullable().optional(),
+  noIndex: z.boolean().default(false),
   isPublished: z.boolean().default(false),
 })
 
@@ -78,6 +81,9 @@ export async function POST(req: Request) {
         htmlContent: body.htmlContent,
         seoTitle: body.seoTitle ?? null,
         seoDescription: body.seoDescription ?? null,
+        focusKeyword: body.focusKeyword ?? null,
+        canonicalUrl: body.canonicalUrl ?? null,
+        noIndex: body.noIndex,
         isPublished: body.isPublished,
       },
     })

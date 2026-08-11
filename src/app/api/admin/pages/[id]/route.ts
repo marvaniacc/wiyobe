@@ -50,6 +50,9 @@ const patchSchema = z.object({
   htmlContent: z.string().optional(),
   seoTitle: z.string().max(200).nullable().optional(),
   seoDescription: z.string().max(500).nullable().optional(),
+  focusKeyword: z.string().max(100).nullable().optional(),
+  canonicalUrl: z.string().url().nullable().optional(),
+  noIndex: z.boolean().optional(),
   isPublished: z.boolean().optional(),
 })
 
@@ -84,6 +87,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(body.htmlContent !== undefined ? { htmlContent: body.htmlContent } : {}),
         ...(body.seoTitle !== undefined ? { seoTitle: body.seoTitle } : {}),
         ...(body.seoDescription !== undefined ? { seoDescription: body.seoDescription } : {}),
+        ...(body.focusKeyword !== undefined ? { focusKeyword: body.focusKeyword } : {}),
+        ...(body.canonicalUrl !== undefined ? { canonicalUrl: body.canonicalUrl } : {}),
+        ...(body.noIndex !== undefined ? { noIndex: body.noIndex } : {}),
         ...(body.isPublished !== undefined ? { isPublished: body.isPublished } : {}),
       },
     })

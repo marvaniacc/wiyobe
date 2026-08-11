@@ -55,11 +55,17 @@ export async function GET() {
 
 const createSchema = z.object({
   title: z.string().min(1).max(200),
-  slug: z.string().max(200).optional(),      // auto-generated from title if omitted
+  slug: z.string().max(200).optional(),
   excerpt: z.string().max(500).default(''),
-  content: z.any().default({ type: 'doc', content: [{ type: 'paragraph' }] }), // TipTap JSON
+  content: z.any().default({ type: 'doc', content: [{ type: 'paragraph' }] }),
   coverImage: z.string().url().nullable().optional(),
   status: z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
+  // SEO fields
+  seoTitle: z.string().max(200).nullable().optional(),
+  seoDescription: z.string().max(500).nullable().optional(),
+  focusKeyword: z.string().max(100).nullable().optional(),
+  canonicalUrl: z.string().url().nullable().optional(),
+  noIndex: z.boolean().default(false),
 })
 
 /**
@@ -89,6 +95,11 @@ export async function POST(req: Request) {
         coverImage: body.coverImage ?? null,
         authorId: session.id,
         status: body.status,
+        seoTitle: body.seoTitle ?? null,
+        seoDescription: body.seoDescription ?? null,
+        focusKeyword: body.focusKeyword ?? null,
+        canonicalUrl: body.canonicalUrl ?? null,
+        noIndex: body.noIndex,
       },
       include: { author: { select: { id: true, name: true, email: true } } },
     })
