@@ -1,10 +1,9 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import ZAI from 'z-ai-web-dev-sdk'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
-// Prevent client-side caching of AI responses
 export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
@@ -31,76 +30,73 @@ Rules:
 /**
  * POST /api/ai/triage
  *
- * Accepts a `symptoms` string, sends it to Google Gemini with a strict
+ * Accepts a `symptoms` string, sends it to the LLM with a strict
  * medical triage system prompt, and returns the AI's recommendation
  * (specialty, reasoning, suggested countries).
  *
- * The API key is accessed server-side only via process.env.GOOGLE_GEMINI_API_KEY.
- * It is NEVER exposed to the client.
+ * Uses z-ai-web-dev-sdk (server-side only) — no API key needed in .env
+ * as the SDK is pre-configured in this environment.
  *
  * Authorization: any authenticated user (patients primarily).
  */
 export async function POST(req: Request) {
   try {
     const session = await getSession()
-    if (!session) return error(401, 'Unauthorized')
+    // Allow both authenticated users AND anonymous visitors (the TriageBot
+    // is shown on the public landing page to help new users find the right
+    // specialist before they sign up).
 
     const { symptoms } = await parseBody(req, triageSchema)
 
-    const apiKey = process.env.GOOGLE_GEMINI_API_KEY
-    if (!apiKey) {
-      console.error('[ai/triage] GOOGLE_GEMINI_API_KEY not configured')
-      return error(503, 'AI service is not configured. Please contact support.')
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
-    })
-
     let aiResponse: string
     try {
-      const result = await model.generateContent(
-        `Patient symptoms: "${symptoms}"\n\nBased on these symptoms, suggest the appropriate medical specialty, your reasoning, and suggested countries for medical tourism. Respond in JSON format only.`
-      )
-      aiResponse = result.response.text()
-    } catch (geminiErr: any) {
-      console.error('[ai/triage] Gemini API error:', geminiErr)
+      const zai = await ZAI.create()
+      const completion = await zai.chat.completions.create({
+        messages: [
+          { role: 'assistant', content: SYSTEM_PROMPT },
+          { role: 'user', content: `Patient symptoms: "${symptoms}"\n\nBased on these symptoms, suggest the appropriate medical specialty, your reasoning, and suggested countries for medical tourism. Respond in JSON format only.` },
+        ],
+        thinking: { type: 'disabled' },
+      })
+      aiResponse = completion.choices[0]?.message?.content || ''
+    } catch (aiErr: any) {
+      console.error('[ai/triage] AI service error:', aiErr)
       return error(502, 'The AI service is temporarily unavailable. Please try again in a moment.')
     }
 
-    // Parse the JSON response — Gemini may wrap it in markdown code fences
+    if (!aiResponse || !aiResponse.trim()) {
+      return error(502, 'The AI returned an empty response. Please try again.')
+    }
+
+    // Parse the JSON response — LLM may wrap it in markdown code fences
     let parsed: { specialty: string; reasoning: string; suggestedCountries: string[] }
 
     try {
-      // Strip markdown code fences if present
       let cleaned = aiResponse.trim()
       if (cleaned.startsWith('```')) {
         cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
       }
       parsed = JSON.parse(cleaned)
-    } catch (parseErr) {
-      console.error('[ai/triage] Failed to parse Gemini response as JSON:', aiResponse)
+    } catch {
       // Fallback: try to extract JSON from the response using regex
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         try {
           parsed = JSON.parse(jsonMatch[0])
         } catch {
+          console.error('[ai/triage] Failed to parse LLM response as JSON:', aiResponse)
           return error(502, 'The AI returned an unexpected response format. Please try rephrasing your symptoms.')
         }
       } else {
+        console.error('[ai/triage] No JSON found in LLM response:', aiResponse)
         return error(502, 'The AI returned an unexpected response format. Please try rephrasing your symptoms.')
       }
     }
 
-    // Validate the parsed response has the expected fields
     if (!parsed.specialty || typeof parsed.specialty !== 'string') {
       return error(502, 'The AI response was incomplete. Please try again.')
     }
 
-    // Ensure suggestedCountries is an array of strings
     if (!Array.isArray(parsed.suggestedCountries)) {
       parsed.suggestedCountries = parsed.suggestedCountries ? [String(parsed.suggestedCountries)] : []
     }
