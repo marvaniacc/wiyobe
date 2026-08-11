@@ -1232,3 +1232,26 @@ Stage Summary:
 - XSS-safe: the custom renderer escapes all text content and only produces known-safe HTML tags. The TipTap JSON is never interpreted as raw HTML.
 - The blog routes are completely separate from the Zustand SPA dashboard — they render independently on the server for search engine crawling.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 12.3
+Agent: main (Lead Architect)
+Task: Phase 12 final step — Dynamic Sitemap & SEO. Generate sitemap.xml and robots.txt using Next.js App Router native metadata APIs.
+
+Work Log:
+- Step 1 (sitemap): Created `src/app/sitemap.ts` using Next.js `MetadataRoute.Sitemap` type. Fetches all PUBLISHED blog posts directly via Prisma (`db.blogPost.findMany` with `select: { slug, updatedAt }`). Constructs an array of 3 entries: landing page `/` (priority 1, weekly), blog list `/blog` (priority 0.9, daily), and one dynamic entry per published post `/blog/[slug]` (priority 0.8, weekly, lastModified = post.updatedAt). Uses `NEXT_PUBLIC_APP_URL` env var with localhost fallback. `export const dynamic = 'force-dynamic'` ensures fresh data on each request. Commit: `babd805`.
+- Step 2 (robots): Created `src/app/robots.ts` using Next.js `MetadataRoute.Robots` type. Rules: `userAgent: '*'`, `allow: '/'`, `disallow: ['/api/']`. Points to the sitemap via `sitemap: ${baseUrl}/sitemap.xml` and includes `host: baseUrl`. Commit: `78f2ef6`.
+- Step 3 (env): Added `NEXT_PUBLIC_APP_URL=http://localhost:3000` to `.env` with a comment explaining the production value should be `https://wishubest.com`. Both sitemap.ts and robots.ts use this variable (with localhost fallback) to construct absolute URLs. Commit: `7f2927b`.
+- Step 4 (verify + fix): Fetched `/sitemap.xml` and `/robots.txt` via curl. Sitemap rendered correctly with all 3 URLs (landing, blog list, blog post). Robots.txt initially returned a 500 error: "A conflicting public file and page file was found for path /robots.txt" — a static `public/robots.txt` existed that conflicted with the new dynamic `src/app/robots.ts`. Removed the static file (it only had basic User-agent rules without sitemap reference or /api/ disallow). After removal, robots.txt rendered correctly. Commit: `1e0d572`.
+- Verification (curl):
+  - `/sitemap.xml` → valid XML with `<urlset>` containing 3 `<url>` entries: `http://localhost:3000` (priority 1, weekly), `http://localhost:3000/blog` (priority 0.9, daily), `http://localhost:3000/blog/welcome-to-wishubest` (priority 0.8, weekly, lastmod 2026-08-10T17:04:44.829Z).
+  - `/robots.txt` → `User-Agent: *`, `Allow: /`, `Disallow: /api/`, `Host: http://localhost:3000`, `Sitemap: http://localhost:3000/sitemap.xml`.
+  - agent-browser: no errors when loading /sitemap.xml. Lint: 0 errors.
+
+Stage Summary:
+- 4 commits pushed to origin/main: babd805 (sitemap), 78f2ef6 (robots), 7f2927b (env), 1e0d572 (conflict fix).
+- Both files use Next.js native App Router metadata types (no custom API routes).
+- Data fetched directly via Prisma inside sitemap.ts (no internal API calls).
+- Absolute URLs constructed from NEXT_PUBLIC_APP_URL env var (with localhost fallback for dev).
+- /api/ routes are blocked from indexing. All public pages (landing, blog list, blog posts) are discoverable by search engines.
+- Lint: 0 errors. Dev server running cleanly.
