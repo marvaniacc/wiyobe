@@ -1564,3 +1564,103 @@ Stage Summary:
 - The bare root path `/` now redirects to `/dashboard`, where the SPA shell (auth, dashboard, default landing) lives.
 - `bun run lint` passes with 0 errors (26 pre-existing "Unused eslint-disable directive" warnings, matching the codebase baseline; the 2 warnings in the new [locale]/blog files mirror the same `@next/next/no-img-element` pattern used elsewhere).
 - TypeScript: no new errors introduced in the moved files; remaining `tsc` errors are pre-existing and unrelated (i18n duplicate keys, layout `lang` metadata, admin API typing).
+
+---
+Task ID: 17.2-step3
+Agent: general-purpose
+Task: Create public provider listing and detail pages (doctors, hospitals, hotels, translators) under the [locale] directory.
+
+Work Log:
+- Created 12 new files (3 per provider type) under `src/app/[locale]/`:
+  - doctors: `doctors/page.tsx`, `doctors/[countrySlug]/page.tsx`, `doctors/[countrySlug]/[providerSlug]/page.tsx`
+  - hospitals: `hospitals/page.tsx`, `hospitals/[countrySlug]/page.tsx`, `hospitals/[countrySlug]/[providerSlug]/page.tsx`
+  - hotels: `hotels/page.tsx`, `hotels/[countrySlug]/page.tsx`, `hotels/[countrySlug]/[providerSlug]/page.tsx`
+  - translators: `translators/page.tsx`, `translators/[countrySlug]/page.tsx`, `translators/[countrySlug]/[providerSlug]/page.tsx`
+- All pages are async Server Components (`async function`) with `export const dynamic = 'force-dynamic'` and `params: Promise<{...}>`.
+- List pages (all countries):
+  - Filter: `verified: true AND user.kycStatus === 'APPROVED' AND slug NOT NULL`
+  - Select: only fields needed for the card grid; `user: { name, avatarUrl }`; `locations` (active only)
+  - Ordered by `rating desc, reviewCount desc`
+  - Render: card grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`) with avatar/icon, name, specialty/type, city/country (with flag emoji), star rating + review count, and "From" fee via `formatCurrency`
+  - Country link: built with `getCountrySlug(country)` from the doctor/hospital/hotel/translator's ISO country code
+  - Empty state with material icon, title, and message
+  - Provider-type nav (Doctors / Hospitals / Hotels / Translators) above the grid
+- Country-filtered list pages:
+  - Validate `countrySlug` with `getCountryCode(countrySlug)`; `notFound()` if unknown
+  - Doctors / Hospitals / Translators: `OR: [{ country: countryCode }, { locations: { some: { country: countryCode, isActive: true } } }]`
+  - Hotels: filter solely by primary `country: countryCode` (NO ProviderLocation relation per the schema)
+  - Hero shows flag emoji + country name; "← All {type}" back-link
+- Detail pages:
+  - Fetch by `slug`, include `user`, `locations` (active, ordered by isPrimary desc then city asc), `services` (active, ordered by name asc)
+  - 404 if not found, not verified, OR `user.kycStatus !== 'APPROVED'`
+  - 404 if no presence in requested country (primary `country` matches OR `locations` array contains a row with that country — except Hotels, which only check the primary country)
+  - `generateMetadata` exported with SEO title, description, canonical URL, openGraph, and twitter card
+  - Layout: profile header card (avatar/icon, name, verified badge, specialty/type, location, rating + review count, fee), then 3-col body grid — left column (About, Credentials, Services, Locations) + right sidebar (Booking, Quick facts, Explore links)
+  - Doctor: shows education, certifications, languages, consultationFee + onlineFee, all locations, services
+  - Hospital: shows departments, accreditations, beds, baseFee, languages, all locations, services
+  - Hotel: shows amenities, roomTypes, starRating, pricePerNight, languages, address, services (NO locations section)
+  - Translator: shows `spokenLanguages` (NOT translation language pairs from the `languages` field), specialization, yearsExperience, hourlyRate + dailyRate, all locations, services
+- All pages share consistent header (brand link `/${locale}`, Blog link `/${locale}/blog`, Dashboard link `/dashboard`) and footer (copyright with current year).
+- All navigation links follow the spec: detail = `/${locale}/{type}/${countrySlug}/${provider.slug}`, country-filtered list = `/${locale}/{type}/${countrySlug}`, full list = `/${locale}/{type}`, app = `/dashboard`, blog = `/${locale}/blog`.
+- Helpers used: `db` from `@/lib/db`, `notFound` from `next/navigation`, `formatCurrency` from `@/lib/money`, `getCountryCode/getCountrySlug/getCountryName/getCountryFlag` from `@/lib/countries`, `Link` from `next/link`, `Metadata` from `next`.
+- Lint cleanup: removed unused `// eslint-disable-next-line @next/next/no-img-element` directives from the 6 list/detail files that render avatar `<img>` tags (the rule is already disabled at the eslint config level, so the inline directives were flagged as "Unused eslint-disable directive"). Also removed invalid `fill` boolean attribute on `<span>` elements in the hospital and hotel detail pages (invalid HTML attribute — caused `tsc` errors).
+
+Stage Summary:
+- All 12 provider route files created and verified.
+- `bun run lint`: 0 errors, 26 warnings (all pre-existing baseline — same as the previous step's count, no new warnings introduced).
+- `bunx tsc --noEmit`: 0 errors in any of the 12 new files (only pre-existing errors in `src/lib/i18n.ts` remain).
+- No existing files modified. The `[locale]` layout and middleware continue to work unchanged.
+- The pages are SEO-friendly: each detail page exports `generateMetadata` with openGraph/twitter cards, canonical URLs of the form `/{locale}/{type}/{countrySlug}/{slug}`, and type-specific metadata (`profile` for doctors/translators with avatars, `website` for hospitals/hotels).
+- Country URL slugs are validated through `getCountryCode(countrySlug)` and 404 cleanly on unknown countries. Detail pages additionally 404 if the provider has no presence in the requested country (preventing URL-rewriting tricks).
+- Visibility filter is strict: only `verified: true` providers whose `user.kycStatus === 'APPROVED'` are listed; KYC-pending or unverified providers are invisible to the public.
+
+---
+Task ID: 17.2-step4
+Agent: general-purpose
+Task: Add multilingual SEO (hreflang alternates) to generateMetadata in the 4 provider detail pages.
+
+Work Log:
+- Audited all 4 provider detail pages to confirm the existing `alternates: { canonical: url }` structure and the slug variable name in each `generateMetadata`:
+  - `src/app/[locale]/doctors/[countrySlug]/[providerSlug]/page.tsx` — slug var: `doctor.slug`
+  - `src/app/[locale]/hospitals/[countrySlug]/[providerSlug]/page.tsx` — slug var: `hospital.slug`
+  - `src/app/[locale]/hotels/[countrySlug]/[providerSlug]/page.tsx` — slug var: `hotel.slug`
+  - `src/app/[locale]/translators/[countrySlug]/[providerSlug]/page.tsx` — slug var: `translator.slug`
+- In each file's successful-return path `alternates` block (NOT the early "not found" returns), expanded the single-line `alternates: { canonical: url }` to a multi-line object that adds a `languages` map with hreflang entries for `en`, `tr`, `fa`, `ar` plus `x-default` (pointing to the `en` URL). Each locale entry constructs the URL as `/LOCALE/<providerType>/${countrySlug}/<entitySlug>`, keeping `countrySlug` and the entity slug constant across locales (only the locale segment varies).
+- Provider-type path segment per file: `doctors`, `hospitals`, `hotels`, `translators` respectively.
+- Left all other metadata fields (title, description, openGraph, twitter) and the early-return "not found" objects unchanged. No changes outside the `alternates` field.
+- Locales were inlined as literal string keys per the spec template (no new imports / shared constants added — kept the diff minimal and self-contained in each file).
+
+Stage Summary:
+- All 4 provider detail pages now emit `<link rel="alternate" hreflang="…">` tags for all 4 supported locales plus `x-default` pointing to the English variant. Combined with the canonical URL, this gives search engines a complete language/region signal set for these pages.
+- `bun run lint`: 0 errors, 26 warnings (all pre-existing baseline — identical to the previous step's count, no new warnings introduced).
+- Files changed: 4 (one per provider type).
+
+---
+Task ID: 17.2
+Agent: main (Lead Architect)
+Task: Phase 17.2 — Hybrid i18n routing, middleware, and public pages. Restructure all public SSR pages under [locale], move SPA to /dashboard, add provider routing with country slugs, hreflang SEO, and updated sitemap.
+
+Work Log:
+- Step 1 (middleware + dashboard): Created `src/middleware.ts` — detects locale from NEXT_LOCALE cookie or Accept-Language header, redirects non-locale-prefixed paths to `/{locale}/...`. Excludes /api, /_next, /dashboard, /uploads, /robots.txt, /sitemap.xml. Created `src/app/dashboard/page.tsx` — serves the DefaultLanding SPA with `robots: noindex`. Commit: `aef9b94`.
+- Step 2 (locale layout + page moves): Created `src/app/[locale]/layout.tsx` (validates locale, sets lang/dir). Created `src/app/[locale]/page.tsx` (locale landing — custom home page or simple landing with dashboard link). Moved blog list, blog detail, and custom pages from `src/app/blog/` and `src/app/[slug]/` into `src/app/[locale]/`. Updated all internal links with locale prefix. Root `src/app/page.tsx` now redirects to `/dashboard`. Commit: `3f0de8e`.
+- Step 3 (country helper + provider routing): Added country slug↔code mapping functions to `src/lib/countries.ts` (getCountryCode, getCountrySlug, getCountryName, getCountryFlag). Created 12 provider route files:
+  - Doctors: list (all), list (by country), detail — with ProviderLocation validation
+  - Hospitals: same pattern
+  - Hotels: same pattern but NO ProviderLocation (primary country only)
+  - Translators: same pattern, detail shows spokenLanguages (not translation pairs)
+  All pages: async Server Components, force-dynamic, verified+kycStatus filters, notFound() for invalid country/provider. Commit: `fb74f8c`.
+- Step 4 (hreflang SEO): Added `alternates.languages` (hreflang) to generateMetadata in all 4 provider detail pages. Each generates URLs for en, tr, fa, ar, and x-default. Commit: `d034d5b`.
+- Step 5 (sitemap + robots): Updated sitemap to generate URLs for all 4 locales including: locale landings, blog list+posts, custom pages, provider type listings, provider detail pages (using country slugs from ProviderLocation + primary country). Updated robots.txt to disallow /dashboard. Commit: `40fc7e0`.
+- Verification (curl + agent-browser):
+  - curl: `/` → 307 redirect to `/en`. `/en` → 200. `/en/blog` → 200. `/en/doctors` → 200. `/dashboard` → 200 (not intercepted by middleware). `/api/auth/signup` → 200 (not intercepted).
+  - agent-browser: `/dashboard` → SPA loads ("MedTravel" brand). `/en` → "Wishubest" landing. `/en/blog` → "Medical Tourism Blog". `/en/doctors` → "Verified Doctors". No errors.
+  - Lint: 0 errors.
+
+Stage Summary:
+- 5 commits pushed to origin/main: aef9b94 (middleware+dashboard), 3f0de8e (locale restructure), fb74f8c (provider routing), d034d5b (hreflang), 40fc7e0 (sitemap+robots).
+- SPA dashboard at /dashboard is excluded from i18n and has robots:noindex.
+- All public pages under [locale] with proper lang/dir attributes.
+- Provider routing validates country slugs and checks ProviderLocation for multi-location providers.
+- Hreflang alternates on all provider detail pages for en, tr, fa, ar, x-default.
+- Sitemap generates URLs for all locales and all provider pages.
+- Lint: 0 errors. Dev server running cleanly.

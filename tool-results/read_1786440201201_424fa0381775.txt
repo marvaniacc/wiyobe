@@ -1,0 +1,925 @@
+     1→// Global Medical Tourism Marketplace — full data model
+     2→generator client {
+     3→  provider = "prisma-client-js"
+     4→}
+     5→
+     6→datasource db {
+     7→  provider = "sqlite"
+     8→  url      = env("DATABASE_URL")
+     9→}
+    10→
+    11→enum Role {
+    12→  PATIENT
+    13→  DOCTOR
+    14→  HOSPITAL
+    15→  HOTEL
+    16→  TRANSLATOR
+    17→  ADMIN
+    18→  AFFILIATE
+    19→}
+    20→
+    21→enum UserStatus {
+    22→  PENDING
+    23→  ACTIVE
+    24→  SUSPENDED
+    25→}
+    26→
+    27→enum ProviderType {
+    28→  DOCTOR
+    29→  HOSPITAL
+    30→  HOTEL
+    31→  TRANSLATOR
+    32→}
+    33→
+    34→enum VisitType {
+    35→  IN_PERSON
+    36→  ONLINE
+    37→}
+    38→
+    39→enum BookingStatus {
+    40→  PENDING
+    41→  CONFIRMED
+    42→  COMPLETED
+    43→  CANCELLED
+    44→  NO_SHOW
+    45→  REFUNDED
+    46→}
+    47→
+    48→enum PaymentStatus {
+    49→  PENDING
+    50→  SUCCEEDED
+    51→  FAILED
+    52→  REFUNDED
+    53→  PARTIALLY_REFUNDED
+    54→}
+    55→
+    56→enum LedgerType {
+    57→  PATIENT_CHARGE
+    58→  COMMISSION
+    59→  AFFILIATE_COMMISSION
+    60→  AFFILIATE_COMMISSION_REVERSAL
+    61→  PROVIDER_CREDIT
+    62→  PROVIDER_DEBIT
+    63→  REFUND_PATIENT
+    64→  REFUND_COMMISSION_REVERSAL
+    65→  REFUND_PROVIDER_DEBIT
+    66→  PAYOUT
+    67→}
+    68→
+    69→enum PayoutStatus {
+    70→  PENDING
+    71→  COMPLETED
+    72→}
+    73→
+    74→model User {
+    75→  id                String       @id @default(cuid())
+    76→  email             String       @unique
+    77→  passwordHash      String?      // optional — Google-only users have no password
+    78→  googleId          String?      @unique
+    79→  authProvider      String       @default("password") // "password" | "google" | "otp"
+    80→  emailVerified     DateTime?
+    81→  role              Role
+    82→  status            UserStatus   @default(ACTIVE)
+    83→  name              String?
+    84→  phone             String?
+    85→  avatarUrl         String?
+    86→  preferredLanguage String       @default("en")
+    87→  country           String?
+    88→  city              String?
+    89→  createdAt         DateTime     @default(now())
+    90→  updatedAt         DateTime     @updatedAt
+    91→
+    92→  patient           Patient?
+    93→  doctor            Doctor?
+    94→  hospital          Hospital?
+    95→  hotel             Hotel?
+    96→  translator        Translator?
+    97→  bookings          Booking[]    @relation("patientBookings")
+    98→  ledgerEntries     LedgerEntry[]
+    99→  reviewsAuthored   Review[]     @relation("reviewAuthor")
+   100→  reviewsReceived   Review[]     @relation("reviewSubject")
+   101→  payouts           Payout[]
+   102→  notifications     Notification[]
+   103→  favorites         Favorite[]   @relation("favorites")
+   104→  medicalDocuments  MedicalDocument[] @relation("medicalDocuments")
+   105→  // Medical documents that other patients (or this user's patients) have
+   106→  // explicitly shared with this user (when they are a doctor).
+   107→  sharedMedicalRecords MedicalRecordAccess[] @relation("doctorRecordAccess")
+   108→  disputesRaised    Dispute[]    @relation("disputesRaised")
+   109→  disputesAgainst   Dispute[]    @relation("disputesAgainst")
+   110→  disputesResolved  Dispute[]    @relation("disputesResolved")
+   111→  affiliate         Affiliate?
+   112→  affiliateReferrals AffiliateClick[] @relation("affiliateReferrals")
+   113→  referredByAffiliateId String?
+   114→  referredByAffiliate  Affiliate? @relation("ReferredProviders", fields: [referredByAffiliateId], references: [id])
+   115→  referredAt           DateTime?
+   116→  // Cryptographically secure token used to authenticate read-only iCal feed
+   117→  // access (/api/calendar/[token]) for providers (DOCTOR, HOSPITAL, HOTEL,
+   118→  // TRANSLATOR) without requiring a login session. NULL for non-providers.
+   119→  calendarToken        String?      @unique
+   120→  // KYC status: PENDING (not started), IN_REVIEW (submitted, awaiting admin),
+   121→  // APPROVED (all required docs approved), REJECTED (at least one rejected).
+   122→  kycStatus            String       @default("PENDING")
+   123→  kycDocuments      KycDocument[] @relation("kycDocuments")
+   124→  kycReviewed       KycDocument[] @relation("kycReviewed")
+   125→  ticketsRaised     Ticket[]    @relation("ticketsRaised")
+   126→  ticketMessages    TicketMessage[] @relation("ticketMessages")
+   127→  chatMessages      ChatMessage[] @relation("chatSender")
+   128→  itineraries       Itinerary[]  @relation("PatientItineraries")
+   129→  // In-app CMS blog posts authored by this user (admin).
+   130→  blogPosts         BlogPost[]
+   131→  mediaAssets       MediaAsset[]
+   132→}
+   133→
+   134→model OtpCode {
+   135→  id        String   @id @default(cuid())
+   136→  email     String
+   137→  code      String   // 6-digit code
+   138→  purpose   String   // "signup" | "signin" | "reset"
+   139→  payload   String?  // JSON of stashed signup data for signup OTP
+   140→  expiresAt DateTime
+   141→  used      Boolean  @default(false)
+   142→  attempts  Int      @default(0)
+   143→  createdAt DateTime @default(now())
+   144→}
+   145→
+   146→model Notification {
+   147→  id         String   @id @default(cuid())
+   148→  userId     String   // recipient
+   149→  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   150→  type       String   // legacy type field: "booking_created" | "booking_cancelled" | etc.
+   151→  category   String   @default("SYSTEM")  // BOOKING | KYC | CHAT | SYSTEM | ANNOUNCEMENT | PAYOUT | REVIEW
+   152→  title      String
+   153→  body       String
+   154→  isRead     Boolean  @default(false)
+   155→  read       Boolean  @default(false)  // legacy field (kept for backward compat — mirrors isRead)
+   156→  link       String?  // dashboard section to navigate to
+   157→  metadata   Json?    // structured extra data, e.g. { reason: "Image blurred" }
+   158→  meta       String?  // legacy JSON string field (kept for backward compat)
+   159→  createdAt  DateTime @default(now())
+   160→
+   161→  @@index([userId, isRead])
+   162→  @@index([category])
+   163→}
+   164→
+   165→model Favorite {
+   166→  id        String   @id @default(cuid())
+   167→  patientId String   // patient user id
+   168→  patient   User     @relation("favorites", fields: [patientId], references: [id], onDelete: Cascade)
+   169→  providerId String  // provider's id (doctor/hospital/hotel/translator record id)
+   170→  providerType String
+   171→  providerUserId String // provider's user id
+   172→  createdAt DateTime @default(now())
+   173→
+   174→  @@unique([patientId, providerId])
+   175→}
+   176→
+   177→model Patient {
+   178→  id            String   @id @default(cuid())
+   179→  userId        String   @unique
+   180→  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   181→  dateOfBirth   String?
+   182→  gender        String?
+   183→  bloodGroup    String?
+   184→  medicalHistory String?
+   185→  emergencyContact String?
+   186→  passportNumber String?
+   187→  createdAt     DateTime @default(now())
+   188→  updatedAt     DateTime @updatedAt
+   189→}
+   190→
+   191→model Doctor {
+   192→  id               String    @id @default(cuid())
+   193→  userId           String    @unique
+   194→  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+   195→  specialty        String
+   196→  subSpecialties   String    // comma-separated
+   197→  bio              String
+   198→  city             String
+   199→  country          String
+   200→  slug             String?   @unique           // URL-friendly slug (e.g., "luis-sharon")
+   201→  yearsExperience  Int       @default(0)
+   202→  consultationFee  String    @default("0")
+   203→  onlineFee        String    @default("0")
+   204→  languages        String    // comma-separated language codes
+   205→  education        String
+   206→  certifications   String
+   207→  verified         Boolean   @default(false)
+   208→  rating           Float     @default(0)
+   209→  reviewCount      Int       @default(0)
+   210→  services         Service[]
+   211→  slots            Slot[]
+   212→  bookings         Booking[]
+   213→  locations        ProviderLocation[] @relation("DoctorLocations")
+   214→  createdAt        DateTime  @default(now())
+   215→  updatedAt        DateTime  @updatedAt
+   216→}
+   217→
+   218→model Hospital {
+   219→  id              String    @id @default(cuid())
+   220→  userId          String    @unique
+   221→  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+   222→  name            String
+   223→  description     String
+   224→  address         String
+   225→  city            String
+   226→  country         String
+   227→  slug            String?   @unique
+   228→  departments     String    // comma-separated
+   229→  accreditations  String    // comma-separated
+   230→  beds            Int       @default(0)
+   231→  baseFee         String    @default("0")
+   232→  languages       String
+   233→  verified        Boolean   @default(false)
+   234→  rating          Float     @default(0)
+   235→  reviewCount     Int       @default(0)
+   236→  services        Service[]
+   237→  slots           Slot[]
+   238→  bookings        Booking[]
+   239→  locations       ProviderLocation[] @relation("HospitalLocations")
+   240→  createdAt       DateTime  @default(now())
+   241→  updatedAt       DateTime  @updatedAt
+   242→}
+   243→
+   244→model Hotel {
+   245→  id            String    @id @default(cuid())
+   246→  userId        String    @unique
+   247→  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+   248→  name          String
+   249→  description   String
+   250→  address       String
+   251→  city          String
+   252→  country       String
+   253→  slug          String?   @unique           // URL-friendly slug (e.g., "hilton-berlin")
+   254→  starRating    Int       @default(3)
+   255→  amenities     String    // comma-separated
+   256→  roomTypes     String    // comma-separated
+   257→  pricePerNight String    @default("0")
+   258→  languages     String
+   259→  verified      Boolean   @default(false)
+   260→  rating        Float     @default(0)
+   261→  reviewCount   Int       @default(0)
+   262→  services      Service[]
+   263→  bookings      Booking[]
+   264→  // NOTE: Hotels do NOT have a ProviderLocation relation.
+   265→  // Each hotel is an independent bookable entity with its own reviews/rating.
+   266→  createdAt     DateTime  @default(now())
+   267→  updatedAt     DateTime  @updatedAt
+   268→}
+   269→
+   270→model Translator {
+   271→  id                String    @id @default(cuid())
+   272→  userId            String    @unique
+   273→  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+   274→  languages         String    // comma-separated translation language pairs (e.g., "en->fa,fa->en")
+   275→  spokenLanguages   String    @default("")  // comma-separated spoken languages (e.g., "Arabic,Persian,English,German")
+   276→  specialization    String    // medical, legal, general
+   277→  bio               String
+   278→  city              String
+   279→  country           String
+   280→  slug              String?   @unique         // URL-friendly slug (e.g., "luis-translator")
+   281→  hourlyRate        String    @default("0")
+   282→  dailyRate         String    @default("0")
+   283→  yearsExperience   Int       @default(0)
+   284→  verified          Boolean   @default(false)
+   285→  rating            Float     @default(0)
+   286→  reviewCount       Int       @default(0)
+   287→  services          Service[]
+   288→  slots             Slot[]
+   289→  bookings          Booking[]
+   290→  locations         ProviderLocation[] @relation("TranslatorLocations")
+   291→  createdAt         DateTime  @default(now())
+   292→  updatedAt         DateTime  @updatedAt
+   293→}
+   294→
+   295→model Service {
+   296→  id              String       @id @default(cuid())
+   297→  providerType    ProviderType
+   298→  doctorId        String?
+   299→  hospitalId      String?
+   300→  hotelId         String?
+   301→  translatorId    String?
+   302→  doctor          Doctor?      @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+   303→  hospital        Hospital?    @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+   304→  hotel           Hotel?       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+   305→  translator      Translator?  @relation(fields: [translatorId], references: [id], onDelete: Cascade)
+   306→  name            String
+   307→  description     String
+   308→  price           String       @default("0")
+   309→  currency        String       @default("USD")
+   310→  durationMinutes Int?
+   311→  isActive        Boolean      @default(true)
+   312→  bookings        Booking[]
+   313→  createdAt       DateTime     @default(now())
+   314→  updatedAt       DateTime     @updatedAt
+   315→}
+   316→
+   317→model Slot {
+   318→  id           String     @id @default(cuid())
+   319→  doctorId     String?
+   320→  hospitalId   String?
+   321→  translatorId String?
+   322→  doctor       Doctor?    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+   323→  hospital     Hospital?  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+   324→  translator   Translator? @relation(fields: [translatorId], references: [id], onDelete: Cascade)
+   325→  startTime    DateTime
+   326→  endTime      DateTime
+   327→  visitType    VisitType  @default(IN_PERSON)
+   328→  isBooked     Boolean    @default(false)
+   329→  booking      Booking?
+   330→  createdAt    DateTime   @default(now())
+   331→}
+   332→
+   333→model Booking {
+   334→  id                 String        @id @default(cuid())
+   335→  patientId          String
+   336→  patient            User          @relation("patientBookings", fields: [patientId], references: [id])
+   337→  providerType       ProviderType
+   338→  doctorId           String?
+   339→  hospitalId         String?
+   340→  hotelId            String?
+   341→  translatorId       String?
+   342→  doctor             Doctor?       @relation(fields: [doctorId], references: [id])
+   343→  hospital           Hospital?     @relation(fields: [hospitalId], references: [id])
+   344→  hotel              Hotel?        @relation(fields: [hotelId], references: [id])
+   345→  translator         Translator?   @relation(fields: [translatorId], references: [id])
+   346→  serviceId          String?
+   347→  service            Service?      @relation(fields: [serviceId], references: [id])
+   348→  slotId             String?       @unique
+   349→  slot               Slot?         @relation(fields: [slotId], references: [id])
+   350→  visitType          VisitType
+   351→  status             BookingStatus @default(PENDING)
+   352→  startDate          DateTime
+   353→  endDate            DateTime?
+   354→  amount             String        @default("0")
+   355→  currency           String        @default("USD")
+   356→  commissionRate     String        @default("0")       // platform commission %
+   357→  commissionAmount   String        @default("0")       // platform commission $
+   358→  affiliateRate      String        @default("0")       // affiliate commission %
+   359→  affiliateAmount    String        @default("0")       // affiliate commission $
+   360→  affiliateId        String?       // affiliate user id who earns (null = no affiliate, platform keeps both)
+   361→  providerNetAmount  String        @default("0")       // provider receives = amount - platform - affiliate
+   362→  videoSessionUrl    String?
+   363→  notes              String?
+   364→  cancellationReason String?
+   365→  cancelledById      String?
+   366→  cancelledAt        DateTime?
+   367→  refundAmount       String?
+   368→  // Promo code applied at checkout. The discount is deducted from the
+   369→  // PLATFORM's commission — the provider always receives their full net share.
+   370→  promoCodeId        String?
+   371→  promoCode          PromoCode?    @relation(fields: [promoCodeId], references: [id])
+   372→  discountAmount     String        @default("0")       // snapshot of the discount applied (capped at platformCut)
+   373→  createdAt          DateTime      @default(now())
+   374→  updatedAt          DateTime      @updatedAt
+   375→
+   376→  payment            Payment?
+   377→  ledgerEntries      LedgerEntry[]
+   378→  review             Review?
+   379→  disputes           Dispute[]
+   380→  chatMessages       ChatMessage[]
+   381→  itineraryId        String?
+   382→  itinerary          Itinerary?  @relation(fields: [itineraryId], references: [id])
+   383→}
+   384→
+   385→/// Promo codes for patient conversion boosts. The discount is always
+   386→/// deducted from the platform's commission, never from provider revenue.
+   387→model PromoCode {
+   388→  id            String    @id @default(cuid())
+   389→  code          String    @unique              // e.g. "WINTER10" — stored uppercase
+   390→  discountType  String                          // "PERCENTAGE" | "FIXED"
+   391→  discountValue Int                             // Percentage: 1-100. Fixed: amount in cents.
+   392→  maxUses       Int?                            // null = unlimited
+   393→  usedCount     Int       @default(0)
+   394→  expiryDate    DateTime?
+   395→  isActive      Boolean   @default(true)
+   396→  createdAt     DateTime  @default(now())
+   397→  updatedAt     DateTime  @updatedAt
+   398→
+   399→  bookings      Booking[]
+   400→}
+   401→
+   402→model Payment {
+   403→  id            String        @id @default(cuid())
+   404→  bookingId     String        @unique
+   405→  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+   406→  stripeChargeId String?
+   407→  amount        String        @default("0")
+   408→  currency      String        @default("USD")
+   409→  status        PaymentStatus @default(PENDING)
+   410→  refundAmount  String        @default("0")
+   411→  createdAt     DateTime      @default(now())
+   412→  updatedAt     DateTime      @updatedAt
+   413→
+   414→  ledgerEntries LedgerEntry[]
+   415→}
+   416→
+   417→model LedgerEntry {
+   418→  id          String     @id @default(cuid())
+   419→  type        LedgerType
+   420→  bookingId   String?
+   421→  booking     Booking?   @relation(fields: [bookingId], references: [id])
+   422→  paymentId   String?
+   423→  payment     Payment?   @relation(fields: [paymentId], references: [id])
+   424→  payoutId    String?
+   425→  payout      Payout?    @relation(fields: [payoutId], references: [id])
+   426→  userId      String?    // provider user id (for provider balances)
+   427→  user        User?      @relation(fields: [userId], references: [id])
+   428→  amount      String     @default("0") // signed: + credit, - debit
+   429→  description String
+   430→  meta        String?
+   431→  createdAt   DateTime   @default(now())
+   432→}
+   433→
+   434→model Payout {
+   435→  id             String       @id @default(cuid())
+   436→  providerUserId String
+   437→  providerUser   User         @relation(fields: [providerUserId], references: [id])
+   438→  providerType   ProviderType
+   439→  amount         String       @default("0")
+   440→  currency       String       @default("USD")
+   441→  status         PayoutStatus @default(PENDING)
+   442→  method         String       @default("bank_transfer")
+   443→  reference      String?
+   444→  periodStart    DateTime
+   445→  periodEnd      DateTime
+   446→  note           String?
+   447→  ledgerEntries  LedgerEntry[]
+   448→  createdAt      DateTime     @default(now())
+   449→  completedAt    DateTime?
+   450→}
+   451→
+   452→model Review {
+   453→  id            String   @id @default(cuid())
+   454→  authorId      String
+   455→  author        User     @relation("reviewAuthor", fields: [authorId], references: [id])
+   456→  subjectUserId String
+   457→  subjectUser   User     @relation("reviewSubject", fields: [subjectUserId], references: [id])
+   458→  bookingId     String   @unique
+   459→  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+   460→  rating        Int
+   461→  comment       String
+   462→  language      String   @default("en")
+   463→  reply         String?
+   464→  repliedAt     DateTime?
+   465→  createdAt     DateTime @default(now())
+   466→}
+   467→
+   468→model CommissionRate {
+   469→  id           String       @id @default(cuid())
+   470→  providerType ProviderType @unique
+   471→  rate         String       @default("12") // platform commission percentage
+   472→  affiliateRate String      @default("25") // percentage of the PLATFORM'S COMMISSION that the affiliate receives
+   473→  updatedAt    DateTime     @updatedAt
+   474→}
+   475→
+   476→model CancellationPolicy {
+   477→  id                      String       @id @default(cuid())
+   478→  providerType            ProviderType @unique
+   479→  freeCancellationHours   Int          @default(24)
+   480→  cancellationFeePercent  String       @default("20")
+   481→  updatedAt               DateTime     @updatedAt
+   482→}
+   483→
+   484→model Setting {
+   485→  id    String @id @default(cuid())
+   486→  key   String @unique
+   487→  value String
+   488→}
+   489→
+   490→model MedicalDocument {
+   491→  id         String   @id @default(cuid())
+   492→  patientId  String   // patient user id
+   493→  patient    User     @relation("medicalDocuments", fields: [patientId], references: [id], onDelete: Cascade)
+   494→  fileName   String
+   495→  fileType   String   // MIME type
+   496→  fileSize   Int
+   497→  category   String   // "prescription" | "test_result" | "insurance" | "passport" | "other"
+   498→  dataUrl    String   // base64 data URL (MVP) — would be S3 URL in production
+   499→  notes      String?
+   500→  createdAt  DateTime @default(now())
+   501→
+   502→  // Doctors the patient has explicitly granted access to this document.
+   503→  // A join table is used instead of a String[] scalar list because SQLite
+   504→  // does not support scalar lists in Prisma. This also enables efficient
+   505→  // authorization queries (a doctor can fetch only documents where a row
+   506→  // with their userId exists here).
+   507→  accessGrants MedicalRecordAccess[]
+   508→  deletedAt  DateTime?  // soft delete — null = active, non-null = in recycle bin
+   509→}
+   510→
+   511→/// Junction table — grants a single doctor access to a single medical document.
+   512→model MedicalRecordAccess {
+   513→  id          String   @id @default(cuid())
+   514→  documentId  String
+   515→  document    MedicalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+   516→  doctorId    String   // the User id of the doctor granted access
+   517→  doctor      User     @relation("doctorRecordAccess", fields: [doctorId], references: [id], onDelete: Cascade)
+   518→  grantedAt   DateTime @default(now())
+   519→
+   520→  @@unique([documentId, doctorId]) // a doctor can't be granted access twice to the same doc
+   521→  @@index([doctorId])              // fast lookup of "all docs shared with me"
+   522→}
+   523→
+   524→enum DisputeStatus {
+   525→  OPEN
+   526→  UNDER_REVIEW
+   527→  RESOLVED
+   528→  CLOSED
+   529→}
+   530→
+   531→enum DisputeType {
+   532→  REFUND_REQUEST
+   533→  SERVICE_QUALITY
+   534→  SCHEDULING_ISSUE
+   535→  PAYMENT_ISSUE
+   536→  OTHER
+   537→}
+   538→
+   539→model Dispute {
+   540→  id           String        @id @default(cuid())
+   541→  bookingId    String
+   542→  booking      Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+   543→  raisedById   String
+   544→  raisedBy     User          @relation("disputesRaised", fields: [raisedById], references: [id])
+   545→  againstUserId String
+   546→  againstUser  User          @relation("disputesAgainst", fields: [againstUserId], references: [id])
+   547→  type         DisputeType   @default(OTHER)
+   548→  status       DisputeStatus @default(OPEN)
+   549→  title        String
+   550→  description  String
+   551→  adminResponse String?
+   552→  resolvedById String?
+   553→  resolvedBy   User?         @relation("disputesResolved", fields: [resolvedById], references: [id])
+   554→  resolvedAt   DateTime?
+   555→  createdAt    DateTime      @default(now())
+   556→  updatedAt    DateTime      @updatedAt
+   557→}
+   558→
+   559→// ============================================================================
+   560→// Affiliate Marketing System
+   561→// ============================================================================
+   562→
+   563→// AffiliateTier enum removed — tier system eliminated in affiliate redesign.
+   564→
+   565→enum AffiliateClickStatus {
+   566→  CLICKED
+   567→  SIGNED_UP
+   568→  BOOKED
+   569→  COMPLETED
+   570→  CANCELLED
+   571→}
+   572→
+   573→model Affiliate {
+   574→  id              String   @id @default(cuid())
+   575→  userId          String   @unique
+   576→  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   577→  referralCode    String   @unique
+   578→  website         String?
+   579→  socialMedia     String?
+   580→  description     String?
+   581→  verified        Boolean  @default(false)
+   582→  totalClicks     Int      @default(0)
+   583→  totalSignups    Int      @default(0)
+   584→  totalBookings   Int      @default(0)
+   585→  totalEarnings   String   @default("0")
+   586→  availableBalance String  @default("0")
+   587→  pendingBalance  String   @default("0")
+   588→  paidOut         String   @default("0")
+   589→  createdAt       DateTime @default(now())
+   590→  updatedAt       DateTime @updatedAt
+   591→
+   592→  clicks            AffiliateClick[]
+   593→  payouts           AffiliatePayout[]
+   594→  referredProviders User[]  @relation("ReferredProviders")
+   595→}
+   596→
+   597→model AffiliateClick {
+   598→  id            String   @id @default(cuid())
+   599→  affiliateId   String
+   600→  affiliate     Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+   601→  visitorIp     String?
+   602→  userAgent     String?
+   603→  referredUserId String?  // user who signed up from this click
+   604→  referredUser  User?     @relation("affiliateReferrals", fields: [referredUserId], references: [id])
+   605→  bookingId     String?   // booking that resulted from this referral
+   606→  status        AffiliateClickStatus @default(CLICKED)
+   607→  commissionAmount String? // commission earned when booking completes
+   608→  clickedAt     DateTime @default(now())
+   609→  convertedAt   DateTime?
+   610→}
+   611→
+   612→model AffiliatePayout {
+   613→  id           String   @id @default(cuid())
+   614→  affiliateId  String
+   615→  affiliate    Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+   616→  amount       String   @default("0")
+   617→  currency     String   @default("USD")
+   618→  status       PayoutStatus @default(PENDING)
+   619→  method       String   @default("bank_transfer")
+   620→  reference    String?
+   621→  periodStart  DateTime
+   622→  periodEnd    DateTime
+   623→  createdAt    DateTime @default(now())
+   624→  completedAt  DateTime?
+   625→}
+   626→
+   627→// AffiliateSetting model removed — tier system eliminated in affiliate redesign.
+   628→
+   629→// ============================================================================
+   630→// KYC (Know Your Customer) — Doctor document verification
+   631→// ============================================================================
+   632→
+   633→enum KycStatus {
+   634→  NOT_SUBMITTED
+   635→  PENDING
+   636→  APPROVED
+   637→  REJECTED
+   638→}
+   639→
+   640→/// Admin-defined KYC requirement — defines what documents each provider type
+   641→/// must submit. Created/managed by admins, used by providers during KYC upload.
+   642→model KycRequirement {
+   643→  id           String       @id @default(cuid())
+   644→  providerType String                        // DOCTOR | HOSPITAL | HOTEL | TRANSLATOR
+   645→  documentName String                        // e.g. "Medical License"
+   646→  description  String?                       // instructions for the provider
+   647→  isRequired   Boolean      @default(true)
+   648→  order        Int          @default(0)      // staging/display order
+   649→  createdAt    DateTime     @default(now())
+   650→  updatedAt    DateTime     @updatedAt
+   651→
+   652→  documents    KycDocument[]
+   653→
+   654→  @@index([providerType])
+   655→}
+   656→
+   657→model KycDocument {
+   658→  id              String    @id @default(cuid())
+   659→  userId          String
+   660→  user            User      @relation("kycDocuments", fields: [userId], references: [id], onDelete: Cascade)
+   661→  // Link to the requirement this document fulfills (optional for backward
+   662→  // compat with pre-existing documents that weren't tied to a requirement).
+   663→  requirementId   String?
+   664→  requirement     KycRequirement? @relation(fields: [requirementId], references: [id])
+   665→  // Copied from the requirement at upload time for historical record (in case
+   666→  // the requirement is later edited or deleted).
+   667→  documentName    String    @default("")
+   668→  // Legacy docType field — kept for backward compat with existing records.
+   669→  docType         String    @default("other")
+   670→  fileName        String
+   671→  fileType        String
+   672→  fileSize        Int
+   673→  dataUrl         String    // base64 data URL
+   674→  notes           String?
+   675→  status          KycStatus @default(NOT_SUBMITTED)
+   676→  // New string-based status for the upgraded workflow: PENDING | APPROVED | REJECTED
+   677→  reviewStatus    String    @default("PENDING")
+   678→  rejectionReason String?
+   679→  adminNote       String?
+   680→  reviewedById    String?
+   681→  reviewedBy      User?     @relation("kycReviewed", fields: [reviewedById], references: [id])
+   682→  reviewedAt      DateTime?
+   683→  uploadedAt      DateTime  @default(now())
+   684→  createdAt       DateTime  @default(now())
+   685→  updatedAt       DateTime  @updatedAt
+   686→
+   687→  @@index([userId])
+   688→  @@index([requirementId])
+   689→}
+   690→
+   691→// ============================================================================
+   692→// Support Tickets — users ↔ admin communication
+   693→// ============================================================================
+   694→
+   695→enum TicketStatus {
+   696→  OPEN
+   697→  IN_PROGRESS
+   698→  RESOLVED
+   699→  CLOSED
+   700→}
+   701→
+   702→enum TicketPriority {
+   703→  LOW
+   704→  MEDIUM
+   705→  HIGH
+   706→  URGENT
+   707→}
+   708→
+   709→model Ticket {
+   710→  id          String         @id @default(cuid())
+   711→  userId      String
+   712→  user        User           @relation("ticketsRaised", fields: [userId], references: [id], onDelete: Cascade)
+   713→  subject     String
+   714→  description String
+   715→  category    String         // "booking" | "payment" | "account" | "technical" | "other"
+   716→  priority    TicketPriority @default(MEDIUM)
+   717→  status      TicketStatus   @default(OPEN)
+   718→  messages    TicketMessage[]
+   719→  createdAt   DateTime       @default(now())
+   720→  updatedAt   DateTime       @updatedAt
+   721→}
+   722→
+   723→model TicketMessage {
+   724→  id        String   @id @default(cuid())
+   725→  ticketId  String
+   726→  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+   727→  senderId  String
+   728→  sender    User     @relation("ticketMessages", fields: [senderId], references: [id])
+   729→  message   String
+   730→  isFromAdmin Boolean @default(false)
+   731→  createdAt DateTime @default(now())
+   732→}
+   733→
+   734→// ============================================================================
+   735→// Booking Chat — patient ↔ provider messaging tied to a booking
+   736→// ============================================================================
+   737→
+   738→model ChatMessage {
+   739→  id           String   @id @default(cuid())
+   740→  bookingId    String
+   741→  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+   742→  senderId     String
+   743→  sender       User     @relation("chatSender", fields: [senderId], references: [id])
+   744→  message      String?
+   745→  read         Boolean  @default(false)
+   746→  createdAt    DateTime @default(now())
+   747→
+   748→  translations MessageTranslation[]
+   749→  attachments  ChatAttachment[]
+   750→
+   751→  @@index([bookingId, createdAt])
+   752→  @@index([senderId])
+   753→}
+   754→
+   755→model MessageTranslation {
+   756→  id              String   @id @default(cuid())
+   757→  messageId       String
+   758→  message         ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+   759→  targetLanguage  String   // e.g. "en", "tr", "fa", "ar"
+   760→  translatedText  String
+   761→  provider        String   @default("zai")
+   762→  createdAt       DateTime @default(now())
+   763→
+   764→  @@unique([messageId, targetLanguage])
+   765→  @@index([messageId])
+   766→}
+   767→
+   768→// File / image / PDF attachments on chat messages.
+   769→// Stored as base64 data URLs (same pattern as MedicalDocument / KycDocument).
+   770→// Served through /api/chat/attachment?id=... which authorizes per-booking access.
+   771→model ChatAttachment {
+   772→  id          String   @id @default(cuid())
+   773→  messageId   String
+   774→  message     ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+   775→  fileName    String
+   776→  fileType    String   // MIME type, e.g. "image/png", "application/pdf"
+   777→  fileSize    Int      // bytes
+   778→  dataUrl     String   // base64 data URL
+   779→  createdAt   DateTime @default(now())
+   780→
+   781→  @@index([messageId])
+   782→}
+   783→
+   784→// ============================================================================
+   785→// Itineraries — Draft medical trip packages (Doctor + Hotel + Translator)
+   786→// ============================================================================
+   787→
+   788→enum ItineraryStatus {
+   789→  DRAFT
+   790→  PENDING_BOOKING
+   791→  BOOKED
+   792→  EXPIRED
+   793→}
+   794→
+   795→model Itinerary {
+   796→  id                 String          @id @default(cuid())
+   797→  patientId          String
+   798→  patient            User            @relation("PatientItineraries", fields: [patientId], references: [id])
+   799→  status             ItineraryStatus @default(DRAFT)
+   800→  isAiGenerated      Boolean         @default(false)
+   801→  totalEstimatedCost Int             @default(0) // stored in cents
+   802→  createdAt          DateTime        @default(now())
+   803→  updatedAt          DateTime        @updatedAt
+   804→
+   805→  items     ItineraryItem[]
+   806→  bookings  Booking[]
+   807→
+   808→  @@index([patientId])
+   809→}
+   810→
+   811→model ItineraryItem {
+   812→  id           String       @id @default(cuid())
+   813→  itineraryId  String
+   814→  itinerary    Itinerary    @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+   815→  providerType ProviderType
+   816→  providerId   String
+   817→  serviceId    String?
+   818→  estimatedCost Int         // stored in cents
+   819→  notes        String?
+   820→  createdAt    DateTime     @default(now())
+   821→
+   822→  @@index([itineraryId])
+   823→}
+   824→
+   825→/// In-app CMS blog posts. Content is stored as TipTap JSON (not HTML) to
+   826→/// prevent XSS when rendered publicly. Phase 12.2 will render this JSON.
+   827→model BlogPost {
+   828→  id              String   @id @default(cuid())
+   829→  title           String
+   830→  slug            String   @unique                        // kebab-case URL slug
+   831→  excerpt         String                                   // short summary for blog cards
+   832→  content         Json                                      // TipTap JSON structure
+   833→  coverImage      String?                                  // optional cover image URL
+   834→  authorId        String
+   835→  author          User     @relation(fields: [authorId], references: [id])
+   836→  status          String   @default("DRAFT")               // "DRAFT" | "PUBLISHED"
+   837→  // SEO fields
+   838→  seoTitle        String?                                  // overrides title in <title> and OG
+   839→  seoDescription  String?                                  // overrides excerpt in meta description
+   840→  focusKeyword    String?                                  // primary keyword for SEO optimization
+   841→  canonicalUrl    String?                                  // canonical URL override
+   842→  noIndex         Boolean  @default(false)                 // exclude from search engines
+   843→  createdAt       DateTime @default(now())
+   844→  updatedAt       DateTime @updatedAt
+   845→  deletedAt       DateTime?                                 // soft delete
+   846→
+   847→  @@index([status])
+   848→  @@index([authorId])
+   849→  @@index([deletedAt])
+   850→}
+   851→
+   852→/// Custom landing pages with raw HTML/CSS content. Admin-authored, so the
+   853→/// HTML is NOT sanitized (admin is trusted). Rendered via SSR on /[slug].
+   854→model CustomPage {
+   855→  id              String   @id @default(cuid())
+   856→  title           String
+   857→  slug            String   @unique                // kebab-case URL slug
+   858→  htmlContent     String                          // raw HTML/CSS code
+   859→  seoTitle        String?
+   860→  seoDescription  String?
+   861→  // SEO fields
+   862→  focusKeyword    String?                         // primary keyword for SEO optimization
+   863→  canonicalUrl    String?                         // canonical URL override
+   864→  noIndex         Boolean  @default(false)        // exclude from search engines
+   865→  isPublished     Boolean  @default(false)
+   866→  createdAt       DateTime @default(now())
+   867→  updatedAt       DateTime @updatedAt
+   868→  deletedAt       DateTime?                        // soft delete
+   869→
+   870→  @@index([isPublished])
+   871→  @@index([deletedAt])
+   872→}
+   873→
+   874→/// Internal media library — files uploaded to public/uploads/ and tracked
+   875→/// in the DB. Used by blog cover images, custom pages, TipTap, etc.
+   876→model MediaAsset {
+   877→  id         String   @id @default(cuid())
+   878→  uploaderId String
+   879→  uploader   User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+   880→  fileName   String                        // original file name from upload
+   881→  filePath   String                        // relative path: /uploads/uuid.ext
+   882→  mimeType   String
+   883→  fileSize   Int                           // bytes
+   884→  createdAt  DateTime @default(now())
+   885→  deletedAt  DateTime?                     // soft delete
+   886→
+   887→  @@index([uploaderId])
+   888→  @@index([deletedAt])
+   889→}
+   890→
+   891→/// Multi-location support for Doctor, Hospital, and Translator entities.
+   892→/// Each provider can have multiple physical locations (offices, clinics,
+   893→/// branches). Reviews, ratings, and reputation belong to the provider entity,
+   894→/// NOT to individual locations.
+   895→///
+   896→/// The provider's primary city/country on the entity itself is the "headquarters"
+   897→/// or first registered location. This model holds additional locations.
+   898→///
+   899→/// Hotels are excluded — each hotel is an independent bookable entity with its
+   900→/// own reviews/rating, so they don't need multi-location support.
+   901→model ProviderLocation {
+   902→  id           String   @id @default(cuid())
+   903→  providerType String   // "DOCTOR" | "HOSPITAL" | "TRANSLATOR"
+   904→  doctorId     String?
+   905→  hospitalId   String?
+   906→  translatorId String?
+   907→  doctor       Doctor?     @relation("DoctorLocations", fields: [doctorId], references: [id], onDelete: Cascade)
+   908→  hospital     Hospital?   @relation("HospitalLocations", fields: [hospitalId], references: [id], onDelete: Cascade)
+   909→  translator   Translator? @relation("TranslatorLocations", fields: [translatorId], references: [id], onDelete: Cascade)
+   910→  city         String
+   911→  country      String                          // ISO 3166-1 alpha-2 (e.g., "CA", "AE", "DE")
+   912→  countrySlug  String   @default("")           // URL-friendly country name (e.g., "canada", "uae")
+   913→  address      String?
+   914→  phone        String?
+   915→  isPrimary    Boolean  @default(false)        // marks the main/headquarters location
+   916→  isActive     Boolean  @default(true)
+   917→  createdAt    DateTime @default(now())
+   918→  updatedAt    DateTime @updatedAt
+   919→
+   920→  @@index([doctorId])
+   921→  @@index([hospitalId])
+   922→  @@index([translatorId])
+   923→  @@index([country])
+   924→}
+   925→

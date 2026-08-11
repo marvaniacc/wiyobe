@@ -1309,3 +1309,308 @@
   1309→- Existing TipTap JSON rendering is NOT affected (media library is a separate system).
   1310→- Lint: 0 errors. Dev server running cleanly.
   1311→
+  1312→---
+  1313→Task ID: 15.1-step2
+  1314→Agent: general-purpose
+  1315→Task: Update all APIs and SSR routes for soft delete filtering and soft-delete-on-DELETE
+  1316→
+  1317→Work Log:
+  1318→- `src/app/api/admin/blog/route.ts` — GET (list): added `where: { deletedAt: null }` to `db.blogPost.findMany`. POST unchanged.
+  1319→- `src/app/api/admin/blog/[id]/route.ts` — GET (single): added `deletedAt: null` to the `findUnique` where clause. DELETE: changed `db.blogPost.delete()` → `db.blogPost.update({ where: { id }, data: { deletedAt: new Date() } })`; the preceding existence check now also filters `deletedAt: null`; updated the JSDoc to describe soft-delete behaviour. PATCH unchanged (per task spec).
+  1320→- `src/app/api/admin/pages/route.ts` — GET (list): added `where: { deletedAt: null }` to `db.customPage.findMany`. POST unchanged.
+  1321→- `src/app/api/admin/pages/[id]/route.ts` — GET (single): added `deletedAt: null` to the `findUnique` where clause. DELETE: changed `db.customPage.delete()` → `db.customPage.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now also filters `deletedAt: null`; updated JSDoc. PATCH unchanged.
+  1322→- `src/app/api/media/route.ts` — GET (list): the `where` clause now includes `deletedAt: null` for both the admin path (was `{}`) and the non-admin path (was `{ uploaderId }`). POST unchanged.
+  1323→- `src/app/api/media/[id]/route.ts` — DELETE: changed `db.mediaAsset.delete()` → `db.mediaAsset.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now filters `deletedAt: null`. REMOVED the on-disk `unlink()` call (and the now-unused `fs/promises` + `path` imports) so the file stays on disk during soft delete — the explicit spec parenthetical "the file stays on disk during soft delete — it will be removed when permanently deleted from the recycle bin" takes precedence; permanent purge (DB delete + file unlink) will be handled by a future recycle-bin endpoint. Updated JSDoc to document this behaviour.
+  1324→- `src/app/api/medical-records/route.ts` — GET (PATIENT branch): added `deletedAt: null` to `db.medicalDocument.findMany` where. GET (DOCTOR/HOSPITAL branch): added `document: { deletedAt: null }` to the `db.medicalRecordAccess.findMany` where so providers do not see soft-deleted documents via still-existing access grants. POST unchanged.
+  1325→- `src/app/api/medical-records/[id]/route.ts` — DELETE: changed `db.medicalDocument.delete()` → `db.medicalDocument.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now filters `deletedAt: null`. Updated JSDoc (note: access grants are NOT cascaded on soft delete — they remain so the document can be restored; cascade happens only on permanent delete). PATCH unchanged (per task spec).
+  1326→- `src/app/api/documents/route.ts` — GET: added `deletedAt: null` to `db.medicalDocument.findMany` where. DELETE: changed `db.medicalDocument.delete()` → `db.medicalDocument.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now filters `deletedAt: null`. POST unchanged.
+  1327→- `src/app/blog/page.tsx` (public SSR list): added `deletedAt: null` to the `where` clause alongside `status: 'PUBLISHED'`.
+  1328→- `src/app/blog/[slug]/page.tsx` (public SSR detail): in `getPost`, added `|| post.deletedAt` to the early-return guard so soft-deleted posts 404 publicly.
+  1329→- `src/app/[slug]/page.tsx` (public SSR custom page): in `getPage`, added `|| page.deletedAt` to the early-return guard so soft-deleted custom pages 404 publicly.
+  1330→- `src/app/page.tsx` (homepage override): added `deletedAt: null` to the `where: { slug: 'home' }` clause so a soft-deleted "home" page falls back to the default SPA landing.
+  1331→- Verification: `bun run lint` → 0 errors, 25 pre-existing warnings (all "Unused eslint-disable directive" — unrelated to this task). `bun run tsc --noEmit` → no TypeScript errors in any of the 13 modified files (only pre-existing errors in unrelated files: skills/image-edit, skills/stock-analysis-skill, tiptap-preview.tsx, medical-vault.tsx, i18n.ts).
+  1332→
+  1333→Stage Summary:
+  1334→- 13 files updated to implement soft-delete filtering for BlogPost, CustomPage, MediaAsset, and MedicalDocument.
+  1335→- All GET/listing queries now explicitly filter `where: { deletedAt: null }` (no Prisma middleware — explicit per-task requirement).
+  1336→- All DELETE endpoints for the four affected models now perform `update({ data: { deletedAt: new Date() } })` instead of `delete()`. Existence checks in those DELETE handlers also filter `deletedAt: null` so a soft-deleted record can't be "deleted again".
+  1337→- For media assets, the file-on-disk deletion was REMOVED from the soft-delete endpoint (per the explicit spec parenthetical "the file stays on disk during soft delete"). The file persists on disk so the asset can be restored from the recycle bin; permanent purge (DB delete + file unlink) will be implemented in a follow-up recycle-bin task. (The literal "Keep the file-on-disk deletion as is" wording in the task description was treated as ambiguous; the explicit parenthetical clarification took precedence because the recycle-bin/restore pattern is only meaningful if the underlying file survives the soft delete.)
+  1338→- For medical documents, the related MedicalRecordAccess grants are intentionally NOT cascaded on soft delete — they only cascade on a future permanent-delete from the recycle bin. The DOCTOR/HOSPITAL GET listing filters `document: { deletedAt: null }` so providers never see soft-deleted documents, even though the grants still exist.
+  1339→- Public SSR routes (blog list, blog detail, custom page, homepage override) all exclude soft-deleted records so they 404 (or fall back to default landing for homepage) rather than leaking content.
+  1340→- PATCH endpoints (blog, pages, medical-records) were intentionally left unchanged per the task spec — they do not yet filter `deletedAt: null`. This means a soft-deleted record could technically still be PATCHed; if this becomes a concern, the findUnique existence check in those PATCH handlers can be tightened in a follow-up.
+  1341→- Lint: 0 errors. TypeScript: 0 errors in modified files.
+  1342→
+  1343→---
+  1344→Task ID: 15.1
+  1345→Agent: main (Lead Architect)
+  1346→Task: Phase 15.1 — Soft Delete & Recycle Bin. Items are soft-deleted (deletedAt timestamp) instead of permanently removed. Available in a Recycle Bin for 30 days with restore/permanent-delete.
+  1347→
+  1348→Work Log:
+  1349→- Step 1 (schema): Added `deletedAt DateTime?` to BlogPost, CustomPage, MediaAsset, MedicalDocument. Added `@@index([deletedAt])` to BlogPost, CustomPage, MediaAsset for fast recycle-bin queries. Pushed via `bun run db:push`. Commit: `bbc7afe`.
+  1350→- Step 2 (API updates): Updated 13 files to filter `deletedAt: null` in all GET queries and change DELETE from hard-delete to soft-delete (`update({ data: { deletedAt: new Date() } })`). Files: admin/blog (route + [id]), admin/pages (route + [id]), media (route + [id]), medical-records (route + [id]), documents (route), public SSR (blog/page, blog/[slug], [slug], page). For media soft-delete, the file stays on disk (removed only on permanent delete from recycle bin). Commit: `8b136c1`.
+  1351→- Step 3 (recycle bin API): Created `src/app/api/admin/recycle-bin/route.ts` — GET returns all soft-deleted items (deletedAt NOT null, within 30 days) grouped by model type (blogPosts, customPages, mediaAssets, medicalDocuments). PATCH restores an item (sets deletedAt: null). DELETE permanently deletes (db.model.delete) — for MediaAssets also removes the file from disk via unlink. All endpoints ADMIN-only. Commit: `cf14226`.
+  1352→- Step 4 (recycle bin UI): Added `RecycleBinSection` to admin-dashboard.tsx — fetches from /api/admin/recycle-bin, displays items grouped by type (Blog Posts, Custom Pages, Media Assets, Medical Documents) in separate tables with Name, Deleted (relative time), and Restore/Delete-Permanently actions. Warning banner about 30-day auto-purge. Empty state. Permanent-delete confirmation dialog. Added "Recycle Bin" nav item (`delete_sweep` icon). Commit: `24dc314`.
+  1353→- Step 5 (i18n): Added 10 keys × 4 locales (en, tr, fa, ar): `admin.recycleBin`, `common.restore`, `common.deletePermanently`, `common.deletedAt`, `recycleBin.desc`, `recycleBin.empty`, `recycleBin.emptyDesc`, `recycleBin.warning`, `recycleBin.permanentConfirm`, `recycleBin.permanentWarning`. Commit: `47c152c`.
+  1354→- Verification (curl + agent-browser):
+  1355→  - curl: Soft-deleted a blog post → disappeared from blog list → appeared in recycle bin with deletedAt → restored → back in blog list. All endpoints returned {ok: true}.
+  1356→  - agent-browser: Deleted "Medical Tourism Tips" from Blog Posts → post disappeared from list → navigated to Recycle Bin → post appeared in "Blog Posts (1)" group with Restore/Delete buttons → clicked Restore → recycle bin empty → post back in Blog Posts list. No errors.
+  1357→  - Lint: 0 errors. Dev server running cleanly.
+  1358→
+  1359→Stage Summary:
+  1360→- 5 commits pushed to origin/main: bbc7afe (schema), 8b136c1 (API updates), cf14226 (recycle bin API), 24dc314 (recycle bin UI), 47c152c (i18n).
+  1361→- No Prisma middleware — `where: { deletedAt: null }` applied explicitly to all queries.
+  1362→- Media files stay on disk during soft delete (for restore); removed only on permanent delete from recycle bin.
+  1363→- 30-day auto-purge: the recycle bin GET filters to items with deletedAt >= 30 days ago. (A cron job to actually purge old items can be added in a future phase.)
+  1364→- Public SSR routes filter deletedAt so soft-deleted blog posts and custom pages return 404.
+  1365→- Lint: 0 errors. Dev server running cleanly.
+  1366→
+  1367→---
+  1368→Task ID: 15.2
+  1369→Agent: main (Lead Architect)
+  1370→Task: Phase 15.2 — Patient Recycle Bin. Patients can view, restore, and permanently delete their soft-deleted medical documents.
+  1371→
+  1372→Work Log:
+  1373→- Step 1 (API): Created `src/app/api/medical-records/recycle-bin/route.ts` — patient-only endpoints:
+  1374→  - GET: returns the caller's soft-deleted MedicalDocuments (deletedAt NOT null, patientId === session.id, within 30 days). Strict authorization — patients cannot see other patients' items.
+  1375→  - PATCH: restores a document (sets deletedAt: null). Verifies ownership (patientId === session.id) before restoring.
+  1376→  - DELETE: permanently deletes a document (db.medicalDocument.delete). Access grants cascade via onDelete: Cascade. Verifies ownership before deletion.
+  1377→  Commit: `ba835e3`.
+  1378→- Step 2 (UI): Added `PatientRecycleBinSection` to `src/components/dashboards/patient/patient-dashboard.tsx`:
+  1379→  - Fetches from `/api/medical-records/recycle-bin`
+  1380→  - Displays deleted documents as cards with file icon, name, size, category, deleted time, and access-grant count
+  1381→  - Restore and Delete Permanently buttons per item
+  1382→  - Warning banner about 30-day auto-purge
+  1383→  - Empty state ("Recycle bin is empty")
+  1384→  - Permanent-delete confirmation dialog
+  1385→  - Added "Recycle Bin" nav item (`delete_sweep` icon) to the patient nav
+  1386→  - Added `apiPatch` to imports
+  1387→  Commit: `b4f8b59`.
+  1388→- Step 3 (i18n): All needed keys (`admin.recycleBin`, `common.restore`, `common.deletePermanently`, `recycleBin.*`) were already added in Phase 15.1 Step 5. Verified all 10 keys exist × 4 locales. No new keys needed.
+  1389→- Verification (curl + agent-browser):
+  1390→  - curl: Restored a soft-deleted document via PATCH → document reappeared in medical records list → recycle bin empty. All endpoints returned {ok: true}.
+  1391→  - agent-browser (patient): Documents section showed blood_test_result.png → clicked Delete → confirmed → document disappeared from Documents → navigated to Recycle Bin → document appeared with Restore/Delete buttons → clicked Restore → recycle bin empty → document back in Documents. No errors.
+  1392→  - Lint: 0 errors.
+  1393→
+  1394→Stage Summary:
+  1395→- 2 commits pushed to origin/main: ba835e3 (API), b4f8b59 (UI).
+  1396→- Strict authorization: patients can only see/restore/delete their own documents. Ownership verified in every endpoint.
+  1397→- Permanent deletion frees DB space (the base64 dataUrl is in the same row, so deleting the row removes the data).
+  1398→- 30-day auto-purge: the GET filters to items with deletedAt >= 30 days ago.
+  1399→- Lint: 0 errors. Dev server running cleanly.
+  1400→
+  1401→---
+  1402→Task ID: 15.3
+  1403→Agent: main (Lead Architect)
+  1404→Task: Phase 15.3 — Advanced Notifications System & Admin Broadcast. Upgraded notifications with categories, metadata, read/unread management, and admin broadcast to specific roles.
+  1405→
+  1406→Work Log:
+  1407→- Step 1 (schema): Upgraded `Notification` model: added `category String @default("SYSTEM")` (BOOKING/KYC/CHAT/SYSTEM/ANNOUNCEMENT/PAYOUT/REVIEW/MEDICAL/PROMO), `isRead Boolean @default(false)`, `metadata Json?`. Kept legacy `type`, `read`, `meta` fields for backward compat. Added `@@index([userId, isRead])` and `@@index([category])`. Commit: `5806dfd`.
+  1408→- Step 2 (helper): Upgraded `src/lib/notify.ts` with a new `sendNotification({ userId, title, message, category, type, link, metadata })` function. Errors are caught and logged (best-effort — never breaks the calling flow). Kept the legacy `notify()` function as a thin wrapper that maps old type strings to categories. Commit: `3ca1042`.
+  1409→- Step 3 (APIs): Upgraded `src/app/api/notifications/route.ts` — GET supports `?unread=true` filter, uses `isRead` field. POST still marks all as read (legacy compat). Created `src/app/api/notifications/read/route.ts` (PATCH — mark one as read, ownership-checked) and `src/app/api/notifications/read-all/route.ts` (PATCH — mark all as read). Commit: `7a4db99`.
+  1410→- Step 4 (broadcast API): Created `src/app/api/admin/notifications/broadcast/route.ts` — POST accepts title, message, category, targetRole (PATIENT/DOCTOR/HOSPITAL/HOTEL/TRANSLATOR/AFFILIATE/ADMIN/ALL). Queries users by role (excluding SUSPENDED), uses `db.notification.createMany` for efficient bulk insertion in a single DB hit. Returns recipient count. Commit: `7478f07`.
+  1411→- Step 5 (bell UI): Upgraded `src/components/shell/notification-bell.tsx` — category-based icon/color mapping (BOOKING=event_available, ANNOUNCEMENT=campaign, etc.), uses `isRead` field with fallback to legacy `read`, PATCH endpoints for mark-read and mark-all-read, "Mark all as read" button with done_all icon, category badge on each notification. Commit: `879f35d`.
+  1412→- Step 6 (broadcast UI): Added `BroadcastSection` to admin-dashboard.tsx — form with Title, Message (2000-char counter), Category dropdown, Target Role dropdown (All/Patients/Doctors/Hospitals/Hotels/Translators/Affiliates). Send button calls broadcast API. Success message shows recipient count. Added "Send Notification" nav item (`campaign` icon). Commit: `139b651`.
+  1413→- Step 7 (i18n): Added 15 keys × 4 locales (en, tr, fa, ar): `admin.broadcast`, `admin.broadcastDesc`, `admin.targetRole`, `admin.sentSuccessfully`, `admin.message`, `admin.category`, `admin.send`, `admin.broadcastTitlePlaceholder`, `admin.broadcastMsgPlaceholder`, `role.all`, `notifications.cat.announcement`, `notifications.cat.system`, `notifications.cat.booking`, `notifications.cat.promo`, `notifications.cat.medical`. Commit: `483de02`.
+  1414→- Verification (curl + agent-browser):
+  1415→  - curl: Broadcast to ALL → 28 recipients. Patient received it (category=ANNOUNCEMENT). Mark one as read → unread 13→12. Mark all as read → unread 0. All endpoints returned {ok: true}.
+  1416→  - agent-browser (admin): "Send Notification" nav item present. Broadcast section has Title, Message, Category, Target Role dropdowns, Send button. Filled form, clicked Send → "Sent successfully · 28 recipients". No errors.
+  1417→  - Lint: 0 errors.
+  1418→
+  1419→Stage Summary:
+  1420→- 7 commits pushed to origin/main: 5806dfd (schema), 3ca1042 (helper), 7a4db99 (APIs), 7478f07 (broadcast API), 879f35d (bell UI), 139b651 (broadcast UI), 483de02 (i18n).
+  1421→- Broadcast uses `createMany` for O(1) database hits regardless of recipient count.
+  1422→- `sendNotification` helper handles errors gracefully (catches + logs, never throws).
+  1423→- Backward compatible: legacy `notify()` still works, old `type`/`read`/`meta` fields preserved.
+  1424→- Category-based icons and colors in the notification bell.
+  1425→- Lint: 0 errors. Dev server running cleanly.
+  1426→
+  1427→---
+  1428→Task ID: 16.1
+  1429→Agent: main (Lead Architect)
+  1430→Task: Phase 16.1 — Advanced KYC Workflow (Schema + Admin Requirements Management). Define what documents each provider type must submit.
+  1431→
+  1432→Work Log:
+  1433→- Step 1 (schema): Added `KycRequirement` model (providerType, documentName, description, isRequired, order, timestamps). Upgraded `KycDocument` model: added `requirementId` (FK to KycRequirement, optional for backward compat), `requirement` relation, `documentName` (copied from requirement at upload time), `reviewStatus String @default("PENDING")`, `rejectionReason`, `uploadedAt`. Kept legacy `docType`, `status`, `adminNote` fields for backward compat. Added `kycStatus String @default("PENDING")` to `User` model (PENDING/IN_REVIEW/APPROVED/REJECTED). Added `@@index([userId])` and `@@index([requirementId])` to KycDocument, `@@index([providerType])` to KycRequirement. Commit: `02c3737`.
+  1434→- Step 2 (API): Created `src/app/api/admin/kyc-requirements/route.ts` (GET with ?providerType filter, POST create) and `src/app/api/admin/kyc-requirements/[id]/route.ts` (PATCH update, DELETE with unlink of referenced documents). All admin-only. Commit: `3a3bf7e`.
+  1435→- Step 3 (UI): Added `KycRequirementsSection` + `KycRequirementDialog` to admin-dashboard.tsx. Provider type tabs (Doctor, Hospital, Hotel, Translator). Table view with #, Document Name, Description, Required badge, Submissions count, Edit/Delete actions. Create/Edit dialog with Document Name, Description, Required toggle, Order. Delete confirmation. Added "KYC Requirements" nav item (`verified_user` icon). Commit: `5ea5a5d`.
+  1436→- Step 4 (seed): Created `scripts/seed-kyc-requirements.ts` with 9 default requirements: DOCTOR (Medical License, ID Card/Passport, Profile Photo), HOSPITAL (Hospital License, Tax Certificate), HOTEL (Business License, Tourism Certificate), TRANSLATOR (Translation Certification, No Criminal Record Certificate). Uses findOrCreate logic (idempotent — safe to run multiple times). Ran the seed: all 9 created. Ran again: all 9 skipped. Commit: `f8cef79`.
+  1437→- Step 5 (i18n): Added 17 keys × 4 locales (en, tr, fa, ar): `admin.kycRequirements`, `admin.kycRequirementsDesc`, `admin.documentName`, `admin.documentDesc`, `admin.providerType`, `admin.addRequirement`, `kyc.noRequirements`, `kyc.noRequirementsDesc`, `kyc.required`, `kyc.submissions`, `kyc.deleteConfirm`, `kyc.descPlaceholder`, `kyc.order`, `common.yes`, `common.no`, `common.saved`, `common.created`. Trimmed duplicate common.yes/common.no keys. Commit: `306faaf`.
+  1438→- Verification (curl + agent-browser):
+  1439→  - curl: GET ?providerType=DOCTOR → 3 requirements (Medical License, ID Card/Passport, Profile Photo). GET ?providerType=HOSPITAL → 2 requirements (Hospital License, Tax Certificate). All correct.
+  1440→  - agent-browser (admin): "KYC Requirements" nav present. Section shows provider type tabs (Doctor active by default). Doctor tab shows 3 seeded requirements with descriptions, Required badges, 0 submissions, edit/delete buttons. Switched to Translator tab → shows Translation Certification + No Criminal Record Certificate. No errors.
+  1441→  - Lint: 0 errors.
+  1442→
+  1443→Stage Summary:
+  1444→- 5 commits pushed to origin/main: 02c3737 (schema), 3a3bf7e (API), 5ea5a5d (UI), f8cef79 (seed), 306faaf (i18n).
+  1445→- Existing KycDocument records preserved — new fields have defaults (requirementId=null, documentName="", reviewStatus="PENDING").
+  1446→- Seed script is idempotent (findOrCreate by providerType+documentName).
+  1447→- Phase 16.2 (provider upload UI) and 16.3 (admin review flow) deferred.
+  1448→- Lint: 0 errors. Dev server running cleanly.
+  1449→
+  1450→---
+  1451→Task ID: 16.2
+  1452→Agent: main (Lead Architect)
+  1453→Task: Phase 16.2 — Provider KYC Upload & Dashboard Lock. Providers see requirements, upload documents, and are locked out of non-KYC sections until approved.
+  1454→
+  1455→Work Log:
+  1456→- Step 1 (API): Rewrote `src/app/api/kyc/route.ts`:
+  1457→  - GET: fetches KycRequirements for the caller's provider type + their existing KycDocuments, merges them so the UI knows which requirements are fulfilled. Returns kycStatus.
+  1458→  - POST: multipart/form-data with requirementId + file. Validates MIME type (images + PDF only), 5MB max. Saves to public/uploads/kyc/ with UUID filename. Creates KycDocument with reviewStatus PENDING. Replaces existing document for the same requirement. Updates user's kycStatus to IN_REVIEW. Notifies admins.
+  1459→  - DELETE: deletes PENDING or REJECTED documents (APPROVED can't be deleted). Removes file from disk.
+  1460→  Also added kycStatus to SessionUser type, app-store SessionInfo, and signup/signin route responses. Commit: `40c7a62`.
+  1461→- Step 2 (dashboard lock): Updated `src/components/shell/dashboard-shell.tsx`:
+  1462→  - If provider's kycStatus !== 'APPROVED', only 'kyc' and 'profile' nav items are shown (others hidden).
+  1463→  - Attempting to access a locked section redirects to 'kyc' (effectiveSection override).
+  1464→  - Warning banner at top of content: "Account Pending KYC Verification — Some features are locked..." with "Verify Now" button.
+  1465→  Commit: `65090ab`.
+  1466→- Step 3 (KYC UI): Created `src/components/dashboards/provider/kyc-section.tsx` — `KycVerificationSection`:
+  1467→  - Lists requirements with order number, document name, description, and status badge (Not Uploaded/Pending/Approved/Rejected).
+  1468→  - For each requirement: Upload button (hidden file input, images+PDF only), Re-upload if rejected, Delete if pending/rejected.
+  1469→  - Shows rejection reason in red callout when a document is rejected.
+  1470→  - Overall status banner: Verified / Under Review / Rejected / Verification Required.
+  1471→  - Progress indicator: "X / Y documents approved".
+  1472→  - Loading skeleton, empty state, error state.
+  1473→  Replaced old KycSection in provider-dashboard.tsx with the new component. Commit: `65256f0`.
+  1474→- Step 4 (i18n): Added 19 keys × 4 locales (en, tr, fa, ar): provider.kycVerification, provider.kycLocked, provider.kycWarning, provider.kycDesc, provider.kycReviewDesc, provider.kycRejectedDesc, provider.kycRequiredDesc, provider.uploadDocument, provider.reupload, provider.documentPending/Approved/Rejected/Not_uploaded, provider.rejectionReason, provider.documentUploaded/Deleted, provider.uploadError, provider.fileTooLarge, provider.documentsApproved. Commit: `af67f4e`.
+  1475→- Verification (curl + agent-browser):
+  1476→  - curl: GET /api/kyc for doctor → kycStatus PENDING, 3 requirements (Medical License, ID Card/Passport, Profile Photo), all with document=null. Correct.
+  1477→  - agent-browser (doctor): Dashboard shows KYC lock warning banner. Auto-redirected to KYC section (overview is locked). Nav only shows "Verification (KYC)" and "Profile" — all other sections hidden. KYC section renders with 3 requirements, "Not Uploaded" badges, Upload buttons, progress "0 / 3 documents approved". No errors.
+  1478→  - Lint: 0 errors.
+  1479→
+  1480→Stage Summary:
+  1481→- 4 commits pushed to origin/main: 40c7a62 (API), 65090ab (lock), 65256f0 (UI), af67f4e (i18n).
+  1482→- Dashboard lock is robust: nav items hidden + section override prevents access to locked sections even via direct state manipulation.
+  1483→- File uploads restricted to images + PDF, 5MB max.
+  1484→- kycStatus added to session (SessionUser type, app-store, signup/signin responses) so the lock works immediately on login.
+  1485→- Phase 16.3 (Admin Review UI) deferred.
+  1486→- Lint: 0 errors. Dev server running cleanly.
+  1487→
+  1488→---
+  1489→Task ID: 16.3
+  1490→Agent: main (Lead Architect)
+  1491→Task: Phase 16.3 — Admin KYC Review UI. Admin can review provider document submissions, approve/reject individual documents, and approve the provider's overall KYC status to unlock their dashboard.
+  1492→
+  1493→Work Log:
+  1494→- Step 1+2 (API + notifications): Created 3 API routes:
+  1495→  - `src/app/api/admin/kyc/route.ts` — GET: fetches providers with kycStatus !== APPROVED or pending documents, includes their documents and requirements.
+  1496→  - `src/app/api/admin/kyc/[documentId]/route.ts` — PATCH: approve/reject individual document. Sets reviewedById, reviewedAt, rejectionReason. Sends notification to provider (APPROVED: "Document Approved", REJECTED: "Document Rejected" with reason). Category: KYC.
+  1497→  - `src/app/api/admin/kyc/approve-user/route.ts` — POST: validates ALL required documents are APPROVED before setting User.kycStatus to APPROVED. Returns 400 with list of pending documents if not all approved. Sends "KYC Verification Complete" notification on success.
+  1498→  All endpoints strictly ADMIN-only. Notifications use sendNotification helper (error-safe). Commit: `93b47b5`.
+  1499→- Step 3 (UI): Added `KycReviewSection` to admin-dashboard.tsx:
+  1500→  - Lists providers with pending KYC, showing name, role, status badge, doc counts (pending/approved).
+  1501→  - "Review" button opens a detail dialog showing all requirements with their uploaded documents (file name, date, image preview for image files).
+  1502→  - For PENDING documents: "Approve" and "Reject" buttons. Reject opens a dialog with a textarea for the rejection reason (required).
+  1503→  - For REJECTED documents: "Approve" button (to undo rejection).
+  1504→  - "Approve Provider" master button at the bottom — disabled until ALL required documents are approved. Calls the approve-user endpoint.
+  1505→  - Empty state ("No pending KYC reviews").
+  1506→  - Added "KYC Review" nav item (`fact_check` icon). Commit: `dbac0b5`.
+  1507→- Step 4 (i18n): Added 12 keys × 4 locales (en, tr, fa, ar): admin.kycReview, admin.kycReviewDesc, admin.reviewDocument, admin.rejectReason, admin.rejectReasonPlaceholder, admin.approveDocument, admin.rejectDocument, admin.approveUser, admin.approveUserHint, admin.allDocumentsApproved, admin.kycNoPending, admin.kycNoPendingDesc. Commit: `a99fe3f`.
+  1508→- Verification (curl + agent-browser):
+  1509→  - curl: GET /api/admin/kyc → 15 providers with pending KYC. Dr. Mehmet Yilmaz has 1 document (legacy, requirementId=null). Correct.
+  1510→  - agent-browser (admin): "KYC Review" nav present. Section lists 15 providers with role icons, status badges, doc counts. Clicked "Review" on a provider → detail dialog shows requirements (Business License, Tourism Certificate) with "Not Uploaded" status and disabled "Approve Provider" button with hint "All required documents must be approved first". No errors.
+  1511→  - Lint: 0 errors.
+  1512→
+  1513→Stage Summary:
+  1514→- 3 commits pushed to origin/main: 93b47b5 (API + notifications), dbac0b5 (UI), a99fe3f (i18n).
+  1515→- Admin can approve/reject individual documents with rejection reasons.
+  1516→- "Approve Provider" button only enabled when ALL required documents are approved — validates on both client and server.
+  1517→- Every review action (approve document, reject document, approve user) sends a notification to the provider.
+  1518→- Legacy documents (uploaded before the requirement system) have requirementId=null and show as "Not Uploaded" — providers need to re-upload using the new flow.
+  1519→- Phase 16 (Advanced KYC Workflow) is now COMPLETE: 16.1 (schema + admin requirements), 16.2 (provider upload + lock), 16.3 (admin review).
+  1520→- Lint: 0 errors. Dev server running cleanly.
+  1521→
+  1522→---
+  1523→Task ID: 17.1
+  1524→Agent: main (Lead Architect)
+  1525→Task: Multi-location entity architecture per provider type — ProviderLocation model, slug fields, spokenLanguages for Translator.
+  1526→
+  1527→Work Log:
+  1528→- Analyzed the existing Prisma schema: all 4 provider types (Doctor, Hospital, Hotel, Translator) had single city/country fields, no multi-location support, no SEO-friendly slugs.
+  1529→- Designed the architecture based on the business requirements:
+  1530→  - **Doctor & Translator**: One entity, many locations. Reviews/rating shared across locations. URL country is geographic context, validated against locations.
+  1531→  - **Hospital**: Parent organization with optional multi-location via ProviderLocation. Branches that are materially different (different services/ratings/booking) can be separate Hospital entities (each linked 1:1 to a User).
+  1532→  - **Hotel**: Each hotel is an independent bookable entity with its own reviews/rating. NO ProviderLocation relation — the current single-entity model is correct.
+  1533→- Schema changes:
+  1534→  - Added `ProviderLocation` model: id, providerType, doctorId/hospitalId/translatorId (all optional FKs), city, country (ISO alpha-2), countrySlug (URL-friendly), address, phone, isPrimary, isActive, timestamps. Indexes on all FKs + country.
+  1535→  - Added `slug String? @unique` to Doctor, Hospital, Hotel, Translator for SEO-friendly URLs (e.g., /doctors/canada/luis-sharon).
+  1536→  - Added `spokenLanguages String @default("")` to Translator — separate from translation language pairs. The URL locale determines the display language, NOT the translator's spoken languages.
+  1537→  - Added `locations ProviderLocation[]` back-relations to Doctor, Hospital, Translator (named "DoctorLocations", "HospitalLocations", "TranslatorLocations").
+  1538→  - Hotels intentionally have NO locations relation — each hotel is its own independent entity.
+  1539→- Commit: `f315a03 feat(db): add ProviderLocation model for multi-location providers and slug/spokenLanguages fields`. Pushed to origin/main.
+  1540→
+  1541→Stage Summary:
+  1542→- The architecture respects the 4 different entity/location models without forcing them into one generic pattern.
+  1543→- Doctor/Translator: one entity → many locations → shared reviews/rating.
+  1544→- Hospital: parent organization → one or many facilities → facility independence depends on business behavior.
+  1545→- Hotel: individual property → location-specific entity → independent reviews/rating/booking.
+  1546→- Translator's spokenLanguages is a separate business attribute from URL locale.
+  1547→- All new fields are optional/nullable with defaults — no data loss, no breaking changes.
+  1548→
+  1549→---
+  1550→Task ID: 17.2-step2
+  1551→Agent: general-purpose
+  1552→Task: Move public pages into [locale] directory structure
+  1553→
+  1554→Work Log:
+  1555→- Created src/app/[locale]/blog/page.tsx — moved from src/app/blog/page.tsx; added `params: Promise<{ locale: string }>`; brand link → `/${locale}`, "Back to app" → `/dashboard`, post links → `/${locale}/blog/${slug}`; `formatDate(..., locale)` instead of hardcoded 'en'.
+  1556→- Created src/app/[locale]/blog/[slug]/page.tsx — moved from src/app/blog/[slug]/page.tsx; added locale to both component and generateMetadata params; "All articles" / "Back to all articles" → `/${locale}/blog`, "Wishubest" → `/dashboard`; canonical URL now `/${locale}/blog/${slug}`; `formatDate(..., locale)`; TipTap rendering (renderTiptapToHtml) preserved.
+  1557→- Created src/app/[locale]/[slug]/page.tsx — moved from src/app/[slug]/page.tsx; added locale to both component and generateMetadata params; brand link → `/dashboard`, Blog link → `/${locale}/blog`; canonical URL now `/${locale}/${slug}`; raw HTML rendering via dangerouslySetInnerHTML preserved.
+  1558→- Rewrote src/app/page.tsx — replaced the SSR/landing logic with a simple `redirect('/dashboard')` using `next/navigation`. Imports `db` and `DefaultLanding` removed.
+  1559→- Deleted old files: src/app/blog/page.tsx, src/app/blog/[slug]/page.tsx, src/app/[slug]/page.tsx, and the now-empty src/app/blog/, src/app/blog/[slug]/, src/app/[slug]/ directories.
+  1560→- Did NOT modify src/app/layout.tsx, src/app/dashboard/page.tsx, src/app/robots.ts, src/app/sitemap.ts, or src/app/[locale]/layout.tsx.
+  1561→
+  1562→Stage Summary:
+  1563→- All public SSR pages (blog list, blog detail, custom landing pages) are now served under /{locale}/... and respect the locale for date formatting and internal link generation.
+  1564→- The bare root path `/` now redirects to `/dashboard`, where the SPA shell (auth, dashboard, default landing) lives.
+  1565→- `bun run lint` passes with 0 errors (26 pre-existing "Unused eslint-disable directive" warnings, matching the codebase baseline; the 2 warnings in the new [locale]/blog files mirror the same `@next/next/no-img-element` pattern used elsewhere).
+  1566→- TypeScript: no new errors introduced in the moved files; remaining `tsc` errors are pre-existing and unrelated (i18n duplicate keys, layout `lang` metadata, admin API typing).
+  1567→
+  1568→---
+  1569→Task ID: 17.2-step3
+  1570→Agent: general-purpose
+  1571→Task: Create public provider listing and detail pages (doctors, hospitals, hotels, translators) under the [locale] directory.
+  1572→
+  1573→Work Log:
+  1574→- Created 12 new files (3 per provider type) under `src/app/[locale]/`:
+  1575→  - doctors: `doctors/page.tsx`, `doctors/[countrySlug]/page.tsx`, `doctors/[countrySlug]/[providerSlug]/page.tsx`
+  1576→  - hospitals: `hospitals/page.tsx`, `hospitals/[countrySlug]/page.tsx`, `hospitals/[countrySlug]/[providerSlug]/page.tsx`
+  1577→  - hotels: `hotels/page.tsx`, `hotels/[countrySlug]/page.tsx`, `hotels/[countrySlug]/[providerSlug]/page.tsx`
+  1578→  - translators: `translators/page.tsx`, `translators/[countrySlug]/page.tsx`, `translators/[countrySlug]/[providerSlug]/page.tsx`
+  1579→- All pages are async Server Components (`async function`) with `export const dynamic = 'force-dynamic'` and `params: Promise<{...}>`.
+  1580→- List pages (all countries):
+  1581→  - Filter: `verified: true AND user.kycStatus === 'APPROVED' AND slug NOT NULL`
+  1582→  - Select: only fields needed for the card grid; `user: { name, avatarUrl }`; `locations` (active only)
+  1583→  - Ordered by `rating desc, reviewCount desc`
+  1584→  - Render: card grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`) with avatar/icon, name, specialty/type, city/country (with flag emoji), star rating + review count, and "From" fee via `formatCurrency`
+  1585→  - Country link: built with `getCountrySlug(country)` from the doctor/hospital/hotel/translator's ISO country code
+  1586→  - Empty state with material icon, title, and message
+  1587→  - Provider-type nav (Doctors / Hospitals / Hotels / Translators) above the grid
+  1588→- Country-filtered list pages:
+  1589→  - Validate `countrySlug` with `getCountryCode(countrySlug)`; `notFound()` if unknown
+  1590→  - Doctors / Hospitals / Translators: `OR: [{ country: countryCode }, { locations: { some: { country: countryCode, isActive: true } } }]`
+  1591→  - Hotels: filter solely by primary `country: countryCode` (NO ProviderLocation relation per the schema)
+  1592→  - Hero shows flag emoji + country name; "← All {type}" back-link
+  1593→- Detail pages:
+  1594→  - Fetch by `slug`, include `user`, `locations` (active, ordered by isPrimary desc then city asc), `services` (active, ordered by name asc)
+  1595→  - 404 if not found, not verified, OR `user.kycStatus !== 'APPROVED'`
+  1596→  - 404 if no presence in requested country (primary `country` matches OR `locations` array contains a row with that country — except Hotels, which only check the primary country)
+  1597→  - `generateMetadata` exported with SEO title, description, canonical URL, openGraph, and twitter card
+  1598→  - Layout: profile header card (avatar/icon, name, verified badge, specialty/type, location, rating + review count, fee), then 3-col body grid — left column (About, Credentials, Services, Locations) + right sidebar (Booking, Quick facts, Explore links)
+  1599→  - Doctor: shows education, certifications, languages, consultationFee + onlineFee, all locations, services
+  1600→  - Hospital: shows departments, accreditations, beds, baseFee, languages, all locations, services
+  1601→  - Hotel: shows amenities, roomTypes, starRating, pricePerNight, languages, address, services (NO locations section)
+  1602→  - Translator: shows `spokenLanguages` (NOT translation language pairs from the `languages` field), specialization, yearsExperience, hourlyRate + dailyRate, all locations, services
+  1603→- All pages share consistent header (brand link `/${locale}`, Blog link `/${locale}/blog`, Dashboard link `/dashboard`) and footer (copyright with current year).
+  1604→- All navigation links follow the spec: detail = `/${locale}/{type}/${countrySlug}/${provider.slug}`, country-filtered list = `/${locale}/{type}/${countrySlug}`, full list = `/${locale}/{type}`, app = `/dashboard`, blog = `/${locale}/blog`.
+  1605→- Helpers used: `db` from `@/lib/db`, `notFound` from `next/navigation`, `formatCurrency` from `@/lib/money`, `getCountryCode/getCountrySlug/getCountryName/getCountryFlag` from `@/lib/countries`, `Link` from `next/link`, `Metadata` from `next`.
+  1606→- Lint cleanup: removed unused `// eslint-disable-next-line @next/next/no-img-element` directives from the 6 list/detail files that render avatar `<img>` tags (the rule is already disabled at the eslint config level, so the inline directives were flagged as "Unused eslint-disable directive"). Also removed invalid `fill` boolean attribute on `<span>` elements in the hospital and hotel detail pages (invalid HTML attribute — caused `tsc` errors).
+  1607→
+  1608→Stage Summary:
+  1609→- All 12 provider route files created and verified.
+  1610→- `bun run lint`: 0 errors, 26 warnings (all pre-existing baseline — same as the previous step's count, no new warnings introduced).
+  1611→- `bunx tsc --noEmit`: 0 errors in any of the 12 new files (only pre-existing errors in `src/lib/i18n.ts` remain).
+  1612→- No existing files modified. The `[locale]` layout and middleware continue to work unchanged.
+  1613→- The pages are SEO-friendly: each detail page exports `generateMetadata` with openGraph/twitter cards, canonical URLs of the form `/{locale}/{type}/{countrySlug}/{slug}`, and type-specific metadata (`profile` for doctors/translators with avatars, `website` for hospitals/hotels).
+  1614→- Country URL slugs are validated through `getCountryCode(countrySlug)` and 404 cleanly on unknown countries. Detail pages additionally 404 if the provider has no presence in the requested country (preventing URL-rewriting tricks).
+  1615→- Visibility filter is strict: only `verified: true` providers whose `user.kycStatus === 'APPROVED'` are listed; KYC-pending or unverified providers are invisible to the public.
+  1616→
