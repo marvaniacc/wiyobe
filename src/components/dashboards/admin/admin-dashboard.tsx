@@ -2639,6 +2639,306 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
 }
 
 // ============================================================================
+// Section: Custom Pages — raw HTML/CSS landing page builder
+// ============================================================================
+
+type CustomPage = {
+  id: string
+  title: string
+  slug: string
+  htmlContent: string
+  seoTitle: string | null
+  seoDescription: string | null
+  isPublished: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+function CustomPagesSection() {
+  const { t, locale } = useT()
+  const { data, loading, error, refetch } = useApi<{ pages: CustomPage[] }>('/api/admin/pages')
+  const [editing, setEditing] = React.useState<CustomPage | null>(null)
+  const [creating, setCreating] = React.useState(false)
+  const [deleteTarget, setDeleteTarget] = React.useState<CustomPage | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
+
+  const pages = data?.pages || []
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await apiDelete(`/api/admin/pages/${deleteTarget.id}`)
+      toast.success(t('pages.deleted', 'Page deleted'))
+      setDeleteTarget(null)
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title={t('admin.customPages', 'Custom Pages')} icon="web" />
+        <LoadingCard lines={4} />
+      </div>
+    )
+  }
+  if (error || !data) return <ErrorState message={error || t('admin.error')} onRetry={refetch} />
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={t('admin.customPages', 'Custom Pages')}
+        description={t('admin.customPagesDesc', 'Create custom landing pages with raw HTML/CSS')}
+        icon="web"
+        action={
+          <Button onClick={() => setCreating(true)} className="gap-1.5">
+            <Icon name="add" size={18} />
+            {t('admin.newPage', 'New Page')}
+          </Button>
+        }
+      />
+
+      {pages.length === 0 ? (
+        <Card className="mt-6">
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <Icon name="web" size={32} className="text-muted-foreground/50" />
+            <p className="text-sm font-medium text-foreground">{t('pages.noPages', 'No custom pages yet')}</p>
+            <p className="max-w-sm text-xs text-muted-foreground">{t('pages.noPagesDesc', 'Create custom landing pages like /about-us or /services with your own HTML/CSS code.')}</p>
+            <Button onClick={() => setCreating(true)} className="mt-2 gap-1.5">
+              <Icon name="add" size={16} />
+              {t('admin.newPage', 'New Page')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="mt-6 overflow-hidden rounded-[16px] border border-divider">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('admin.title', 'Title')}</TableHead>
+                <TableHead>{t('blog.slug', 'Slug')}</TableHead>
+                <TableHead className="text-center">{t('common.status', 'Status')}</TableHead>
+                <TableHead>{t('blog.updated', 'Updated')}</TableHead>
+                <TableHead className="text-end">{t('common.actions', 'Actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pages.map((page) => (
+                <TableRow key={page.id}>
+                  <TableCell>
+                    <span className="max-w-xs truncate text-sm font-medium text-foreground">{page.title}</span>
+                  </TableCell>
+                  <TableCell>
+                    <code className="text-xs text-muted-foreground">/{page.slug}</code>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'rounded-full border',
+                        page.isPublished
+                          ? 'border-success/20 bg-success/10 text-success'
+                          : 'border-warning/20 bg-warning/10 text-warning',
+                      )}
+                    >
+                      {page.isPublished ? t('admin.published', 'Published') : t('admin.draft', 'Draft')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">{relativeTime(page.updatedAt, locale)}</span>
+                  </TableCell>
+                  <TableCell className="text-end">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditing(page)}
+                        title={t('common.edit', 'Edit')}
+                        className="gap-1"
+                      >
+                        <Icon name="edit" size={16} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteTarget(page)}
+                        title={t('common.delete', 'Delete')}
+                        className="text-error hover:bg-error/5"
+                      >
+                        <Icon name="delete" size={16} />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <CustomPageEditorDialog
+        open={creating || !!editing}
+        page={editing}
+        onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null) } }}
+        onSaved={() => { setCreating(false); setEditing(null); refetch() }}
+      />
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="warning" size={20} className="text-error" />
+              {t('pages.deleteTitle', 'Delete page?')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('blog.deleteConfirm', 'Are you sure you want to delete')} <span className="font-semibold text-foreground">{deleteTarget?.title}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="gap-1.5">
+              {deleting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="delete" size={16} />}
+              {t('common.delete', 'Delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
+  open: boolean
+  page: CustomPage | null
+  onOpenChange: (o: boolean) => void
+  onSaved: () => void
+}) {
+  const { t } = useT()
+  const [title, setTitle] = React.useState('')
+  const [slug, setSlug] = React.useState('')
+  const [seoTitle, setSeoTitle] = React.useState('')
+  const [seoDescription, setSeoDescription] = React.useState('')
+  const [isPublished, setIsPublished] = React.useState(false)
+  const [htmlContent, setHtmlContent] = React.useState('')
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (open) {
+      setTitle(page?.title || '')
+      setSlug(page?.slug || '')
+      setSeoTitle(page?.seoTitle || '')
+      setSeoDescription(page?.seoDescription || '')
+      setIsPublished(page?.isPublished || false)
+      setHtmlContent(page?.htmlContent || '')
+    }
+  }, [open, page])
+
+  async function handleSave() {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      const payload = {
+        title: title.trim(),
+        slug: slug.trim() || undefined,
+        htmlContent,
+        seoTitle: seoTitle.trim() || null,
+        seoDescription: seoDescription.trim() || null,
+        isPublished,
+      }
+      if (page) {
+        await apiPatch(`/api/admin/pages/${page.id}`, payload)
+        toast.success(t('pages.updated', 'Page updated'))
+      } else {
+        await apiPost('/api/admin/pages', payload)
+        toast.success(t('pages.created', 'Page created'))
+      }
+      onSaved()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="web" size={20} className="text-primary" />
+            {page ? t('pages.editPage', 'Edit Page') : t('admin.newPage', 'New Page')}
+          </DialogTitle>
+          <DialogDescription>{t('pages.editorDesc', 'Create a custom landing page with raw HTML/CSS.')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Title + Slug */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.title', 'Title')}</Label>
+              <Input placeholder="About Us" value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('blog.slug', 'Slug')}</Label>
+              <Input placeholder="auto-generated from title" value={slug} onChange={(e) => setSlug(e.target.value)} className="font-mono text-sm" />
+            </div>
+          </div>
+
+          {/* SEO Title + Description */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.seoTitle', 'SEO Title')}</Label>
+              <Input placeholder={t('pages.seoTitlePlaceholder', 'Optional — defaults to page title')} value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.seoDescription', 'SEO Description')}</Label>
+              <Input placeholder={t('pages.seoDescPlaceholder', 'Meta description for search engines')} value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Published toggle */}
+          <div className="flex items-center justify-between rounded-[12px] border border-divider p-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">{t('admin.published', 'Published')}</p>
+              <p className="text-xs text-muted-foreground">{t('pages.publishHint', 'Published pages are publicly accessible at /{slug}')}</p>
+            </div>
+            <Switch checked={isPublished} onCheckedChange={setIsPublished} aria-label={t('admin.published', 'Published')} />
+          </div>
+
+          {/* HTML Content */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('admin.htmlContent', 'HTML Content')}</Label>
+            <textarea
+              placeholder={'<div style="padding: 40px;">\n  <h1>Welcome to our page</h1>\n  <p>Custom HTML/CSS here…</p>\n</div>'}
+              value={htmlContent}
+              onChange={(e) => setHtmlContent(e.target.value)}
+              rows={14}
+              className="flex w-full rounded-[14px] border border-divider bg-surface px-3.5 py-2.5 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+              spellCheck={false}
+            />
+            <p className="text-[11px] text-muted-foreground">{t('pages.htmlHint', 'Paste raw HTML/CSS here. The content is rendered as-is (no sanitization).')}</p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+          <Button onClick={handleSave} disabled={!title.trim() || saving} className="gap-1.5">
+            {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+            {page ? t('common.save', 'Save') : t('blog.create', 'Create')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -2655,6 +2955,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'affiliate-rates': return <AffiliateRatesSection />
     case 'promo-codes': return <PromoCodesSection />
     case 'blog': return <BlogSection />
+    case 'custom-pages': return <CustomPagesSection />
     case 'cancellations': return <CancellationsSection />
     case 'payouts': return <PayoutsSection />
     case 'ledger': return <LedgerSection />
