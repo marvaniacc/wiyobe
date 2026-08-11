@@ -1446,3 +1446,41 @@ Stage Summary:
 - Seed script is idempotent (findOrCreate by providerType+documentName).
 - Phase 16.2 (provider upload UI) and 16.3 (admin review flow) deferred.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 16.2
+Agent: main (Lead Architect)
+Task: Phase 16.2 — Provider KYC Upload & Dashboard Lock. Providers see requirements, upload documents, and are locked out of non-KYC sections until approved.
+
+Work Log:
+- Step 1 (API): Rewrote `src/app/api/kyc/route.ts`:
+  - GET: fetches KycRequirements for the caller's provider type + their existing KycDocuments, merges them so the UI knows which requirements are fulfilled. Returns kycStatus.
+  - POST: multipart/form-data with requirementId + file. Validates MIME type (images + PDF only), 5MB max. Saves to public/uploads/kyc/ with UUID filename. Creates KycDocument with reviewStatus PENDING. Replaces existing document for the same requirement. Updates user's kycStatus to IN_REVIEW. Notifies admins.
+  - DELETE: deletes PENDING or REJECTED documents (APPROVED can't be deleted). Removes file from disk.
+  Also added kycStatus to SessionUser type, app-store SessionInfo, and signup/signin route responses. Commit: `40c7a62`.
+- Step 2 (dashboard lock): Updated `src/components/shell/dashboard-shell.tsx`:
+  - If provider's kycStatus !== 'APPROVED', only 'kyc' and 'profile' nav items are shown (others hidden).
+  - Attempting to access a locked section redirects to 'kyc' (effectiveSection override).
+  - Warning banner at top of content: "Account Pending KYC Verification — Some features are locked..." with "Verify Now" button.
+  Commit: `65090ab`.
+- Step 3 (KYC UI): Created `src/components/dashboards/provider/kyc-section.tsx` — `KycVerificationSection`:
+  - Lists requirements with order number, document name, description, and status badge (Not Uploaded/Pending/Approved/Rejected).
+  - For each requirement: Upload button (hidden file input, images+PDF only), Re-upload if rejected, Delete if pending/rejected.
+  - Shows rejection reason in red callout when a document is rejected.
+  - Overall status banner: Verified / Under Review / Rejected / Verification Required.
+  - Progress indicator: "X / Y documents approved".
+  - Loading skeleton, empty state, error state.
+  Replaced old KycSection in provider-dashboard.tsx with the new component. Commit: `65256f0`.
+- Step 4 (i18n): Added 19 keys × 4 locales (en, tr, fa, ar): provider.kycVerification, provider.kycLocked, provider.kycWarning, provider.kycDesc, provider.kycReviewDesc, provider.kycRejectedDesc, provider.kycRequiredDesc, provider.uploadDocument, provider.reupload, provider.documentPending/Approved/Rejected/Not_uploaded, provider.rejectionReason, provider.documentUploaded/Deleted, provider.uploadError, provider.fileTooLarge, provider.documentsApproved. Commit: `af67f4e`.
+- Verification (curl + agent-browser):
+  - curl: GET /api/kyc for doctor → kycStatus PENDING, 3 requirements (Medical License, ID Card/Passport, Profile Photo), all with document=null. Correct.
+  - agent-browser (doctor): Dashboard shows KYC lock warning banner. Auto-redirected to KYC section (overview is locked). Nav only shows "Verification (KYC)" and "Profile" — all other sections hidden. KYC section renders with 3 requirements, "Not Uploaded" badges, Upload buttons, progress "0 / 3 documents approved". No errors.
+  - Lint: 0 errors.
+
+Stage Summary:
+- 4 commits pushed to origin/main: 40c7a62 (API), 65090ab (lock), 65256f0 (UI), af67f4e (i18n).
+- Dashboard lock is robust: nav items hidden + section override prevents access to locked sections even via direct state manipulation.
+- File uploads restricted to images + PDF, 5MB max.
+- kycStatus added to session (SessionUser type, app-store, signup/signin responses) so the lock works immediately on login.
+- Phase 16.3 (Admin Review UI) deferred.
+- Lint: 0 errors. Dev server running cleanly.
