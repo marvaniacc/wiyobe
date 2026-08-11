@@ -703,7 +703,7 @@ function BrowseSection() {
       ) : (
         <div className="grid animate-fade-in grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {data.results.map((p) => (
-            <ProviderCard key={p.id} provider={p} onBook={() => openBooking(p)} onView={() => openView(p)} />
+            <ProviderCard key={p.id} provider={p} />
           ))}
         </div>
       )}
@@ -751,63 +751,24 @@ function BrowseSkeleton() {
   )
 }
 
-function ProviderCard({ provider, onBook, onView }: {
+function ProviderCard({ provider }: {
   provider: Provider
-  onBook: () => void
-  onView: () => void
+  onBook?: () => void
+  onView?: () => void
 }) {
-  const { t, locale } = useT()
-  const compareIds = useApp((s) => s.compareIds)
-  const toggleCompare = useApp((s) => s.toggleCompare)
-  const inCompare = compareIds.includes(provider.id)
-  const compareFull = compareIds.length >= 4 && !inCompare
-  const [isFav, setIsFav] = useState(false)
+  const { t } = useT()
+  const goPublicProfile = useApp((s) => s.goPublicProfile)
 
-  // Check favorite status
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/favorites').then(r => r.json()).then(d => {
-      if (!cancelled && d.favorites) {
-        setIsFav(d.favorites.some((f: any) => f.providerId === provider.id))
-      }
-    }).catch(() => {})
-    return () => { cancelled = true }
-  }, [provider.id])
-
-  function handleCompareClick(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (compareFull) {
-      toast.info(t('browse.compareFull'))
-      return
-    }
-    toggleCompare(provider.id)
-    toast.success(inCompare ? t('browse.removedFromCompare') : t('browse.addedToCompare'))
+  function handleViewProfile() {
+    goPublicProfile(provider.id, provider.providerType)
   }
-
-  async function handleFavoriteClick(e: React.MouseEvent) {
-    e.stopPropagation()
-    try {
-      const res = await apiPost('/api/favorites', { providerId: provider.id, providerType: provider.providerType, providerUserId: provider.userId })
-      setIsFav(res.favorited)
-      toast.success(res.favorited ? t('favorites.added') : t('favorites.removed'))
-    } catch (err: any) { toast.error(err.message) }
-  }
-
-  const price = formatCurrency(provider.price, 'USD', locale)
-  const showOnline = onlinePriceAvailable(provider)
 
   return (
-    <Card
-      className="group flex cursor-pointer flex-col gap-0 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
-      onClick={onView}
-    >
+    <Card className="group flex flex-col gap-0 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md">
       {/* === Top Section: Avatar + Name + Specialty + Location === */}
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
-          {/* Avatar */}
-          <ProviderAvatar name={provider.name} avatarUrl={provider.avatarUrl} size={56} />
-
-          {/* Info */}
+          <ProviderAvatar name={provider.name} avatarUrl={provider.avatarUrl} size={64} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <h3 className="truncate text-sm font-semibold text-foreground">{provider.name || '—'}</h3>
@@ -824,24 +785,6 @@ function ProviderCard({ provider, onBook, onView }: {
               <Icon name="location_on" size={11} />
               <span className="truncate">{[provider.city, provider.country].filter(Boolean).join(', ')}</span>
             </div>
-            {/* Compact rating */}
-            <div className="mt-1 flex items-center gap-1">
-              <Icon name="star" size={12} className="text-warning" fill />
-              <span className="text-[11px] font-medium text-foreground">{provider.rating?.toFixed(1) || '0.0'}</span>
-              <span className="text-[10px] text-muted-foreground">({provider.reviewCount})</span>
-              {showOnline && (
-                <span className="ms-1 inline-flex items-center gap-0.5 rounded-full bg-info/10 px-1.5 py-0.5 text-[9px] font-medium text-info">
-                  <Icon name="videocam" size={9} />
-                  Online
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Price */}
-          <div className="shrink-0 text-end">
-            <div className="text-sm font-bold text-foreground tabular-nums">{price}</div>
-            <div className="text-[10px] text-muted-foreground">{provider.priceLabel}</div>
           </div>
         </div>
       </CardContent>
@@ -849,36 +792,16 @@ function ProviderCard({ provider, onBook, onView }: {
       {/* === Horizontal Divider === */}
       <div className="border-t border-divider" />
 
-      {/* === Bottom Section: CTA Buttons === */}
-      <CardContent className="flex items-center gap-2 p-3">
-        <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); onView() }}>
+      {/* === Bottom Section: Single View Profile button === */}
+      <CardContent className="p-3">
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full gap-1.5"
+          onClick={handleViewProfile}
+        >
           <Icon name="person" size={14} />
           {t('common.viewProfile', 'View Profile')}
-        </Button>
-        <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); onBook() }}>
-          <Icon name="event_available" size={14} />
-          {t('common.bookNow')}
-        </Button>
-        {/* Compare + Favorite as compact icon buttons */}
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          onClick={handleCompareClick}
-          title={t('common.compare')}
-          aria-label={t('common.compare')}
-          className={cn('shrink-0', inCompare && 'text-primary')}
-        >
-          <Icon name="compare" size={16} fill={inCompare} />
-        </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          onClick={handleFavoriteClick}
-          title={t('dash.favorites')}
-          aria-label={t('dash.favorites')}
-          className={cn('shrink-0', isFav && 'text-error')}
-        >
-          <Icon name={isFav ? 'favorite' : 'favorite_border'} size={16} fill={isFav} />
         </Button>
       </CardContent>
     </Card>
