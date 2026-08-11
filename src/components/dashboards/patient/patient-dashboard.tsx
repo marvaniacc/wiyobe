@@ -802,79 +802,88 @@ function ProviderCard({ provider, onBook, onView }: {
 
   return (
     <Card
-      className="group flex cursor-pointer flex-col gap-0 transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="group flex cursor-pointer flex-col gap-0 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
       onClick={onView}
     >
-      <CardContent className="flex flex-1 flex-col gap-3 p-4">
-        {/* Header */}
-        <div className="flex items-start gap-3">
-          <ProviderAvatar name={provider.name} avatarUrl={provider.avatarUrl} size={48} />
+      {/* === Top Section: Avatar + Name + Specialty + Location === */}
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          {/* Avatar */}
+          <ProviderAvatar name={provider.name} avatarUrl={provider.avatarUrl} size={56} />
+
+          {/* Info */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <h3 className="truncate font-semibold text-foreground">{provider.name || '—'}</h3>
+              <h3 className="truncate text-sm font-semibold text-foreground">{provider.name || '—'}</h3>
               {provider.verified && (
                 <span className="inline-flex shrink-0 text-primary" title={t('common.verified')}>
-                  <Icon name="verified" size={16} fill />
+                  <Icon name="verified" size={14} fill />
                 </span>
               )}
             </div>
-            <div className="truncate text-sm text-muted-foreground">
+            <p className="truncate text-xs text-muted-foreground">
               {provider.specialty || t(PROVIDER_TYPE_LABEL_KEY[provider.providerType])}
-            </div>
-            <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-              <Icon name="location_on" size={12} />
+            </p>
+            <div className="mt-0.5 flex items-center gap-0.5 text-[11px] text-muted-foreground">
+              <Icon name="location_on" size={11} />
               <span className="truncate">{[provider.city, provider.country].filter(Boolean).join(', ')}</span>
             </div>
+            {/* Compact rating */}
+            <div className="mt-1 flex items-center gap-1">
+              <Icon name="star" size={12} className="text-warning" fill />
+              <span className="text-[11px] font-medium text-foreground">{provider.rating?.toFixed(1) || '0.0'}</span>
+              <span className="text-[10px] text-muted-foreground">({provider.reviewCount})</span>
+              {showOnline && (
+                <span className="ms-1 inline-flex items-center gap-0.5 rounded-full bg-info/10 px-1.5 py-0.5 text-[9px] font-medium text-info">
+                  <Icon name="videocam" size={9} />
+                  Online
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Price */}
+          <div className="shrink-0 text-end">
+            <div className="text-sm font-bold text-foreground tabular-nums">{price}</div>
+            <div className="text-[10px] text-muted-foreground">{provider.priceLabel}</div>
           </div>
         </div>
+      </CardContent>
 
-        {/* Rating + price */}
-        <div className="flex items-center justify-between gap-2">
-          <StarRating rating={provider.rating || 0} size={14} showValue count={provider.reviewCount} />
-          <div className="text-end">
-            <div className="text-base font-semibold text-foreground tabular-nums">{price}</div>
-            <div className="text-[11px] text-muted-foreground">{t('common.from')} · {provider.priceLabel}</div>
-          </div>
-        </div>
+      {/* === Horizontal Divider === */}
+      <div className="border-t border-divider" />
 
-        {showOnline && (
-          <div className="inline-flex items-center gap-1 self-start rounded-full bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">
-            <Icon name="videocam" size={11} />
-            {t('booking.onlineAvailable')}
-          </div>
-        )}
-
-        {/* Languages */}
-        {parseList(provider.languages).length > 0 && (
-          <LanguageBadges languages={provider.languages} />
-        )}
-
-        {/* Actions */}
-        <div className="mt-auto flex items-center gap-2 pt-1">
-          <Button size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); onBook() }}>
-            <Icon name="event_available" size={16} />
-            {t('common.bookNow')}
-          </Button>
-          <Button
-            size="icon-sm"
-            variant={inCompare ? 'default' : 'outline'}
-            onClick={handleCompareClick}
-            title={t('common.compare')}
-            aria-label={t('common.compare')}
-          >
-            <Icon name="compare" size={16} fill={inCompare} />
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="outline"
-            onClick={handleFavoriteClick}
-            title={t('dash.favorites')}
-            aria-label={t('dash.favorites')}
-            className={isFav ? 'text-error border-error/30 hover:bg-error/5' : ''}
-          >
-            <Icon name={isFav ? 'favorite' : 'favorite_border'} size={16} fill={isFav} />
-          </Button>
-        </div>
+      {/* === Bottom Section: CTA Buttons === */}
+      <CardContent className="flex items-center gap-2 p-3">
+        <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); onView() }}>
+          <Icon name="person" size={14} />
+          {t('common.viewProfile', 'View Profile')}
+        </Button>
+        <Button size="sm" className="flex-1 gap-1.5" onClick={(e) => { e.stopPropagation(); onBook() }}>
+          <Icon name="event_available" size={14} />
+          {t('common.bookNow')}
+        </Button>
+        {/* Compare + Favorite as compact icon buttons */}
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          onClick={handleCompareClick}
+          title={t('common.compare')}
+          aria-label={t('common.compare')}
+          className={cn('shrink-0', inCompare && 'text-primary')}
+        >
+          <Icon name="compare" size={16} fill={inCompare} />
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          onClick={handleFavoriteClick}
+          title={t('dash.favorites')}
+          aria-label={t('dash.favorites')}
+          className={cn('shrink-0', isFav && 'text-error')}
+        >
+          <Icon name={isFav ? 'favorite' : 'favorite_border'} size={16} fill={isFav} />
+        </Button>
       </CardContent>
     </Card>
   )
