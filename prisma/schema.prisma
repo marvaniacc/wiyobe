@@ -141,16 +141,22 @@ model OtpCode {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String   // recipient
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String   // "booking_created" | "booking_cancelled" | "booking_completed" | "payout_sent" | "review_received" | "system"
-  title     String
-  body      String
-  read      Boolean  @default(false)
-  link      String?  // dashboard section to navigate to
-  meta      String?  // JSON
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String   // recipient
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String   // legacy type field: "booking_created" | "booking_cancelled" | etc.
+  category   String   @default("SYSTEM")  // BOOKING | KYC | CHAT | SYSTEM | ANNOUNCEMENT | PAYOUT | REVIEW
+  title      String
+  body       String
+  isRead     Boolean  @default(false)
+  read       Boolean  @default(false)  // legacy field (kept for backward compat — mirrors isRead)
+  link       String?  // dashboard section to navigate to
+  metadata   Json?    // structured extra data, e.g. { reason: "Image blurred" }
+  meta       String?  // legacy JSON string field (kept for backward compat)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([category])
 }
 
 model Favorite {
