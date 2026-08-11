@@ -3452,6 +3452,290 @@ function BroadcastSection() {
 }
 
 // ============================================================================
+// Section: KYC Requirements — define required documents per provider type
+// ============================================================================
+
+type KycRequirement = {
+  id: string
+  providerType: string
+  documentName: string
+  description: string | null
+  isRequired: boolean
+  order: number
+  createdAt: string
+  _count?: { documents: number }
+}
+
+const PROVIDER_TYPES = [
+  { key: 'DOCTOR', icon: 'medical_services', cls: 'bg-primary/10 text-primary' },
+  { key: 'HOSPITAL', icon: 'local_hospital', cls: 'bg-info/10 text-info' },
+  { key: 'HOTEL', icon: 'hotel', cls: 'bg-warning/10 text-warning' },
+  { key: 'TRANSLATOR', icon: 'translate', cls: 'bg-[#9334E6]/10 text-[#9334E6]' },
+] as const
+
+function KycRequirementsSection() {
+  const { t } = useT()
+  const [activeType, setActiveType] = React.useState<string>('DOCTOR')
+  const [requirements, setRequirements] = React.useState<KycRequirement[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [editing, setEditing] = React.useState<KycRequirement | null>(null)
+  const [creating, setCreating] = React.useState(false)
+  const [deleteTarget, setDeleteTarget] = React.useState<KycRequirement | null>(null)
+
+  const fetchReqs = React.useCallback(async (pt: string) => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/kyc-requirements?providerType=${pt}`)
+      const data = await res.json()
+      setRequirements(data.requirements || [])
+    } catch {
+      setRequirements([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    fetchReqs(activeType)
+  }, [activeType, fetchReqs])
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    try {
+      await apiDelete(`/api/admin/kyc-requirements/${deleteTarget.id}`)
+      toast.success(t('common.delete', 'Deleted'))
+      setDeleteTarget(null)
+      fetchReqs(activeType)
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    }
+  }
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={t('admin.kycRequirements', 'KYC Requirements')}
+        description={t('admin.kycRequirementsDesc', 'Define what documents each provider type must submit for verification')}
+        icon="verified_user"
+        action={
+          <Button onClick={() => setCreating(true)} className="gap-1.5">
+            <Icon name="add" size={18} />
+            {t('admin.addRequirement', 'Add Requirement')}
+          </Button>
+        }
+      />
+
+      {/* Provider type tabs */}
+      <div className="mt-6 flex gap-2">
+        {PROVIDER_TYPES.map((pt) => (
+          <button
+            key={pt.key}
+            onClick={() => setActiveType(pt.key)}
+            className={cn(
+              'flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+              activeType === pt.key
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-divider bg-surface text-muted-foreground hover:bg-surface-secondary'
+            )}
+          >
+            <Icon name={pt.icon} size={18} fill />
+            {t(`role.${pt.key.toLowerCase()}`)}
+          </button>
+        ))}
+      </div>
+
+      {/* Requirements list */}
+      <div className="mt-6">
+        {loading ? (
+          <LoadingCard lines={3} />
+        ) : requirements.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+              <Icon name="folder_off" size={32} className="text-muted-foreground/50" />
+              <p className="text-sm font-medium text-foreground">{t('kyc.noRequirements', 'No requirements defined yet')}</p>
+              <p className="text-xs text-muted-foreground">{t('kyc.noRequirementsDesc', 'Add required documents for this provider type.')}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="overflow-hidden rounded-[16px] border border-divider">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>{t('admin.documentName', 'Document Name')}</TableHead>
+                  <TableHead>{t('admin.documentDesc', 'Description')}</TableHead>
+                  <TableHead className="text-center">{t('kyc.required', 'Required')}</TableHead>
+                  <TableHead className="text-center">{t('kyc.submissions', 'Submissions')}</TableHead>
+                  <TableHead className="text-end">{t('common.actions', 'Actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {requirements.map((req) => (
+                  <TableRow key={req.id}>
+                    <TableCell>
+                      <span className="flex size-6 items-center justify-center rounded-full bg-surface-secondary text-xs font-medium text-muted-foreground">
+                        {req.order}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-medium text-foreground">{req.documentName}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">{req.description || '—'}</span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={cn('rounded-full border', req.isRequired ? 'border-error/20 bg-error/5 text-error' : 'border-divider text-muted-foreground')}>
+                        {req.isRequired ? t('common.yes', 'Yes') : t('common.no', 'No')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-sm tabular-nums text-muted-foreground">{req._count?.documents || 0}</span>
+                    </TableCell>
+                    <TableCell className="text-end">
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(req)} title={t('common.edit', 'Edit')} className="gap-1">
+                          <Icon name="edit" size={16} />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(req)} title={t('common.delete', 'Delete')} className="text-error hover:bg-error/5">
+                          <Icon name="delete" size={16} />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* Edit/Create dialog */}
+      <KycRequirementDialog
+        open={creating || !!editing}
+        requirement={editing}
+        providerType={activeType}
+        onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null) } }}
+        onSaved={() => { setCreating(false); setEditing(null); fetchReqs(activeType) }}
+      />
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="warning" size={20} className="text-error" />
+              {t('common.delete', 'Delete')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('kyc.deleteConfirm', 'Delete requirement')} <span className="font-semibold text-foreground">{deleteTarget?.documentName}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete} className="gap-1.5">
+              <Icon name="delete" size={16} />
+              {t('common.delete', 'Delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function KycRequirementDialog({ open, requirement, providerType, onOpenChange, onSaved }: {
+  open: boolean
+  requirement: KycRequirement | null
+  providerType: string
+  onOpenChange: (o: boolean) => void
+  onSaved: () => void
+}) {
+  const { t } = useT()
+  const [documentName, setDocumentName] = React.useState('')
+  const [description, setDescription] = React.useState('')
+  const [isRequired, setIsRequired] = React.useState(true)
+  const [order, setOrder] = React.useState(0)
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (open) {
+      setDocumentName(requirement?.documentName || '')
+      setDescription(requirement?.description || '')
+      setIsRequired(requirement?.isRequired ?? true)
+      setOrder(requirement?.order ?? 0)
+    }
+  }, [open, requirement])
+
+  async function handleSave() {
+    if (!documentName.trim()) return
+    setSaving(true)
+    try {
+      const payload = {
+        providerType,
+        documentName: documentName.trim(),
+        description: description.trim() || null,
+        isRequired,
+        order,
+      }
+      if (requirement) {
+        await apiPatch(`/api/admin/kyc-requirements/${requirement.id}`, payload)
+        toast.success(t('common.saved', 'Saved'))
+      } else {
+        await apiPost('/api/admin/kyc-requirements', payload)
+        toast.success(t('common.created', 'Created'))
+      }
+      onSaved()
+    } catch (e: any) {
+      toast.error(e.message || t('admin.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="verified_user" size={20} className="text-primary" />
+            {requirement ? t('common.edit', 'Edit') : t('admin.addRequirement', 'Add Requirement')}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('admin.documentName', 'Document Name')}</Label>
+            <Input placeholder="Medical License" value={documentName} onChange={(e) => setDocumentName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('admin.documentDesc', 'Description')}</Label>
+            <Textarea placeholder={t('kyc.descPlaceholder', 'Instructions for the provider…')} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={500} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between rounded-[12px] border border-divider p-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">{t('kyc.required', 'Required')}</p>
+              </div>
+              <Switch checked={isRequired} onCheckedChange={setIsRequired} aria-label={t('kyc.required', 'Required')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('kyc.order', 'Order')}</Label>
+              <Input type="number" value={order} onChange={(e) => setOrder(parseInt(e.target.value) || 0)} min={0} />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+          <Button onClick={handleSave} disabled={!documentName.trim() || saving} className="gap-1.5">
+            {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+            {requirement ? t('common.save', 'Save') : t('common.create', 'Create')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -3480,6 +3764,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'settings': return <AdminSettingsSection />
     case 'recycle-bin': return <RecycleBinSection />
     case 'broadcast': return <BroadcastSection />
+    case 'kyc-requirements': return <KycRequirementsSection />
     case 'profile': return <AdminProfileSection />
     default: return <OverviewSection />
   }

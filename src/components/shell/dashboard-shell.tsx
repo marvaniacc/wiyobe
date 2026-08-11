@@ -108,6 +108,7 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'settings', labelKey: 'dash.settings', icon: 'settings' },
     { key: 'recycle-bin', labelKey: 'admin.recycleBin', icon: 'delete_sweep' },
     { key: 'broadcast', labelKey: 'admin.broadcast', icon: 'campaign' },
+    { key: 'kyc-requirements', labelKey: 'admin.kycRequirements', icon: 'verified_user' },
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
   ],
   AFFILIATE: [
