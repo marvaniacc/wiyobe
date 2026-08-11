@@ -50,6 +50,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // Don't intercept the root path — let the root page.tsx redirect to /dashboard
+  if (pathname === '/') {
+    return NextResponse.next()
+  }
+
   // Check if the first path segment is already a supported locale
   const segments = pathname.split('/').filter(Boolean)
   const firstSegment = segments[0]
