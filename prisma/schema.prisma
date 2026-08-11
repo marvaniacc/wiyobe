@@ -125,6 +125,7 @@ model User {
   itineraries       Itinerary[]  @relation("PatientItineraries")
   // In-app CMS blog posts authored by this user (admin).
   blogPosts         BlogPost[]
+  mediaAssets       MediaAsset[]
 }
 
 model OtpCode {
@@ -802,4 +803,19 @@ model CustomPage {
   updatedAt      DateTime @updatedAt
 
   @@index([isPublished])
+}
+
+/// Internal media library — files uploaded to public/uploads/ and tracked
+/// in the DB. Used by blog cover images, custom pages, TipTap, etc.
+model MediaAsset {
+  id         String   @id @default(cuid())
+  uploaderId String
+  uploader   User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  fileName   String                        // original file name from upload
+  filePath   String                        // relative path: /uploads/uuid.ext
+  mimeType   String
+  fileSize   Int                           // bytes
+  createdAt  DateTime @default(now())
+
+  @@index([uploaderId])
 }
