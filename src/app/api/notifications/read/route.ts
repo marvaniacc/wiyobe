@@ -5,17 +5,32 @@ import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
-const schema = z.object({ id: z.string() })
+const schema = z.object({
+  id: z.string(),
+})
 
-export async function POST(req: Request) {
+/**
+ * PATCH /api/notifications/read
+ *
+ * Marks a single notification as read by id. The notification must belong
+ * to the caller.
+ */
+export async function PATCH(req: Request) {
   try {
     const session = await getSession()
     if (!session) return error(401, 'Unauthorized')
+
     const { id } = await parseBody(req, schema)
+
+    // Verify ownership
+    const notif = await db.notification.findUnique({ where: { id } })
+    if (!notif || notif.userId !== session.id) return error(404, 'Notification not found')
+
     await db.notification.update({
-      where: { id, userId: session.id },
-      data: { read: true },
+      where: { id },
+      data: { isRead: true, read: true },
     })
+
     return json({ ok: true })
   } catch (e) { return handleError(e) }
 }
