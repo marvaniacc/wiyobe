@@ -1518,3 +1518,30 @@ Stage Summary:
 - Legacy documents (uploaded before the requirement system) have requirementId=null and show as "Not Uploaded" — providers need to re-upload using the new flow.
 - Phase 16 (Advanced KYC Workflow) is now COMPLETE: 16.1 (schema + admin requirements), 16.2 (provider upload + lock), 16.3 (admin review).
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 17.1
+Agent: main (Lead Architect)
+Task: Multi-location entity architecture per provider type — ProviderLocation model, slug fields, spokenLanguages for Translator.
+
+Work Log:
+- Analyzed the existing Prisma schema: all 4 provider types (Doctor, Hospital, Hotel, Translator) had single city/country fields, no multi-location support, no SEO-friendly slugs.
+- Designed the architecture based on the business requirements:
+  - **Doctor & Translator**: One entity, many locations. Reviews/rating shared across locations. URL country is geographic context, validated against locations.
+  - **Hospital**: Parent organization with optional multi-location via ProviderLocation. Branches that are materially different (different services/ratings/booking) can be separate Hospital entities (each linked 1:1 to a User).
+  - **Hotel**: Each hotel is an independent bookable entity with its own reviews/rating. NO ProviderLocation relation — the current single-entity model is correct.
+- Schema changes:
+  - Added `ProviderLocation` model: id, providerType, doctorId/hospitalId/translatorId (all optional FKs), city, country (ISO alpha-2), countrySlug (URL-friendly), address, phone, isPrimary, isActive, timestamps. Indexes on all FKs + country.
+  - Added `slug String? @unique` to Doctor, Hospital, Hotel, Translator for SEO-friendly URLs (e.g., /doctors/canada/luis-sharon).
+  - Added `spokenLanguages String @default("")` to Translator — separate from translation language pairs. The URL locale determines the display language, NOT the translator's spoken languages.
+  - Added `locations ProviderLocation[]` back-relations to Doctor, Hospital, Translator (named "DoctorLocations", "HospitalLocations", "TranslatorLocations").
+  - Hotels intentionally have NO locations relation — each hotel is its own independent entity.
+- Commit: `f315a03 feat(db): add ProviderLocation model for multi-location providers and slug/spokenLanguages fields`. Pushed to origin/main.
+
+Stage Summary:
+- The architecture respects the 4 different entity/location models without forcing them into one generic pattern.
+- Doctor/Translator: one entity → many locations → shared reviews/rating.
+- Hospital: parent organization → one or many facilities → facility independence depends on business behavior.
+- Hotel: individual property → location-specific entity → independent reviews/rating/booking.
+- Translator's spokenLanguages is a separate business attribute from URL locale.
+- All new fields are optional/nullable with defaults — no data loss, no breaking changes.
