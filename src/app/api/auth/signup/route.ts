@@ -128,7 +128,7 @@ export async function POST(req: Request) {
     }
 
     return json({
-      user: { id: user.id, email: user.email, role: user.role, name: user.name, status: user.status, preferredLanguage: user.preferredLanguage },
+      user: { id: user.id, email: user.email, role: user.role, name: user.name, status: user.status, preferredLanguage: user.preferredLanguage, kycStatus: user.kycStatus },
       needsApproval: status === 'PENDING',
     }, 201)
   } catch (e) { return handleError(e) }

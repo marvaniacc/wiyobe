@@ -16,6 +16,7 @@ export type SessionInfo = {
   name: string | null
   preferredLanguage: string
   avatarUrl?: string | null
+  kycStatus?: string
 } | null
 
 interface AppState {
