@@ -141,6 +141,15 @@ export function DashboardShell() {
   const nav = NAV[session.role] || []
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // KYC lock: providers whose kycStatus is not APPROVED can only access
+  // 'kyc' and 'profile' sections. All other nav items are hidden, and
+  // attempting to access a locked section redirects to 'kyc'.
+  const isProvider = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'].includes(session.role)
+  const kycLocked = isProvider && session.kycStatus !== 'APPROVED'
+  const ALLOWED_WHEN_LOCKED = new Set(['kyc', 'profile'])
+  const effectiveSection = kycLocked && !ALLOWED_WHEN_LOCKED.has(section) ? 'kyc' : section
+  const effectiveNav = kycLocked ? nav.filter((item) => ALLOWED_WHEN_LOCKED.has(item.key)) : nav
+
   const initials = (session.name || session.email).split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
 
   async function handleSignOut() {
@@ -172,8 +181,8 @@ export function DashboardShell() {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2">
           <ul className="flex flex-col gap-1">
-            {nav.map((item) => {
-              const active = section === item.key
+            {effectiveNav.map((item) => {
+              const active = effectiveSection === item.key
               return (
                 <li key={item.key}>
                   <button
@@ -223,7 +232,7 @@ export function DashboardShell() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="hidden sm:inline">{t('dash.dashboard')}</span>
             <Icon name="chevron_right" size={16} className="hidden sm:inline rtl:rotate-180" />
-            <span className="font-medium text-foreground">{t(NAV[session.role]?.find((n) => n.key === section)?.labelKey || 'dash.overview')}</span>
+            <span className="font-medium text-foreground">{t(NAV[session.role]?.find((n) => n.key === effectiveSection)?.labelKey || 'dash.overview')}</span>
           </div>
 
           <div className="ms-auto flex items-center gap-1.5">
@@ -295,9 +304,25 @@ export function DashboardShell() {
 
         {/* Content */}
         <main className="flex-1 px-4 py-6 md:px-6 lg:px-8">
-          {session.role === 'PATIENT' && <PatientDashboard section={section} />}
+          {/* KYC lock warning banner */}
+          {kycLocked && (
+            <div className="mb-4 flex items-center gap-3 rounded-[14px] border border-warning/30 bg-warning/5 p-4">
+              <Icon name="lock" size={20} className="shrink-0 text-warning" fill />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">{t('provider.kycLocked', 'Account Pending KYC Verification')}</p>
+                <p className="text-xs text-muted-foreground">{t('provider.kycWarning', 'Some features are locked until your documents are approved. Please complete your KYC verification.')}</p>
+              </div>
+              {effectiveSection !== 'kyc' && (
+                <Button size="sm" variant="outline" onClick={() => goDashboard('kyc')} className="shrink-0 gap-1.5">
+                  <Icon name="badge" size={16} />
+                  {t('provider.kycVerification', 'Verify Now')}
+                </Button>
+              )}
+            </div>
+          )}
+          {session.role === 'PATIENT' && <PatientDashboard section={effectiveSection} />}
           {(session.role === 'DOCTOR' || session.role === 'HOSPITAL' || session.role === 'HOTEL' || session.role === 'TRANSLATOR') && (
-            <ProviderDashboard section={section} role={session.role} />
+            <ProviderDashboard section={effectiveSection} role={session.role} />
           )}
           {session.role === 'ADMIN' && <AdminDashboard section={section} />}
           {session.role === 'AFFILIATE' && <AffiliateDashboard section={section} />}
