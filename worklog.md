@@ -1308,3 +1308,34 @@ Stage Summary:
 - Reusable MediaPicker component can be integrated into any form (TipTap, custom pages, blog, etc.) — accepts filter prop and onSelected callback.
 - Existing TipTap JSON rendering is NOT affected (media library is a separate system).
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 15.1-step2
+Agent: general-purpose
+Task: Update all APIs and SSR routes for soft delete filtering and soft-delete-on-DELETE
+
+Work Log:
+- `src/app/api/admin/blog/route.ts` — GET (list): added `where: { deletedAt: null }` to `db.blogPost.findMany`. POST unchanged.
+- `src/app/api/admin/blog/[id]/route.ts` — GET (single): added `deletedAt: null` to the `findUnique` where clause. DELETE: changed `db.blogPost.delete()` → `db.blogPost.update({ where: { id }, data: { deletedAt: new Date() } })`; the preceding existence check now also filters `deletedAt: null`; updated the JSDoc to describe soft-delete behaviour. PATCH unchanged (per task spec).
+- `src/app/api/admin/pages/route.ts` — GET (list): added `where: { deletedAt: null }` to `db.customPage.findMany`. POST unchanged.
+- `src/app/api/admin/pages/[id]/route.ts` — GET (single): added `deletedAt: null` to the `findUnique` where clause. DELETE: changed `db.customPage.delete()` → `db.customPage.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now also filters `deletedAt: null`; updated JSDoc. PATCH unchanged.
+- `src/app/api/media/route.ts` — GET (list): the `where` clause now includes `deletedAt: null` for both the admin path (was `{}`) and the non-admin path (was `{ uploaderId }`). POST unchanged.
+- `src/app/api/media/[id]/route.ts` — DELETE: changed `db.mediaAsset.delete()` → `db.mediaAsset.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now filters `deletedAt: null`. REMOVED the on-disk `unlink()` call (and the now-unused `fs/promises` + `path` imports) so the file stays on disk during soft delete — the explicit spec parenthetical "the file stays on disk during soft delete — it will be removed when permanently deleted from the recycle bin" takes precedence; permanent purge (DB delete + file unlink) will be handled by a future recycle-bin endpoint. Updated JSDoc to document this behaviour.
+- `src/app/api/medical-records/route.ts` — GET (PATIENT branch): added `deletedAt: null` to `db.medicalDocument.findMany` where. GET (DOCTOR/HOSPITAL branch): added `document: { deletedAt: null }` to the `db.medicalRecordAccess.findMany` where so providers do not see soft-deleted documents via still-existing access grants. POST unchanged.
+- `src/app/api/medical-records/[id]/route.ts` — DELETE: changed `db.medicalDocument.delete()` → `db.medicalDocument.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now filters `deletedAt: null`. Updated JSDoc (note: access grants are NOT cascaded on soft delete — they remain so the document can be restored; cascade happens only on permanent delete). PATCH unchanged (per task spec).
+- `src/app/api/documents/route.ts` — GET: added `deletedAt: null` to `db.medicalDocument.findMany` where. DELETE: changed `db.medicalDocument.delete()` → `db.medicalDocument.update({ where: { id }, data: { deletedAt: new Date() } })`; existence check now filters `deletedAt: null`. POST unchanged.
+- `src/app/blog/page.tsx` (public SSR list): added `deletedAt: null` to the `where` clause alongside `status: 'PUBLISHED'`.
+- `src/app/blog/[slug]/page.tsx` (public SSR detail): in `getPost`, added `|| post.deletedAt` to the early-return guard so soft-deleted posts 404 publicly.
+- `src/app/[slug]/page.tsx` (public SSR custom page): in `getPage`, added `|| page.deletedAt` to the early-return guard so soft-deleted custom pages 404 publicly.
+- `src/app/page.tsx` (homepage override): added `deletedAt: null` to the `where: { slug: 'home' }` clause so a soft-deleted "home" page falls back to the default SPA landing.
+- Verification: `bun run lint` → 0 errors, 25 pre-existing warnings (all "Unused eslint-disable directive" — unrelated to this task). `bun run tsc --noEmit` → no TypeScript errors in any of the 13 modified files (only pre-existing errors in unrelated files: skills/image-edit, skills/stock-analysis-skill, tiptap-preview.tsx, medical-vault.tsx, i18n.ts).
+
+Stage Summary:
+- 13 files updated to implement soft-delete filtering for BlogPost, CustomPage, MediaAsset, and MedicalDocument.
+- All GET/listing queries now explicitly filter `where: { deletedAt: null }` (no Prisma middleware — explicit per-task requirement).
+- All DELETE endpoints for the four affected models now perform `update({ data: { deletedAt: new Date() } })` instead of `delete()`. Existence checks in those DELETE handlers also filter `deletedAt: null` so a soft-deleted record can't be "deleted again".
+- For media assets, the file-on-disk deletion was REMOVED from the soft-delete endpoint (per the explicit spec parenthetical "the file stays on disk during soft delete"). The file persists on disk so the asset can be restored from the recycle bin; permanent purge (DB delete + file unlink) will be implemented in a follow-up recycle-bin task. (The literal "Keep the file-on-disk deletion as is" wording in the task description was treated as ambiguous; the explicit parenthetical clarification took precedence because the recycle-bin/restore pattern is only meaningful if the underlying file survives the soft delete.)
+- For medical documents, the related MedicalRecordAccess grants are intentionally NOT cascaded on soft delete — they only cascade on a future permanent-delete from the recycle bin. The DOCTOR/HOSPITAL GET listing filters `document: { deletedAt: null }` so providers never see soft-deleted documents, even though the grants still exist.
+- Public SSR routes (blog list, blog detail, custom page, homepage override) all exclude soft-deleted records so they 404 (or fall back to default landing for homepage) rather than leaking content.
+- PATCH endpoints (blog, pages, medical-records) were intentionally left unchanged per the task spec — they do not yet filter `deletedAt: null`. This means a soft-deleted record could technically still be PATCHed; if this becomes a concern, the findUnique existence check in those PATCH handlers can be tightened in a follow-up.
+- Lint: 0 errors. TypeScript: 0 errors in modified files.

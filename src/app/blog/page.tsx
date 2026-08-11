@@ -28,10 +28,11 @@ type PostCard = {
 }
 
 export default async function BlogListPage() {
-  // Fetch only published posts, newest first. Select only the fields needed
-  // for the card grid — the full TipTap JSON content is NOT loaded here.
+  // Fetch only published, non-soft-deleted posts, newest first. Select only
+  // the fields needed for the card grid — the full TipTap JSON content is NOT
+  // loaded here.
   const posts: PostCard[] = await db.blogPost.findMany({
-    where: { status: 'PUBLISHED' },
+    where: { status: 'PUBLISHED', deletedAt: null },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,

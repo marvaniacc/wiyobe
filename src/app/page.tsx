@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
  */
 export default async function Home() {
   const homePage = await db.customPage.findUnique({
-    where: { slug: 'home' },
+    where: { slug: 'home', deletedAt: null },
     select: { htmlContent: true, isPublished: true },
   })
 

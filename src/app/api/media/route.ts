@@ -59,7 +59,9 @@ export async function GET() {
     const session = await getSession()
     if (!session) return error(401, 'Unauthorized')
 
-    const where = session.role === 'ADMIN' ? {} : { uploaderId: session.id }
+    const where = session.role === 'ADMIN'
+      ? { deletedAt: null }
+      : { uploaderId: session.id, deletedAt: null }
     const assets = await db.mediaAsset.findMany({
       where,
       orderBy: { createdAt: 'desc' },

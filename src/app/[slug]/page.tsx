@@ -26,7 +26,8 @@ type CustomPage = {
  */
 async function getPage(slug: string): Promise<CustomPage | null> {
   const page = await db.customPage.findUnique({ where: { slug } })
-  if (!page || !page.isPublished) return null
+  // Only published, non-soft-deleted pages are publicly accessible.
+  if (!page || !page.isPublished || page.deletedAt) return null
   return page
 }
 

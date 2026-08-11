@@ -38,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
 
     const { id } = await params
-    const page = await db.customPage.findUnique({ where: { id } })
+    const page = await db.customPage.findUnique({ where: { id, deletedAt: null } })
     if (!page) return error(404, 'Page not found')
     return json({ page })
   } catch (e) { return handleError(e) }
@@ -100,7 +100,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 /**
  * DELETE /api/admin/pages/[id]
  *
- * Admin only. Permanently deletes a custom page.
+ * Admin only. Soft-deletes a custom page by setting `deletedAt` to the
+ * current time. The page remains in the DB (recoverable from the recycle
+ * bin) but is hidden from all default listings.
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -108,10 +110,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
 
     const { id } = await params
-    const existing = await db.customPage.findUnique({ where: { id } })
+    const existing = await db.customPage.findUnique({ where: { id, deletedAt: null } })
     if (!existing) return error(404, 'Page not found')
 
-    await db.customPage.delete({ where: { id } })
+    await db.customPage.update({ where: { id }, data: { deletedAt: new Date() } })
     return json({ ok: true })
   } catch (e) { return handleError(e) }
 }

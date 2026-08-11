@@ -110,8 +110,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 /**
  * DELETE /api/medical-records/[id]
  *
- * Patients only. Permanently deletes a medical document and all of its
- * access grants (the grants cascade via onDelete: Cascade in the schema).
+ * Patients only. Soft-deletes a medical document by setting `deletedAt` to
+ * the current time. The document (and its access grants) remain in the DB
+ * (recoverable from the recycle bin) but are hidden from all default
+ * listings. The grants cascade only on a permanent delete.
  *
  * Authorization: the caller must own the document.
  */
@@ -122,10 +124,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (session.role !== 'PATIENT') return error(403, 'Patients only')
 
     const { id } = await params
-    const doc = await db.medicalDocument.findUnique({ where: { id } })
+    const doc = await db.medicalDocument.findUnique({ where: { id, deletedAt: null } })
     if (!doc || doc.patientId !== session.id) return error(404, 'Document not found')
 
-    await db.medicalDocument.delete({ where: { id } })
+    await db.medicalDocument.update({ where: { id }, data: { deletedAt: new Date() } })
     return json({ ok: true })
   } catch (e) { return handleError(e) }
 }

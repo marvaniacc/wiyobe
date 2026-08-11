@@ -44,6 +44,7 @@ export async function GET() {
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
 
     const posts = await db.blogPost.findMany({
+      where: { deletedAt: null },
       orderBy: { updatedAt: 'desc' },
       include: {
         author: { select: { id: true, name: true, email: true } },

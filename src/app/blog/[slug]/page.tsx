@@ -35,8 +35,8 @@ async function getPost(slug: string): Promise<PostDetail | null> {
       author: { select: { name: true, email: true } },
     },
   })
-  // Only published posts are publicly accessible.
-  if (!post || post.status !== 'PUBLISHED') return null
+  // Only published, non-soft-deleted posts are publicly accessible.
+  if (!post || post.status !== 'PUBLISHED' || post.deletedAt) return null
   return post as PostDetail
 }
 

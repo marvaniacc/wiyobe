@@ -41,7 +41,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const { id } = await params
     const post = await db.blogPost.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: { author: { select: { id: true, name: true, email: true } } },
     })
     if (!post) return error(404, 'Post not found')
@@ -114,7 +114,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 /**
  * DELETE /api/admin/blog/[id]
  *
- * Admin only. Permanently deletes a blog post.
+ * Admin only. Soft-deletes a blog post by setting `deletedAt` to the current
+ * time. The post remains in the DB (recoverable from the recycle bin) but is
+ * hidden from all default listings.
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -122,10 +124,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
 
     const { id } = await params
-    const existing = await db.blogPost.findUnique({ where: { id } })
+    const existing = await db.blogPost.findUnique({ where: { id, deletedAt: null } })
     if (!existing) return error(404, 'Post not found')
 
-    await db.blogPost.delete({ where: { id } })
+    await db.blogPost.update({ where: { id }, data: { deletedAt: new Date() } })
     return json({ ok: true })
   } catch (e) { return handleError(e) }
 }

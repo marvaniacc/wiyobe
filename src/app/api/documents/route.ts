@@ -12,7 +12,7 @@ export async function GET() {
     if (session.role !== 'PATIENT') return error(403, 'Patients only')
 
     const docs = await db.medicalDocument.findMany({
-      where: { patientId: session.id },
+      where: { patientId: session.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     })
     return json({ documents: docs })
@@ -62,10 +62,10 @@ export async function DELETE(req: Request) {
     const id = searchParams.get('id')
     if (!id) return error(400, 'id required')
 
-    const doc = await db.medicalDocument.findUnique({ where: { id } })
+    const doc = await db.medicalDocument.findUnique({ where: { id, deletedAt: null } })
     if (!doc || doc.patientId !== session.id) return error(404, 'Document not found')
 
-    await db.medicalDocument.delete({ where: { id } })
+    await db.medicalDocument.update({ where: { id }, data: { deletedAt: new Date() } })
     return json({ ok: true })
   } catch (e) { return handleError(e) }
 }

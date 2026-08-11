@@ -39,6 +39,7 @@ export async function GET() {
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
 
     const pages = await db.customPage.findMany({
+      where: { deletedAt: null },
       orderBy: { updatedAt: 'desc' },
     })
     return json({ pages })

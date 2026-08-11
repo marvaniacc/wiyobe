@@ -26,7 +26,7 @@ export async function GET() {
 
     if (session.role === 'PATIENT') {
       const docs = await db.medicalDocument.findMany({
-        where: { patientId: session.id },
+        where: { patientId: session.id, deletedAt: null },
         include: {
           accessGrants: {
             select: { doctorId: true, grantedAt: true, doctor: { select: { id: true, name: true, email: true, doctor: { select: { specialty: true } } } } },
@@ -41,7 +41,7 @@ export async function GET() {
     // Provider (DOCTOR / HOSPITAL) — only docs explicitly shared with them.
     if (session.role === 'DOCTOR' || session.role === 'HOSPITAL') {
       const accessRecords = await db.medicalRecordAccess.findMany({
-        where: { doctorId: session.id },
+        where: { doctorId: session.id, document: { deletedAt: null } },
         include: {
           document: {
             include: {
