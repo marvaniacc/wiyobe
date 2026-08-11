@@ -85,7 +85,16 @@ export async function generateMetadata({
   return {
     title: metaTitle,
     description: metaDescription,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      languages: {
+        'en': `/en/hotels/${countrySlug}/${hotel.slug}`,
+        'tr': `/tr/hotels/${countrySlug}/${hotel.slug}`,
+        'fa': `/fa/hotels/${countrySlug}/${hotel.slug}`,
+        'ar': `/ar/hotels/${countrySlug}/${hotel.slug}`,
+        'x-default': `/en/hotels/${countrySlug}/${hotel.slug}`,
+      },
+    },
     openGraph: {
       title: metaTitle,
       description: metaDescription,

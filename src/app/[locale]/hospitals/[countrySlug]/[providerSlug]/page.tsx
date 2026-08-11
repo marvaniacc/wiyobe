@@ -96,7 +96,16 @@ export async function generateMetadata({
   return {
     title: metaTitle,
     description: metaDescription,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      languages: {
+        'en': `/en/hospitals/${countrySlug}/${hospital.slug}`,
+        'tr': `/tr/hospitals/${countrySlug}/${hospital.slug}`,
+        'fa': `/fa/hospitals/${countrySlug}/${hospital.slug}`,
+        'ar': `/ar/hospitals/${countrySlug}/${hospital.slug}`,
+        'x-default': `/en/hospitals/${countrySlug}/${hospital.slug}`,
+      },
+    },
     openGraph: {
       title: metaTitle,
       description: metaDescription,

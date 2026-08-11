@@ -103,7 +103,16 @@ export async function generateMetadata({
   return {
     title: metaTitle,
     description: metaDescription,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      languages: {
+        'en': `/en/doctors/${countrySlug}/${doctor.slug}`,
+        'tr': `/tr/doctors/${countrySlug}/${doctor.slug}`,
+        'fa': `/fa/doctors/${countrySlug}/${doctor.slug}`,
+        'ar': `/ar/doctors/${countrySlug}/${doctor.slug}`,
+        'x-default': `/en/doctors/${countrySlug}/${doctor.slug}`,
+      },
+    },
     openGraph: {
       title: metaTitle,
       description: metaDescription,
