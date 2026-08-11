@@ -2249,6 +2249,11 @@ type BlogPost = {
   coverImage: string | null
   authorId: string
   status: 'DRAFT' | 'PUBLISHED'
+  seoTitle: string | null
+  seoDescription: string | null
+  focusKeyword: string | null
+  canonicalUrl: string | null
+  noIndex: boolean
   createdAt: string
   updatedAt: string
   author?: { id: string; name: string | null; email: string }
@@ -2514,6 +2519,11 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
   const [content, setContent] = React.useState<TiptapJSON | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [mediaPickerOpen, setMediaPickerOpen] = React.useState(false)
+  const [seoTitle, setSeoTitle] = React.useState('')
+  const [seoDescription, setSeoDescription] = React.useState('')
+  const [focusKeyword, setFocusKeyword] = React.useState('')
+  const [canonicalUrl, setCanonicalUrl] = React.useState('')
+  const [noIndex, setNoIndex] = React.useState(false)
 
   // Sync form state when the dialog opens (for create or edit).
   React.useEffect(() => {
@@ -2524,6 +2534,11 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
       setCoverImage(post?.coverImage || '')
       setStatus(post?.status || 'DRAFT')
       setContent(post?.content ? (post.content as TiptapJSON) : null)
+      setSeoTitle(post?.seoTitle || '')
+      setSeoDescription(post?.seoDescription || '')
+      setFocusKeyword(post?.focusKeyword || '')
+      setCanonicalUrl(post?.canonicalUrl || '')
+      setNoIndex(post?.noIndex || false)
     }
   }, [open, post])
 
@@ -2533,11 +2548,16 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
     try {
       const payload = {
         title: title.trim(),
-        slug: slug.trim() || undefined, // server auto-generates if omitted
+        slug: slug.trim() || undefined,
         excerpt: excerpt.trim(),
         content: content || { type: 'doc', content: [{ type: 'paragraph' }] },
         coverImage: coverImage.trim() || null,
         status,
+        seoTitle: seoTitle.trim() || null,
+        seoDescription: seoDescription.trim() || null,
+        focusKeyword: focusKeyword.trim() || null,
+        canonicalUrl: canonicalUrl.trim() || null,
+        noIndex,
       }
       if (post) {
         await apiPatch(`/api/admin/blog/${post.id}`, payload)
@@ -2600,67 +2620,137 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
             <p className="text-[11px] text-muted-foreground">{excerpt.length}/500</p>
           </div>
 
-          {/* Cover Image + Status */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">{t('admin.coverImage', 'Cover Image')}</Label>
-              {coverImage ? (
-                <div className="relative overflow-hidden rounded-[12px] border border-divider">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={coverImage} alt="Cover preview" className="aspect-[16/9] w-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setCoverImage('')}
-                    className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-surface/90 text-error shadow-sm transition-colors hover:bg-error hover:text-error-foreground"
-                    title={t('common.remove', 'Remove')}
-                  >
-                    <Icon name="close" size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMediaPickerOpen(true)}
-                    className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-surface"
-                  >
-                    <Icon name="swap_horiz" size={14} />
-                    {t('media.change', 'Change')}
-                  </button>
-                </div>
-              ) : (
+          {/* Cover Image — full width */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('admin.coverImage', 'Cover Image')}</Label>
+            {coverImage ? (
+              <div className="relative overflow-hidden rounded-[12px] border border-divider">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverImage} alt="Cover preview" className="aspect-[16/9] w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setCoverImage('')}
+                  className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-surface/90 text-error shadow-sm transition-colors hover:bg-error hover:text-error-foreground"
+                  title={t('common.remove', 'Remove')}
+                >
+                  <Icon name="close" size={16} />
+                </button>
                 <button
                   type="button"
                   onClick={() => setMediaPickerOpen(true)}
-                  className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-divider transition-colors hover:border-primary/50 hover:bg-accent/30"
+                  className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-surface"
                 >
-                  <Icon name="add_photo_alternate" size={28} className="text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">{t('media.selectCover', 'Select Cover Image')}</span>
+                  <Icon name="swap_horiz" size={14} />
+                  {t('media.change', 'Change')}
                 </button>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">{t('common.status', 'Status')}</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as 'DRAFT' | 'PUBLISHED')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DRAFT">{t('admin.draft', 'Draft')}</SelectItem>
-                  <SelectItem value="PUBLISHED">{t('admin.published', 'Published')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMediaPickerOpen(true)}
+                className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-divider transition-colors hover:border-primary/50 hover:bg-accent/30"
+              >
+                <Icon name="add_photo_alternate" size={28} className="text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">{t('media.selectCover', 'Select Cover Image')}</span>
+              </button>
+            )}
           </div>
 
-          {/* Content editor */}
+          {/* Content editor with prominent Insert Media button */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium">{t('admin.content', 'Content')}</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">{t('admin.content', 'Content')}</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMediaPickerOpen(true)}
+                className="gap-1.5"
+              >
+                <Icon name="perm_media" size={14} />
+                {t('media.insert', 'Insert Media')}
+              </Button>
+            </div>
             <TiptapEditor content={content} onChange={setContent} />
+          </div>
+
+          {/* SEO Section */}
+          <div className="space-y-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Icon name="search" size={16} className="text-primary" />
+              {t('seo.section', 'SEO Settings')}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.metaTitle', 'Meta Title')}</Label>
+                <Input
+                  placeholder={t('seo.metaTitlePlaceholder', 'Defaults to post title if empty')}
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  maxLength={200}
+                />
+                <p className="text-[11px] text-muted-foreground">{seoTitle.length}/200</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.focusKeyword', 'Focus Keyword')}</Label>
+                <Input
+                  placeholder={t('seo.focusKeywordPlaceholder', 'e.g. medical tourism turkey')}
+                  value={focusKeyword}
+                  onChange={(e) => setFocusKeyword(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.metaDescription', 'Meta Description')}</Label>
+              <Textarea
+                placeholder={t('seo.metaDescPlaceholder', 'Defaults to excerpt if empty')}
+                value={seoDescription}
+                onChange={(e) => setSeoDescription(e.target.value)}
+                rows={2}
+                maxLength={500}
+              />
+              <p className="text-[11px] text-muted-foreground">{seoDescription.length}/500</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.canonicalUrl', 'Canonical URL')}</Label>
+                <Input
+                  placeholder={t('seo.canonicalPlaceholder', 'https://wishubest.com/… (optional)')}
+                  value={canonicalUrl}
+                  onChange={(e) => setCanonicalUrl(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-[12px] border border-divider p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{t('seo.noIndex', 'No Index')}</p>
+                  <p className="text-xs text-muted-foreground">{t('seo.noIndexHint', 'Exclude from search engines')}</p>
+                </div>
+                <Switch checked={noIndex} onCheckedChange={setNoIndex} aria-label={t('seo.noIndex', 'No Index')} />
+              </div>
+            </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
-          <Button onClick={handleSave} disabled={!title.trim() || saving} className="gap-1.5">
-            {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
-            {post ? t('common.save', 'Save') : t('blog.create', 'Create')}
-          </Button>
+          {/* Status dropdown moved here for better visual layout */}
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-medium text-muted-foreground">{t('common.status', 'Status')}</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as 'DRAFT' | 'PUBLISHED')}>
+              <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DRAFT">{t('admin.draft', 'Draft')}</SelectItem>
+                <SelectItem value="PUBLISHED">{t('admin.published', 'Published')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={handleSave} disabled={!title.trim() || saving} className="gap-1.5">
+              {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+              {post ? t('common.save', 'Save') : t('blog.create', 'Create')}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
 
@@ -2682,6 +2772,9 @@ type CustomPage = {
   htmlContent: string
   seoTitle: string | null
   seoDescription: string | null
+  focusKeyword: string | null
+  canonicalUrl: string | null
+  noIndex: boolean
   isPublished: boolean
   createdAt: string
   updatedAt: string
@@ -2857,6 +2950,9 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
   const [slug, setSlug] = React.useState('')
   const [seoTitle, setSeoTitle] = React.useState('')
   const [seoDescription, setSeoDescription] = React.useState('')
+  const [focusKeyword, setFocusKeyword] = React.useState('')
+  const [canonicalUrl, setCanonicalUrl] = React.useState('')
+  const [noIndex, setNoIndex] = React.useState(false)
   const [isPublished, setIsPublished] = React.useState(false)
   const [htmlContent, setHtmlContent] = React.useState('')
   const [saving, setSaving] = React.useState(false)
@@ -2868,6 +2964,9 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
       setSlug(page?.slug || '')
       setSeoTitle(page?.seoTitle || '')
       setSeoDescription(page?.seoDescription || '')
+      setFocusKeyword(page?.focusKeyword || '')
+      setCanonicalUrl(page?.canonicalUrl || '')
+      setNoIndex(page?.noIndex || false)
       setIsPublished(page?.isPublished || false)
       setHtmlContent(page?.htmlContent || '')
     }
@@ -2883,6 +2982,9 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
         htmlContent,
         seoTitle: seoTitle.trim() || null,
         seoDescription: seoDescription.trim() || null,
+        focusKeyword: focusKeyword.trim() || null,
+        canonicalUrl: canonicalUrl.trim() || null,
+        noIndex,
         isPublished,
       }
       if (page) {
@@ -2924,27 +3026,6 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
             </div>
           </div>
 
-          {/* SEO Title + Description */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">{t('admin.seoTitle', 'SEO Title')}</Label>
-              <Input placeholder={t('pages.seoTitlePlaceholder', 'Optional — defaults to page title')} value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">{t('admin.seoDescription', 'SEO Description')}</Label>
-              <Input placeholder={t('pages.seoDescPlaceholder', 'Meta description for search engines')} value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} />
-            </div>
-          </div>
-
-          {/* Published toggle */}
-          <div className="flex items-center justify-between rounded-[12px] border border-divider p-3">
-            <div>
-              <p className="text-sm font-medium text-foreground">{t('admin.published', 'Published')}</p>
-              <p className="text-xs text-muted-foreground">{t('pages.publishHint', 'Published pages are publicly accessible at /{slug}')}</p>
-            </div>
-            <Switch checked={isPublished} onCheckedChange={setIsPublished} aria-label={t('admin.published', 'Published')} />
-          </div>
-
           {/* HTML Content */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -2970,14 +3051,78 @@ function CustomPageEditorDialog({ open, page, onOpenChange, onSaved }: {
             />
             <p className="text-[11px] text-muted-foreground">{t('pages.htmlHint', 'Paste raw HTML/CSS here. The content is rendered as-is (no sanitization).')}</p>
           </div>
+
+          {/* SEO Section */}
+          <div className="space-y-3 rounded-[14px] border border-divider bg-surface-secondary/40 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Icon name="search" size={16} className="text-primary" />
+              {t('seo.section', 'SEO Settings')}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.metaTitle', 'Meta Title')}</Label>
+                <Input
+                  placeholder={t('seo.metaTitlePlaceholder', 'Defaults to page title if empty')}
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  maxLength={200}
+                />
+                <p className="text-[11px] text-muted-foreground">{seoTitle.length}/200</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.focusKeyword', 'Focus Keyword')}</Label>
+                <Input
+                  placeholder={t('seo.focusKeywordPlaceholder', 'e.g. about wishubest')}
+                  value={focusKeyword}
+                  onChange={(e) => setFocusKeyword(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.metaDescription', 'Meta Description')}</Label>
+              <Textarea
+                placeholder={t('seo.metaDescPlaceholder', 'Meta description for search engines')}
+                value={seoDescription}
+                onChange={(e) => setSeoDescription(e.target.value)}
+                rows={2}
+                maxLength={500}
+              />
+              <p className="text-[11px] text-muted-foreground">{seoDescription.length}/500</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('seo.canonicalUrl', 'Canonical URL')}</Label>
+                <Input
+                  placeholder={t('seo.canonicalPlaceholder', 'https://wishubest.com/… (optional)')}
+                  value={canonicalUrl}
+                  onChange={(e) => setCanonicalUrl(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-[12px] border border-divider p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{t('seo.noIndex', 'No Index')}</p>
+                  <p className="text-xs text-muted-foreground">{t('seo.noIndexHint', 'Exclude from search engines')}</p>
+                </div>
+                <Switch checked={noIndex} onCheckedChange={setNoIndex} aria-label={t('seo.noIndex', 'No Index')} />
+              </div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
-          <Button onClick={handleSave} disabled={!title.trim() || saving} className="gap-1.5">
-            {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
-            {page ? t('common.save', 'Save') : t('blog.create', 'Create')}
-          </Button>
+          {/* Published toggle moved to footer for better visual layout */}
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-medium text-muted-foreground">{t('admin.published', 'Published')}</Label>
+            <Switch checked={isPublished} onCheckedChange={setIsPublished} aria-label={t('admin.published', 'Published')} />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={handleSave} disabled={!title.trim() || saving} className="gap-1.5">
+              {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+              {page ? t('common.save', 'Save') : t('blog.create', 'Create')}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
 
