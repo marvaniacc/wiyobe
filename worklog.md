@@ -1255,3 +1255,29 @@ Stage Summary:
 - Absolute URLs constructed from NEXT_PUBLIC_APP_URL env var (with localhost fallback for dev).
 - /api/ routes are blocked from indexing. All public pages (landing, blog list, blog posts) are discoverable by search engines.
 - Lint: 0 errors. Dev server running cleanly.
+
+---
+Task ID: 13
+Agent: main (Lead Architect)
+Task: Phase 13 — Custom Landing Pages Builder. Admin creates custom landing pages (e.g., /about-us, /services) with raw HTML/CSS. Public SSR rendering + dynamic homepage override.
+
+Work Log:
+- Step 1 (schema): Added `CustomPage` model to `prisma/schema.prisma`: `id`, `title`, `slug @unique`, `htmlContent String` (raw HTML/CSS), `seoTitle String?`, `seoDescription String?`, `isPublished Boolean @default(false)`, timestamps. `@@index([isPublished])` for fast public queries. Pushed via `bun run db:push`. Commit: `2453df2`.
+- Step 2 (admin API + UI): Created `src/app/api/admin/pages/route.ts` (GET list, POST create with auto-slug + de-duplication) and `src/app/api/admin/pages/[id]/route.ts` (GET, PATCH, DELETE). All strictly ADMIN-only. Added `CustomPagesSection` + `CustomPageEditorDialog` to admin-dashboard.tsx: table view (Title, Slug, Status badge, Updated, Edit/Delete actions), editor dialog with Title, Slug, SEO Title, SEO Description, isPublished Switch toggle, and a large `font-mono` `<textarea>` for htmlContent. Added "Custom Pages" nav item (`web` icon). Fixed missing `Switch` import. Commits: `bdbd573`, `b6b6f0e`.
+- Step 3 (public SSR route): Created `src/app/[slug]/page.tsx` — a pure async Server Component. Fetches the CustomPage by slug; calls `notFound()` if not found or not published. Renders `htmlContent` via `dangerouslySetInnerHTML` (admin-trusted, no sanitization) inside a full-width standalone layout (minimal header + footer, no dashboard sidebar). `generateMetadata` returns seoTitle/seoDescription. Next.js automatically prioritizes static folders (`/blog`, `/api`, `/_next`) over the `[slug]` catch-all — verified no conflict. Commit: `d14e90e`.
+- Step 4 (homepage override): Converted `src/app/page.tsx` from a client component to a **Server Component**. It queries the DB for a CustomPage with slug `home` that is published. If found, renders its htmlContent via `dangerouslySetInnerHTML`. Otherwise, renders the `DefaultLanding` client component (extracted from the original page.tsx client logic — session bootstrapping, auth, Zustand dashboard, query-param routing). This allows the admin to override the homepage with custom HTML while preserving the SPA fallback. Commit: `63bb5f8`.
+- Step 5 (i18n): Added 18 keys × 4 locales (en, tr, fa, ar): `admin.customPages`, `admin.customPagesDesc`, `admin.newPage`, `admin.htmlContent`, `admin.seoTitle`, `admin.seoDescription`, `pages.noPages`, `pages.noPagesDesc`, `pages.deleted`, `pages.deleteTitle`, `pages.editPage`, `pages.editorDesc`, `pages.seoTitlePlaceholder`, `pages.seoDescPlaceholder`, `pages.publishHint`, `pages.htmlHint`, `pages.created`, `pages.updated`. Commit: `ee21b3a`.
+- Verification (curl + agent-browser):
+  - curl: Created "About Us" page (slug=about-us, published). `/about-us` → 200, renders raw HTML (h1 "About Wishubest" + "Our Mission" callout). SEO: `<title>About Wishubest — Global Medical Tourism</title>` + meta description. `/nonexistent-page` → 404. `/blog` and `/blog/welcome-to-wishubest` → 200 (no conflict with [slug] catch-all).
+  - Homepage override: Created `home` page (published) → `/` renders custom HTML ("Welcome to Wishubest" / "Custom homepage content"). Unpublished it → `/` falls back to default landing ("MedTravel" brand).
+  - agent-browser (admin): "Custom Pages" nav item present. Section shows table with Home (Draft) and About Us (Published). "New Page" dialog renders all fields (Title, Slug, SEO Title, SEO Description, Published toggle, HTML Content textarea).
+  - agent-browser (public): `/about-us` renders "About Wishubest" heading + paragraph + "Our Mission" callout. Page title = "About Wishubest — Global Medical Tourism". No errors.
+  - Lint: 0 errors. Dev server running cleanly.
+
+Stage Summary:
+- 6 commits pushed to origin/main: 2453df2 (schema), bdbd573 (admin UI/API), b6b6f0e (lint fix), d14e90e (SSR route), 63bb5f8 (homepage override), ee21b3a (i18n).
+- Admin can create custom landing pages with raw HTML/CSS (no sanitization — admin is trusted). API strictly ADMIN-only.
+- Public pages render full-width (no dashboard sidebar) via SSR for SEO.
+- Homepage can be overridden by publishing a CustomPage with slug "home"; otherwise the default Zustand SPA landing renders.
+- The `[slug]` catch-all does NOT conflict with `/blog`, `/api`, or `/_next` (Next.js prioritizes static folders).
+- Lint: 0 errors. Dev server running cleanly.
