@@ -34,7 +34,7 @@ export default async function LocaleHomePage({
     )
   }
 
-  // Default landing — link to dashboard + AI symptom checker
+  // Default landing — link to dashboard + floating AI symptom checker
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
@@ -56,12 +56,10 @@ export default async function LocaleHomePage({
         >
           Go to Dashboard
         </Link>
-
-        {/* AI Symptom Checker */}
-        <div className="w-full pt-4">
-          <TriageBot />
-        </div>
       </div>
+
+      {/* Floating AI Symptom Checker — FAB in bottom corner */}
+      <TriageBot />
     </div>
   )
 }
