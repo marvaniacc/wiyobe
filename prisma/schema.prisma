@@ -1,10 +1,13 @@
 // Global Medical Tourism Marketplace — full data model
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Vercel runs on Amazon Linux 2 (rhel-openssl-3.0.x); local dev is debian-based.
+  // Listing both ensures the Prisma engine binary works in both environments.
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
