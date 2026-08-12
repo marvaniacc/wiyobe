@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   // Allow images from Unsplash (landing page hero images) and QR code API
   images: {
     remotePatterns: [
@@ -14,6 +13,22 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // iframe embedding — allow the IDE Preview panel and any external dashboard
+  // to embed pages from this app.
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "ALLOWALL" },
+          { key: "Content-Security-Policy", value: "frame-ancestors *;" },
+        ],
+      },
+    ];
+  },
+  // Allow the IDE Preview origin (*.space-z.ai) to load /_next/* assets in dev.
+  // Ignored in production builds.
+  allowedDevOrigins: ['*'],
 };
 
 export default nextConfig;
