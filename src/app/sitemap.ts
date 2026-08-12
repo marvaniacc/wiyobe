@@ -20,6 +20,8 @@ const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar']
  *  - Dashboard (/dashboard) — excluded (noindex)
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Base URL is dynamic via NEXT_PUBLIC_APP_URL (set in Vercel env vars).
+  // Falls back to localhost for local dev only.
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
   const now = new Date()
 
