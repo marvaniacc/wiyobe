@@ -54,3 +54,8 @@ server.log
 # Skills directory
 /skills/db/custom.db
 *.db
+
+# Dev artifacts — not for production
+tool-results/
+start-dev.sh
+keep-alive.sh
