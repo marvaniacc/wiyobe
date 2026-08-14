@@ -147,6 +147,9 @@ const en: Dict = {
   'nav.support': 'Support',
   'nav.settings': 'Settings',
 
+  'dash.tags': 'Tags',
+  'dash.locations': 'Locations',
+
   'dash.overview': 'Overview',
   'dash.bookings': 'Bookings',
   'dash.itineraries': 'My Trips',
@@ -859,6 +862,7 @@ const en: Dict = {
   'admin.blogPosts': 'Blog Posts',
   'admin.blogDesc': 'Write and publish blog posts and marketing pages',
   'admin.customPages': 'Custom Pages',
+  'admin.mediaLibrary': 'Media Library',
   'admin.customPagesDesc': 'Create custom landing pages with raw HTML/CSS',
   'media.library': 'Media Library',
   'media.upload': 'Upload',
@@ -1259,6 +1263,9 @@ const tr: Dict = {
   'nav.content': 'İçerik & Medya',
   'nav.support': 'Destek',
   'nav.settings': 'Ayarlar',
+
+  'dash.tags': 'Etiketler',
+  'dash.locations': 'Konumlar',
 
   'dash.overview': 'Genel bakış',
   'dash.bookings': 'Rezervasyonlar',
@@ -1955,6 +1962,7 @@ const tr: Dict = {
   'admin.blogPosts': 'Blog Yazıları',
   'admin.blogDesc': 'Blog yazıları ve pazarlama sayfaları yazın ve yayınlayın',
   'admin.customPages': 'Özel Sayfalar',
+  'admin.mediaLibrary': 'Medya Kütüphanesi',
   'admin.customPagesDesc': 'Ham HTML/CSS ile özel açılış sayfaları oluşturun',
   'media.library': 'Medya Kütüphanesi',
   'media.upload': 'Yükle',
@@ -2350,6 +2358,9 @@ const fa: Dict = {
   'nav.content': 'محتوا و رسانه',
   'nav.support': 'پشتیبانی',
   'nav.settings': 'تنظیمات',
+
+  'dash.tags': 'تگ‌ها',
+  'dash.locations': 'موقعیت‌ها',
 
   'dash.overview': 'نمای کلی',
   'dash.bookings': 'رزروها',
@@ -3046,6 +3057,7 @@ const fa: Dict = {
   'admin.blogPosts': 'پست‌های وبلاگ',
   'admin.blogDesc': 'پست‌های وبلاگ و صفحات بازاریابی بنویسید و منتشر کنید',
   'admin.customPages': 'صفحات سفارشی',
+  'admin.mediaLibrary': 'کتابخانه رسانه',
   'admin.customPagesDesc': 'ایجاد صفحات فرود سفارشی با HTML/CSS خام',
   'media.library': 'کتابخانه رسانه',
   'media.upload': 'آپلود',
@@ -3436,6 +3448,9 @@ const ar: Dict = {
   'nav.content': 'المحتوى والوسائط',
   'nav.support': 'الدعم',
   'nav.settings': 'الإعدادات',
+
+  'dash.tags': 'الوسوم',
+  'dash.locations': 'المواقع',
 
   'dash.overview': 'نظرة عامة',
   'dash.bookings': 'الحجوزات',
@@ -4127,6 +4142,7 @@ const ar: Dict = {
   'admin.blogPosts': 'منشورات المدونة',
   'admin.blogDesc': 'اكتب وانشر منشورات المدونة وصفحات التسويق',
   'admin.customPages': 'صفحات مخصصة',
+  'admin.mediaLibrary': 'مكتبة الوسائط',
   'admin.customPagesDesc': 'إنشاء صفحات هبوط مخصصة بـ HTML/CSS خام',
   'media.library': 'مكتبة الوسائط',
   'media.upload': 'رفع',
