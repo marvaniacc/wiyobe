@@ -614,6 +614,14 @@ function LivenessVideoSection({
         setRecordedUrl(url)
         setRecording(false)
         setCountdown(0)
+        // Stop the camera tracks so the live feed dies — only the recorded
+        // preview should be visible, not both simultaneously.
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop())
+          streamRef.current = null
+        }
+        if (videoRef.current) videoRef.current.srcObject = null
+        setCameraActive(false)
       }
 
       recorder.onerror = (e: any) => {
@@ -657,11 +665,8 @@ function LivenessVideoSection({
     if (recordedUrlRef.current) URL.revokeObjectURL(recordedUrlRef.current)
     setRecordedUrl(null)
     recordedUrlRef.current = null
-    // Re-bind stream if camera is still active
-    if (streamRef.current && videoRef.current) {
-      videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().catch(() => {})
-    }
+    // Camera was stopped after recording — restart it for retake
+    startCamera()
   }
 
   function handleUploadRecorded() {
@@ -750,8 +755,8 @@ function LivenessVideoSection({
           </div>
         )}
 
-        {/* Live camera preview */}
-        {cameraActive && (
+        {/* Live camera preview (only while camera is active, no recording yet) */}
+        {cameraActive && !recordedBlob && (
           <div className="relative mt-3 overflow-hidden rounded-[12px] border border-divider bg-black">
             <video
               ref={videoRef}
@@ -767,13 +772,14 @@ function LivenessVideoSection({
                 REC {countdown}
               </div>
             )}
-            {/* Recording finished — playback */}
-            {recordedBlob && !recording && recordedUrl && (
-              <div className="mt-2">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Preview (recorded):</p>
-                <video src={recordedUrl} controls autoPlay playsInline className="h-auto max-h-[360px] w-full rounded-[12px] border border-divider bg-black" />
-              </div>
-            )}
+          </div>
+        )}
+
+        {/* Recorded video preview (shown after recording stops, camera is off) */}
+        {recordedBlob && recordedUrl && !cameraActive && (
+          <div className="mt-3">
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Preview (recorded):</p>
+            <video src={recordedUrl} controls autoPlay playsInline className="h-auto max-h-[360px] w-full rounded-[12px] border border-divider bg-black" />
           </div>
         )}
 
@@ -790,14 +796,15 @@ function LivenessVideoSection({
               </Button>
             )}
 
-            {/* Camera controls */}
-            {!cameraActive && !uploading && (
+            {/* Camera controls — show Start Camera when no recording in progress */}
+            {!cameraActive && !recordedBlob && !uploading && (
               <Button size="sm" onClick={startCamera} disabled={disabled} className="gap-1.5">
                 <Icon name="videocam" size={14} />
                 {uploaded ? 'Record New Video' : 'Start Camera'}
               </Button>
             )}
 
+            {/* Recording controls — live camera, not yet recorded */}
             {cameraActive && !recording && !recordedBlob && (
               <>
                 <Button size="sm" variant="outline" onClick={stopCamera}>
@@ -810,7 +817,8 @@ function LivenessVideoSection({
               </>
             )}
 
-            {cameraActive && recordedBlob && !recording && (
+            {/* Post-recording controls — recorded preview showing, camera off */}
+            {recordedBlob && !cameraActive && !recording && (
               <>
                 <Button size="sm" variant="outline" onClick={handleRetake}>
                   Retake
