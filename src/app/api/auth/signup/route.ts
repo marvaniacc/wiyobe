@@ -36,7 +36,20 @@ export async function POST(req: Request) {
     const existing = await db.user.findUnique({ where: { email: body.email } })
     if (existing) return error(409, 'An account with this email already exists.')
 
-    const status = body.role === 'PATIENT' ? 'ACTIVE' : 'PENDING'
+    // Registration control: check if signup is open for this role
+    const providerRoles = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'] as const
+    if (providerRoles.includes(body.role as any)) {
+      const settingKey = `signupOpen${body.role.charAt(0)}${body.role.slice(1).toLowerCase()}`
+      const setting = await db.siteSetting.findUnique({ where: { key: settingKey } })
+      if (setting?.value === 'false') {
+        return error(403, `Registration for ${body.role.toLowerCase()}s is currently closed.`)
+      }
+    }
+
+    // All users (including providers) get ACTIVE status immediately.
+    // The dashboard lock mechanism (kycStatus !== APPROVED) restricts
+    // providers to only the KYC and Profile sections until verified.
+    const status = 'ACTIVE'
 
     const user = await db.user.create({
       data: {

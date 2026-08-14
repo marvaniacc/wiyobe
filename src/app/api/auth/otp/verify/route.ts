@@ -57,7 +57,21 @@ export async function POST(req: Request) {
     if (body.purpose === 'signup') {
       if (!otp.payload) return error(400, 'Missing signup data. Please start over.')
       const data = JSON.parse(otp.payload)
-      const status = data.role === 'PATIENT' ? 'ACTIVE' : 'PENDING'
+
+      // Registration control: check if signup is open for this role
+      const providerRoles = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'] as const
+      if (providerRoles.includes(data.role as any)) {
+        const settingKey = `signupOpen${data.role.charAt(0)}${data.role.slice(1).toLowerCase()}`
+        const setting = await db.siteSetting.findUnique({ where: { key: settingKey } })
+        if (setting?.value === 'false') {
+          return error(403, `Registration for ${data.role.toLowerCase()}s is currently closed.`)
+        }
+      }
+
+      // All users (including providers) get ACTIVE status immediately.
+      // The dashboard lock mechanism (kycStatus !== APPROVED) restricts
+      // providers to only the KYC and Profile sections until verified.
+      const status = 'ACTIVE'
 
       const user = await db.user.create({
         data: {

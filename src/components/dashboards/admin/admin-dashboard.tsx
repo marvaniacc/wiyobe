@@ -5147,6 +5147,47 @@ function AdminSettingsSection() {
             </CardContent>
           </Card>
 
+          {/* Registration Control */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="app_registration" size={18} className="text-primary" />
+                Registration Control
+              </CardTitle>
+              <CardDescription>Open or close signups for each provider type. When closed, new users cannot register as that role.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {([
+                { key: 'signupOpenDoctor', label: 'Doctor Signups' },
+                { key: 'signupOpenHospital', label: 'Hospital Signups' },
+                { key: 'signupOpenHotel', label: 'Hotel Signups' },
+                { key: 'signupOpenTranslator', label: 'Translator Signups' },
+              ] as const).map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between gap-3 rounded-[12px] border border-divider p-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {values[key] === 'false' ? 'Closed — new registrations blocked' : 'Open — accepting new registrations'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={values[key] !== 'false'}
+                    onCheckedChange={async (checked) => {
+                      const newVal = checked ? 'true' : 'false'
+                      setValues((v) => ({ ...v, [key]: newVal }))
+                      try {
+                        await apiPatch('/api/admin/settings', { [key]: newVal })
+                        toast.success(`${label} ${checked ? 'opened' : 'closed'}`)
+                      } catch (e: any) {
+                        toast.error(e.message || 'Failed to update')
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           {/* Platform Settings (legacy) */}
           <Card>
             <CardHeader>
