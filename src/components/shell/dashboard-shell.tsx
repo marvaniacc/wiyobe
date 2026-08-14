@@ -85,31 +85,8 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
   ],
   ADMIN: [
+    // Kept for fallback/effectiveNav — admin uses ADMIN_NAV_GROUPS below
     { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
-    { key: 'analytics', labelKey: 'dash.analytics', icon: 'monitoring' },
-    { key: 'bookings', labelKey: 'dash.bookings', icon: 'event_available' },
-    { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
-    { key: 'providers', labelKey: 'dash.providers', icon: 'verified' },
-    { key: 'users', labelKey: 'dash.users', icon: 'group' },
-    { key: 'moderation', labelKey: 'dash.moderation', icon: 'manage_accounts' },
-    { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
-    { key: 'commission', labelKey: 'dash.commission', icon: 'percent' },
-    { key: 'affiliate-rates', labelKey: 'admin.affiliateRates', icon: 'campaign' },
-    { key: 'promo-codes', labelKey: 'admin.promoCodes', icon: 'local_offer' },
-    { key: 'blog', labelKey: 'admin.blogPosts', icon: 'article' },
-    { key: 'custom-pages', labelKey: 'admin.customPages', icon: 'web' },
-    { key: 'cancellations', labelKey: 'dash.cancellations', icon: 'cancel_schedule_send' },
-    { key: 'payouts', labelKey: 'dash.payouts', icon: 'account_balance' },
-    { key: 'ledger', labelKey: 'dash.ledger', icon: 'receipt_long' },
-    { key: 'reports', labelKey: 'dash.reports', icon: 'analytics' },
-    { key: 'affiliates', labelKey: 'admin.affiliates', icon: 'campaign' },
-    { key: 'kyc', labelKey: 'admin.kyc', icon: 'badge' },
-    { key: 'tickets', labelKey: 'admin.tickets', icon: 'support_agent' },
-    { key: 'settings', labelKey: 'dash.settings', icon: 'settings' },
-    { key: 'recycle-bin', labelKey: 'admin.recycleBin', icon: 'delete_sweep' },
-    { key: 'broadcast', labelKey: 'admin.broadcast', icon: 'campaign' },
-    { key: 'kyc-requirements', labelKey: 'admin.kycRequirements', icon: 'verified_user' },
-    { key: 'kyc-review', labelKey: 'admin.kycReview', icon: 'fact_check' },
     { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
   ],
   AFFILIATE: [
@@ -124,6 +101,95 @@ const NAV: Record<string, NavItem[]> = {
 
 const ROLE_LABEL_KEY: Record<string, string> = {
   PATIENT: 'role.patient', DOCTOR: 'role.doctor', HOSPITAL: 'role.hospital', HOTEL: 'role.hotel', TRANSLATOR: 'role.translator', ADMIN: 'role.admin', AFFILIATE: 'role.affiliate',
+}
+
+// ============================================================================
+// Admin sidebar — 9 accordion groups
+// ============================================================================
+type NavItem = { key: string; labelKey: string; icon: string }
+type NavGroup = { groupKey: string; labelKey: string; icon: string; items: NavItem[] }
+
+const ADMIN_NAV_GROUPS: NavGroup[] = [
+  {
+    groupKey: 'dashboard', labelKey: 'nav.dashboard', icon: 'space_dashboard',
+    items: [
+      { key: 'overview', labelKey: 'dash.overview', icon: 'space_dashboard' },
+      { key: 'analytics', labelKey: 'dash.analytics', icon: 'monitoring' },
+      { key: 'reports', labelKey: 'dash.reports', icon: 'analytics' },
+    ],
+  },
+  {
+    groupKey: 'bookings', labelKey: 'nav.bookings', icon: 'event_available',
+    items: [
+      { key: 'bookings', labelKey: 'dash.bookings', icon: 'event_available' },
+      { key: 'disputes', labelKey: 'dash.disputes', icon: 'gavel' },
+      { key: 'cancellations', labelKey: 'dash.cancellations', icon: 'cancel_schedule_send' },
+    ],
+  },
+  {
+    groupKey: 'providers', labelKey: 'nav.providers', icon: 'verified',
+    items: [
+      { key: 'providers', labelKey: 'dash.providers', icon: 'verified' },
+      { key: 'kyc-review', labelKey: 'admin.kycReview', icon: 'fact_check' },
+      { key: 'kyc-requirements', labelKey: 'admin.kycRequirements', icon: 'verified_user' },
+    ],
+  },
+  {
+    groupKey: 'users', labelKey: 'nav.users', icon: 'group',
+    items: [
+      { key: 'users', labelKey: 'dash.users', icon: 'group' },
+      { key: 'broadcast', labelKey: 'admin.broadcast', icon: 'campaign' },
+    ],
+  },
+  {
+    groupKey: 'affiliates', labelKey: 'nav.affiliates', icon: 'campaign',
+    items: [
+      { key: 'affiliates', labelKey: 'admin.affiliates', icon: 'campaign' },
+      { key: 'affiliate-rates', labelKey: 'admin.affiliateRates', icon: 'percent' },
+    ],
+  },
+  {
+    groupKey: 'finance', labelKey: 'nav.finance', icon: 'account_balance',
+    items: [
+      { key: 'commission', labelKey: 'dash.commission', icon: 'percent' },
+      { key: 'payouts', labelKey: 'dash.payouts', icon: 'account_balance' },
+      { key: 'ledger', labelKey: 'dash.ledger', icon: 'receipt_long' },
+      { key: 'promo-codes', labelKey: 'admin.promoCodes', icon: 'local_offer' },
+    ],
+  },
+  {
+    groupKey: 'content', labelKey: 'nav.content', icon: 'article',
+    items: [
+      { key: 'blog', labelKey: 'admin.blogPosts', icon: 'article' },
+      { key: 'custom-pages', labelKey: 'admin.customPages', icon: 'web' },
+      { key: 'media-library', labelKey: 'admin.mediaLibrary', icon: 'perm_media' },
+      { key: 'tags', labelKey: 'dash.tags', icon: 'sell' },
+      { key: 'locations', labelKey: 'dash.locations', icon: 'public' },
+    ],
+  },
+  {
+    groupKey: 'support', labelKey: 'nav.support', icon: 'support_agent',
+    items: [
+      { key: 'tickets', labelKey: 'admin.tickets', icon: 'support_agent' },
+      { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
+    ],
+  },
+  {
+    groupKey: 'settings', labelKey: 'nav.settings', icon: 'settings',
+    items: [
+      { key: 'settings', labelKey: 'dash.settings', icon: 'settings' },
+      { key: 'recycle-bin', labelKey: 'admin.recycleBin', icon: 'delete_sweep' },
+      { key: 'profile', labelKey: 'dash.profile', icon: 'account_circle' },
+    ],
+  },
+]
+
+// Map each admin section to its parent group for auto-expand
+const ADMIN_SECTION_TO_GROUP: Record<string, string> = {}
+for (const g of ADMIN_NAV_GROUPS) {
+  for (const item of g.items) {
+    ADMIN_SECTION_TO_GROUP[item.key] = g.groupKey
+  }
 }
 
 export function DashboardShell() {
@@ -141,6 +207,13 @@ export function DashboardShell() {
   const section = view.name === 'dashboard' ? view.section : 'overview'
   const nav = NAV[session.role] || []
   const [mobileOpen, setMobileOpen] = useState(false)
+  const activeNavGroup = useApp((s) => s.activeNavGroup)
+  const setActiveNavGroup = useApp((s) => s.setActiveNavGroup)
+
+  const isAdmin = session.role === 'ADMIN'
+  // Auto-expand the group containing the current section
+  const currentGroup = isAdmin ? (ADMIN_SECTION_TO_GROUP[section] || 'dashboard') : null
+  const expandedGroup = activeNavGroup || currentGroup
 
   // KYC lock: providers whose kycStatus is not APPROVED can only access
   // 'kyc' and 'profile' sections. All other nav items are hidden, and
@@ -172,7 +245,7 @@ export function DashboardShell() {
         {/* Brand */}
         <div className="flex h-16 items-center gap-3 px-4">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
-            <Icon name="monitor_heart" size={22} fill />
+            <Icon name="monitor_heart" size={20} fill />
           </div>
           <span className="overflow-hidden whitespace-nowrap text-lg font-semibold text-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 [.w-\[248px\]_&]:opacity-100">
             {t('brand.name')}
@@ -180,29 +253,82 @@ export function DashboardShell() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2">
-          <ul className="flex flex-col gap-1">
-            {effectiveNav.map((item) => {
-              const active = effectiveSection === item.key
-              return (
-                <li key={item.key}>
-                  <button
-                    onClick={() => { goDashboard(item.key); setMobileOpen(false) }}
-                    title={t(item.labelKey)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors',
-                      active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-surface-secondary hover:text-foreground'
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
+          {isAdmin ? (
+            /* Admin: 9 accordion groups */
+            <ul className="flex flex-col gap-0.5">
+              {ADMIN_NAV_GROUPS.map((group) => {
+                const isExpanded = expandedGroup === group.groupKey
+                const hasActive = group.items.some((item) => effectiveSection === item.key)
+                return (
+                  <li key={group.groupKey}>
+                    <button
+                      onClick={() => setActiveNavGroup(isExpanded ? null : group.groupKey)}
+                      title={t(group.labelKey)}
+                      className={cn(
+                        'flex w-full items-center justify-center rounded-[10px] py-2.5 text-sm font-medium transition-colors group-hover:justify-start group-hover:gap-3 group-hover:px-3 [.w-\[248px\]_&]:justify-start [.w-\[248px\]_&]:gap-3 [.w-\[248px\]_&]:px-3',
+                        hasActive ? 'text-foreground' : 'text-muted-foreground hover:bg-surface-secondary hover:text-foreground'
+                      )}
+                    >
+                      <Icon name={group.icon} size={20} fill={hasActive} className="shrink-0" />
+                      <span className="hidden flex-1 truncate text-start group-hover:block [.w-\[248px\]_&]:block">
+                        {t(group.labelKey)}
+                      </span>
+                      <Icon name="expand_more" size={16} className={cn('hidden shrink-0 group-hover:block [.w-\[248px\]_&]:block', isExpanded && 'rotate-180')} />
+                    </button>
+                    {isExpanded && (
+                      <ul className="ms-3 flex flex-col gap-0.5 border-s border-divider ps-2 pt-0.5">
+                        {group.items.map((item) => {
+                          const active = effectiveSection === item.key
+                          return (
+                            <li key={item.key}>
+                              <button
+                                onClick={() => { goDashboard(item.key); setMobileOpen(false) }}
+                                title={t(item.labelKey)}
+                                className={cn(
+                                  'flex w-full items-center justify-center rounded-[8px] py-2 text-[13px] font-medium transition-colors group-hover:justify-start group-hover:gap-2.5 group-hover:px-2.5 [.w-\[248px\]_&]:justify-start [.w-\[248px\]_&]:gap-2.5 [.w-\[248px\]_&]:px-2.5',
+                                  active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-surface-secondary hover:text-foreground'
+                                )}
+                              >
+                                <Icon name={item.icon} size={16} fill={active} className="shrink-0" />
+                                <span className="hidden truncate group-hover:block [.w-\[248px\]_&]:block">
+                                  {t(item.labelKey)}
+                                </span>
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
                     )}
-                  >
-                    <Icon name={item.icon} size={22} fill={active} className="shrink-0" />
-                    <span className="overflow-hidden whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100 [.w-\[248px\]_&]:opacity-100">
-                      {t(item.labelKey)}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            /* Non-admin: flat list */
+            <ul className="flex flex-col gap-1">
+              {effectiveNav.map((item) => {
+                const active = effectiveSection === item.key
+                return (
+                  <li key={item.key}>
+                    <button
+                      onClick={() => { goDashboard(item.key); setMobileOpen(false) }}
+                      title={t(item.labelKey)}
+                      className={cn(
+                        'flex w-full items-center justify-center rounded-[10px] py-2.5 text-sm font-medium transition-colors group-hover:justify-start group-hover:gap-3 group-hover:px-3 [.w-\[248px\]_&]:justify-start [.w-\[248px\]_&]:gap-3 [.w-\[248px\]_&]:px-3',
+                        active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-surface-secondary hover:text-foreground'
+                      )}
+                    >
+                      <Icon name={item.icon} size={20} fill={active} className="shrink-0" />
+                      <span className="hidden flex-1 truncate text-start group-hover:block [.w-\[248px\]_&]:block">
+                        {t(item.labelKey)}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </nav>
 
         {/* User mini at bottom */}

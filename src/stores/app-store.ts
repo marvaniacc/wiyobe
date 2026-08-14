@@ -52,6 +52,9 @@ interface AppState {
 
   // Persisted last dashboard section for refresh persistence
   lastSection: string | null
+  // Active accordion group in the admin sidebar
+  activeNavGroup: string | null
+  setActiveNavGroup: (g: string | null) => void
 }
 
 export const useApp = create<AppState>()(
@@ -83,6 +86,8 @@ export const useApp = create<AppState>()(
 
       compareIds: [],
       lastSection: null,
+      activeNavGroup: null,
+      setActiveNavGroup: (g) => set({ activeNavGroup: g }),
       toggleCompare: (id) =>
         set((s) => ({
           compareIds: s.compareIds.includes(id)
@@ -95,7 +100,7 @@ export const useApp = create<AppState>()(
     }),
     {
       name: 'medtravel-app',
-      partialize: (s) => ({ locale: s.locale, theme: s.theme, compareIds: s.compareIds, lastSection: s.lastSection }),
+      partialize: (s) => ({ locale: s.locale, theme: s.theme, compareIds: s.compareIds, lastSection: s.lastSection, activeNavGroup: s.activeNavGroup }),
     }
   )
 )
