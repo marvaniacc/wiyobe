@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   // Allow images from Unsplash (landing page hero images) and QR code API
   images: {
     remotePatterns: [

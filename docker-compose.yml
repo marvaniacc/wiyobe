@@ -1,0 +1,76 @@
+# ============================================================================
+# Wishubest — Docker Compose for VPS Deployment
+# ============================================================================
+# Usage:
+#   1. Copy .env.example to .env and fill in real values
+#   2. docker-compose build
+#   3. docker-compose up -d
+#   4. docker-compose exec app npx prisma db push
+#   5. docker-compose exec app bun run scripts/seed-locations.ts
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ── PostgreSQL Database ─────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: wishubest-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-wishubest}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-wishubest}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Next.js Application ─────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wishubest-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # Database — uses the internal Docker network hostname 'db'
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-wishubest}?schema=public
+      # Auth
+      AUTH_SECRET: ${AUTH_SECRET:-medtour-dev-secret-change-me}
+      # App config
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-Wishubest}
+      # Supabase Storage (for file uploads)
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      # AI
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+      # Email (optional)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      # Stripe (optional)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+    volumes:
+      # Persist uploaded files (if using local storage fallback)
+      - uploads:/app/public/uploads
+
+volumes:
+  postgres-data:
+    driver: local
+  uploads:
+    driver: local
