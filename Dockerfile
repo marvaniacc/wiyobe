@@ -25,7 +25,9 @@ COPY . .
 RUN npx prisma generate
 
 # Build Next.js (standalone output)
+# AUTH_SECRET is required at build time for module evaluation
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV AUTH_SECRET="build-placeholder-not-used-at-runtime"
 RUN npm run build
 
 # ── Stage 3: runner ──────────────────────────────────────────────────────────
