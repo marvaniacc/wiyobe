@@ -5188,6 +5188,9 @@ function AdminSettingsSection() {
             </CardContent>
           </Card>
 
+          {/* Header Builder */}
+          <HeaderBuilderCard values={values} setValues={setValues} />
+
           {/* Platform Settings (legacy) */}
           <Card>
             <CardHeader>
@@ -5301,5 +5304,161 @@ function AdminProfileSection() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+// ============================================================================
+// Header Builder — design two distinct headers (Guest + Logged-in)
+// ============================================================================
+type HeaderMenuItem = { label: string; link: string }
+type HeaderConfig = {
+  menuItems: HeaderMenuItem[]
+  ctaLabel: string
+  ctaLink: string
+}
+
+function parseHeaderConfig(json: string | undefined): HeaderConfig {
+  const defaults: HeaderConfig = { menuItems: [], ctaLabel: '', ctaLink: '' }
+  if (!json) return defaults
+  try {
+    const parsed = JSON.parse(json)
+    return {
+      menuItems: Array.isArray(parsed.menuItems) ? parsed.menuItems : [],
+      ctaLabel: parsed.ctaLabel || '',
+      ctaLink: parsed.ctaLink || '',
+    }
+  } catch {
+    return defaults
+  }
+}
+
+function HeaderBuilderCard({ values, setValues }: {
+  values: Record<string, string>
+  setValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
+}) {
+  const { t } = useT()
+  const [saving, setSaving] = React.useState(false)
+
+  const guestConfig = parseHeaderConfig(values.headerConfigGuest)
+  const loggedConfig = parseHeaderConfig(values.headerConfigLogged)
+
+  function updateConfig(key: 'headerConfigGuest' | 'headerConfigLogged', config: HeaderConfig) {
+    setValues((v) => ({ ...v, [key]: JSON.stringify(config) }))
+  }
+
+  function addMenuItem(key: 'headerConfigGuest' | 'headerConfigLogged') {
+    const config = key === 'headerConfigGuest' ? guestConfig : loggedConfig
+    updateConfig(key, { ...config, menuItems: [...config.menuItems, { label: '', link: '' }] })
+  }
+
+  function removeMenuItem(key: 'headerConfigGuest' | 'headerConfigLogged', index: number) {
+    const config = key === 'headerConfigGuest' ? guestConfig : loggedConfig
+    updateConfig(key, { ...config, menuItems: config.menuItems.filter((_, i) => i !== index) })
+  }
+
+  function updateMenuItem(key: 'headerConfigGuest' | 'headerConfigLogged', index: number, field: 'label' | 'link', value: string) {
+    const config = key === 'headerConfigGuest' ? guestConfig : loggedConfig
+    const items = [...config.menuItems]
+    items[index] = { ...items[index], [field]: value }
+    updateConfig(key, { ...config, menuItems: items })
+  }
+
+  async function saveHeaders() {
+    setSaving(true)
+    try {
+      await apiPatch('/api/admin/settings', {
+        headerConfigGuest: values.headerConfigGuest || JSON.stringify({ menuItems: [], ctaLabel: '', ctaLink: '' }),
+        headerConfigLogged: values.headerConfigLogged || JSON.stringify({ menuItems: [], ctaLabel: '', ctaLink: '' }),
+      })
+      toast.success('Header configuration saved')
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save headers')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function renderHeaderEditor(title: string, icon: string, configKey: 'headerConfigGuest' | 'headerConfigLogged', config: HeaderConfig) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon name={icon} size={16} className="text-primary" />
+          <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+        </div>
+
+        {/* Menu items */}
+        <div className="space-y-2">
+          {config.menuItems.map((item, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Input
+                placeholder="Label (e.g. Doctors)"
+                value={item.label}
+                onChange={(e) => updateMenuItem(configKey, i, 'label', e.target.value)}
+                className="h-8 flex-1 text-sm"
+              />
+              <Input
+                placeholder="/en/doctors"
+                value={item.link}
+                onChange={(e) => updateMenuItem(configKey, i, 'link', e.target.value)}
+                className="h-8 flex-1 text-sm font-mono"
+              />
+              <Button size="sm" variant="ghost" onClick={() => removeMenuItem(configKey, i)} className="size-8 p-0 text-error">
+                <Icon name="close" size={14} />
+              </Button>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" onClick={() => addMenuItem(configKey)} className="gap-1.5 text-xs">
+            <Icon name="add" size={14} />
+            Add Menu Item
+          </Button>
+        </div>
+
+        {/* CTA Button */}
+        <div className="space-y-1.5 rounded-[10px] border border-divider p-3">
+          <p className="text-xs font-medium text-muted-foreground">Primary CTA Button</p>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Label (e.g. Login)"
+              value={config.ctaLabel}
+              onChange={(e) => updateConfig(configKey, { ...config, ctaLabel: e.target.value })}
+              className="h-8 flex-1 text-sm"
+            />
+            <Input
+              placeholder="/dashboard"
+              value={config.ctaLink}
+              onChange={(e) => updateConfig(configKey, { ...config, ctaLink: e.target.value })}
+              className="h-8 flex-1 text-sm font-mono"
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Icon name="view_quilt" size={18} className="text-primary" />
+          Header Builder
+        </CardTitle>
+        <CardDescription>
+          Design two distinct headers: one for guests (not logged in) and one for logged-in users. Menu items and CTA buttons are fully customizable.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          {renderHeaderEditor('Guest Header', 'person_off', 'headerConfigGuest', guestConfig)}
+          {renderHeaderEditor('Logged-in Header', 'person', 'headerConfigLogged', loggedConfig)}
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={saveHeaders} disabled={saving} className="gap-2">
+            {saving ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="save" size={16} />}
+            Save Header Configuration
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
