@@ -17,6 +17,9 @@ import { ProviderDashboard } from '@/components/dashboards/provider/provider-das
 import { AdminDashboard } from '@/components/dashboards/admin/admin-dashboard'
 import { AffiliateDashboard } from '@/components/dashboards/affiliate/affiliate-dashboard'
 import { NotificationBell } from '@/components/shell/notification-bell'
+import dynamic from 'next/dynamic'
+const PageEditorFullScreen = dynamic(() => import('@/components/admin/full-screen-editors').then(m => m.PageEditorFullScreen), { ssr: false })
+const BlogEditorFullScreen = dynamic(() => import('@/components/admin/full-screen-editors').then(m => m.BlogEditorFullScreen), { ssr: false })
 
 type NavItem = { key: string; labelKey: string; icon: string }
 
@@ -230,6 +233,17 @@ export function DashboardShell() {
     try { await fetch('/api/auth/signout', { method: 'POST' }) } catch {}
     signOut()
     toast.success('Signed out')
+  }
+
+  const isFullScreenEditor = section === 'page-editor' || section === 'blog-editor'
+
+  if (isFullScreenEditor && session.role === 'ADMIN') {
+    return (
+      <div className="flex h-screen w-full flex-col bg-background" dir={dir}>
+        {section === 'page-editor' && <PageEditorFullScreen />}
+        {section === 'blog-editor' && <BlogEditorFullScreen />}
+      </div>
+    )
   }
 
   return (

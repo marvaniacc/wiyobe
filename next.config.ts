@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@blocknote/core", "@blocknote/react", "@blocknote/mantine"],
   // Allow images from Unsplash (landing page hero images) and QR code API
   images: {
     remotePatterns: [

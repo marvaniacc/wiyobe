@@ -55,6 +55,10 @@ interface AppState {
   // Active accordion group in the admin sidebar
   activeNavGroup: string | null
   setActiveNavGroup: (g: string | null) => void
+  editingPageId: string | null
+  editingBlogPostId: string | null
+  setEditingPageId: (id: string | null) => void
+  setEditingBlogPostId: (id: string | null) => void
 }
 
 export const useApp = create<AppState>()(
@@ -88,6 +92,10 @@ export const useApp = create<AppState>()(
       lastSection: null,
       activeNavGroup: null,
       setActiveNavGroup: (g) => set({ activeNavGroup: g }),
+      editingPageId: null,
+      editingBlogPostId: null,
+      setEditingPageId: (id) => set({ editingPageId: id }),
+      setEditingBlogPostId: (id) => set({ editingBlogPostId: id }),
       toggleCompare: (id) =>
         set((s) => ({
           compareIds: s.compareIds.includes(id)

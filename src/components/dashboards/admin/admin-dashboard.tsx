@@ -4067,6 +4067,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'kyc': return <AdminKycSection />
     case 'tickets': return <AdminTicketsSection />
     case 'settings': return <AdminSettingsSection />
+    case 'locations': return <LocationsSection />
     case 'recycle-bin': return <RecycleBinSection />
     case 'broadcast': return <BroadcastSection />
     case 'kyc-requirements': return <KycRequirementsSection />
@@ -5460,5 +5461,125 @@ function HeaderBuilderCard({ values, setValues }: {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// ============================================================================
+// Locations Management Section
+// ============================================================================
+function LocationsSection() {
+  const { t } = useT()
+  const { data, loading, error, refetch } = useApi<{ countries: any[] }>('/api/admin/locations')
+  const [selectedCountry, setSelectedCountry] = React.useState<any | null>(null)
+  const [cities, setCities] = React.useState<any[]>([])
+  const [newCountryName, setNewCountryName] = React.useState('')
+  const [newCountryIso, setNewCountryIso] = React.useState('')
+  const [newCountryFlag, setNewCountryFlag] = React.useState('')
+  const [newCityName, setNewCityName] = React.useState('')
+
+  const countries = data?.countries || []
+
+  React.useEffect(() => {
+    if (selectedCountry) {
+      fetch(`/api/admin/locations/cities?countryId=${selectedCountry.id}`).then(r => r.json()).then(d => setCities(d.cities || [])).catch(() => setCities([]))
+    }
+  }, [selectedCountry])
+
+  async function addCountry() {
+    if (!newCountryName.trim() || !newCountryIso.trim()) return
+    try {
+      await apiPost('/api/admin/locations', { name: newCountryName, isoCode: newCountryIso, flag: newCountryFlag || undefined })
+      setNewCountryName(''); setNewCountryIso(''); setNewCountryFlag('')
+      toast.success('Country added'); refetch()
+    } catch (e: any) { toast.error(e.message || 'Failed') }
+  }
+
+  async function addCity() {
+    if (!newCityName.trim() || !selectedCountry) return
+    try {
+      await apiPost('/api/admin/locations/cities', { name: newCityName, countryId: selectedCountry.id })
+      setNewCityName('')
+      toast.success('City added')
+      const res = await fetch(`/api/admin/locations/cities?countryId=${selectedCountry.id}`).then(r => r.json())
+      setCities(res.cities || [])
+      refetch()
+    } catch (e: any) { toast.error(e.message || 'Failed') }
+  }
+
+  async function deleteCountry(id: string) {
+    try { await apiDelete(`/api/admin/locations/${id}`); toast.success('Country deleted'); setSelectedCountry(null); refetch() }
+    catch (e: any) { toast.error(e.message || 'Failed') }
+  }
+
+  async function deleteCity(id: string) {
+    try { await apiDelete(`/api/admin/locations/cities/${id}`); toast.success('City deleted'); setCities(cities.filter(c => c.id !== id)) }
+    catch (e: any) { toast.error(e.message || 'Failed') }
+  }
+
+  if (loading) return <div><PageHeader title="Locations" icon="public" /><LoadingCard lines={4} /></div>
+  if (error) return <Card><CardContent className="p-6 text-error">{error}</CardContent></Card>
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Locations" description="Manage countries and cities for provider registration and filtering" icon="public" />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Countries */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Icon name="flag" size={18} className="text-primary" />Countries ({countries.length})</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <Input placeholder="Name" value={newCountryName} onChange={(e) => setNewCountryName(e.target.value)} className="h-8 text-sm" />
+              <Input placeholder="ISO (e.g. TR)" value={newCountryIso} onChange={(e) => setNewCountryIso(e.target.value)} maxLength={2} className="h-8 w-20 text-sm uppercase" />
+              <Input placeholder="🇹🇷" value={newCountryFlag} onChange={(e) => setNewCountryFlag(e.target.value)} className="h-8 w-12 text-sm" />
+              <Button size="sm" onClick={addCountry} className="gap-1"><Icon name="add" size={14} /></Button>
+            </div>
+            <div className="space-y-1 max-h-[400px] overflow-y-auto">
+              {countries.map((c) => (
+                <div key={c.id} className={cn('flex items-center justify-between rounded-[10px] border p-2.5 cursor-pointer transition-colors', selectedCountry?.id === c.id ? 'border-primary bg-accent' : 'border-divider hover:bg-surface-secondary')} onClick={() => setSelectedCountry(c)}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{c.flag || '🌍'}</span>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{c.name}</p>
+                      <p className="text-xs text-muted-foreground">{c.isoCode} · {c.cities?.length || 0} cities</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); deleteCountry(c.id) }} className="text-error"><Icon name="delete" size={14} /></Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cities */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Icon name="location_city" size={18} className="text-primary" />Cities {selectedCountry ? `· ${selectedCountry.name}` : ''}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {!selectedCountry ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Select a country to manage its cities</p>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <Input placeholder="City name" value={newCityName} onChange={(e) => setNewCityName(e.target.value)} className="h-8 text-sm" />
+                  <Button size="sm" onClick={addCity} className="gap-1"><Icon name="add" size={14} /></Button>
+                </div>
+                <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                  {cities.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between rounded-[10px] border border-divider p-2.5">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{c.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">/{c.slug}</p>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => deleteCity(c.id)} className="text-error"><Icon name="delete" size={14} /></Button>
+                    </div>
+                  ))}
+                  {cities.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No cities yet</p>}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }
