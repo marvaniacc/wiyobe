@@ -1,16 +1,17 @@
-import { DefaultLanding } from '@/components/landing/default-landing'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Root page — renders the SPA directly (no redirect).
+ * Root page — redirects to the default locale landing page.
  *
- * The IDE Preview panel loads `/` in an iframe. HTTP redirects (307) break
- * iframe rendering in some environments, so we render the DefaultLanding
- * client component directly here instead of redirecting to /dashboard.
+ * In production, `/` redirects to `/en` (the public SSR landing page).
+ * The SPA dashboard lives at `/dashboard` and is unaffected.
  *
- * The public SSR pages live under /{locale}/... (see src/app/[locale]/).
+ * Locale detection from Accept-Language header could be added here,
+ * but for simplicity we default to 'en'. The middleware handles
+ * locale-specific routing for /{locale}/... paths.
  */
 export default function RootPage() {
-  return <DefaultLanding />
+  redirect('/en')
 }
