@@ -3458,6 +3458,7 @@ type KycRequirement = {
   providerType: string
   documentName: string
   description: string | null
+  type: 'IMAGE' | 'DOCUMENT' | 'VIDEO'
   isRequired: boolean
   order: number
   createdAt: string
@@ -3651,6 +3652,7 @@ function KycRequirementDialog({ open, requirement, providerType, onOpenChange, o
   const { t } = useT()
   const [documentName, setDocumentName] = React.useState('')
   const [description, setDescription] = React.useState('')
+  const [type, setType] = React.useState<'IMAGE' | 'DOCUMENT' | 'VIDEO'>('IMAGE')
   const [isRequired, setIsRequired] = React.useState(true)
   const [order, setOrder] = React.useState(0)
   const [saving, setSaving] = React.useState(false)
@@ -3659,6 +3661,7 @@ function KycRequirementDialog({ open, requirement, providerType, onOpenChange, o
     if (open) {
       setDocumentName(requirement?.documentName || '')
       setDescription(requirement?.description || '')
+      setType((requirement?.type as 'IMAGE' | 'DOCUMENT' | 'VIDEO') || 'IMAGE')
       setIsRequired(requirement?.isRequired ?? true)
       setOrder(requirement?.order ?? 0)
     }
@@ -3672,6 +3675,7 @@ function KycRequirementDialog({ open, requirement, providerType, onOpenChange, o
         providerType,
         documentName: documentName.trim(),
         description: description.trim() || null,
+        type,
         isRequired,
         order,
       }
@@ -3707,6 +3711,24 @@ function KycRequirementDialog({ open, requirement, providerType, onOpenChange, o
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">{t('admin.documentDesc', 'Description')}</Label>
             <Textarea placeholder={t('kyc.descPlaceholder', 'Instructions for the provider…')} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={500} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{t('kyc.requirementType', 'Requirement Type')}</Label>
+            <Select value={type} onValueChange={(v) => setType(v as 'IMAGE' | 'DOCUMENT' | 'VIDEO')}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IMAGE">{t('kyc.typeImage', 'Image (photo / scan)')}</SelectItem>
+                <SelectItem value="DOCUMENT">{t('kyc.typeDocument', 'Document (PDF)')}</SelectItem>
+                <SelectItem value="VIDEO">{t('kyc.typeVideo', 'Video (webcam liveness)')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              {type === 'VIDEO'
+                ? t('kyc.typeVideoHint', 'Provider will record a 5-second selfie video via webcam.')
+                : type === 'DOCUMENT'
+                  ? t('kyc.typeDocumentHint', 'Provider will upload a PDF file.')
+                  : t('kyc.typeImageHint', 'Provider will upload a single photo.')}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center justify-between rounded-[12px] border border-divider p-3">

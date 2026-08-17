@@ -149,8 +149,14 @@ export function KycVerificationSection() {
   useEffect(() => { fetchKyc() }, [fetchKyc])
 
   async function handleUpload(requirementId: string, file: File) {
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error(t('provider.fileTooLarge', 'File too large (max 5MB)'))
+    // Look up the requirement to determine the max file size.
+    // VIDEO allows up to MAX_VIDEO_SIZE (15 MB); IMAGE/DOCUMENT allow 5 MB.
+    const req = requirements.find((r) => r.id === requirementId)
+    const isVideo = req?.type === 'VIDEO'
+    const maxSize = isVideo ? MAX_VIDEO_SIZE : 5 * 1024 * 1024
+    if (file.size > maxSize) {
+      const maxMb = Math.round(maxSize / (1024 * 1024))
+      toast.error(t('provider.fileTooLarge', `File too large (max ${maxMb}MB)`))
       return
     }
     setUploadingFor(requirementId)
@@ -407,14 +413,6 @@ function UploadButton({ requirementId, onUpload, disabled, loading, label }: {
 
 
 /* --- Video Upload Button with Webcam Recording --- */
-function getSupportedMimeType(): string | null {
-  if (typeof MediaRecorder === 'undefined') return null
-  const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4;codecs=h264', 'video/mp4']
-  for (const type of candidates) {
-    try { if (MediaRecorder.isTypeSupported(type)) return type } catch {}
-  }
-  return null
-}
 
 function VideoUploadButton({ onUpload, disabled, loading }: {
   requirementId: string

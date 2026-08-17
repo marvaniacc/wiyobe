@@ -640,6 +640,16 @@ enum KycStatus {
   REJECTED
 }
 
+/// Type of artifact a provider must submit for a KYC requirement.
+/// IMAGE = single photo (license, ID, passport scan)
+/// DOCUMENT = multi-page PDF (tax certificate, criminal record check)
+/// VIDEO = webcam liveness clip (selfie + ID verification)
+enum KycRequirementType {
+  IMAGE
+  DOCUMENT
+  VIDEO
+}
+
 /// Admin-defined KYC requirement — defines what documents each provider type
 /// must submit. Created/managed by admins, used by providers during KYC upload.
 model KycRequirement {
@@ -647,7 +657,7 @@ model KycRequirement {
   providerType String                        // DOCTOR | HOSPITAL | HOTEL | TRANSLATOR
   documentName String                        // e.g. "Medical License"
   description  String?                       // instructions for the provider
-  type         String       @default("IMAGE")  // IMAGE | DOCUMENT | VIDEO
+  type         KycRequirementType @default(IMAGE)  // IMAGE | DOCUMENT | VIDEO (DB-enforced enum)
   isRequired   Boolean      @default(true)
   order        Int          @default(0)      // staging/display order
   createdAt    DateTime     @default(now())

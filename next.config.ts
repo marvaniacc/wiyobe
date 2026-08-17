@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // BlockNote editor packages must remain external to the server bundle to
+  // keep ProseMirror schema isolation intact (see components/editor/blocknote-editor.tsx).
   serverExternalPackages: ["@blocknote/core", "@blocknote/react", "@blocknote/mantine"],
   // Allow images from Unsplash (landing page hero images) and QR code API
   images: {
@@ -10,10 +11,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'api.qrserver.com' },
     ],
   },
-  // TypeScript errors are ignored in build to avoid blocking deploys for type-only issues
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // NOTE: TypeScript and ESLint build errors are NO LONGER ignored — broken
+  // types / lint failures will block `next build`. Fix them at the source.
   reactStrictMode: false,
   // iframe embedding — allow the IDE Preview panel and any external dashboard
   // to embed pages from this app.

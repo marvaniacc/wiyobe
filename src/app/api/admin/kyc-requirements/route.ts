@@ -36,6 +36,7 @@ const createSchema = z.object({
   providerType: z.enum(['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']),
   documentName: z.string().min(1).max(200),
   description: z.string().max(500).nullable().optional(),
+  type: z.enum(['IMAGE', 'DOCUMENT', 'VIDEO']).default('IMAGE'),
   isRequired: z.boolean().default(true),
   order: z.number().int().default(0),
 })
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
         providerType: body.providerType,
         documentName: body.documentName,
         description: body.description ?? null,
+        type: body.type,
         isRequired: body.isRequired,
         order: body.order,
       },

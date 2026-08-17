@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic'
 const patchSchema = z.object({
   documentName: z.string().min(1).max(200).optional(),
   description: z.string().max(500).nullable().optional(),
+  type: z.enum(['IMAGE', 'DOCUMENT', 'VIDEO']).optional(),
   isRequired: z.boolean().optional(),
   order: z.number().int().optional(),
   providerType: z.enum(['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']).optional(),
@@ -34,6 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: {
         ...(body.documentName !== undefined ? { documentName: body.documentName } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.type !== undefined ? { type: body.type } : {}),
         ...(body.isRequired !== undefined ? { isRequired: body.isRequired } : {}),
         ...(body.order !== undefined ? { order: body.order } : {}),
         ...(body.providerType !== undefined ? { providerType: body.providerType } : {}),

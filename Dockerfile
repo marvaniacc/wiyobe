@@ -10,7 +10,7 @@ RUN apk add --no-cache libc6-compat openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV AUTH_SECRET="f4a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9"
+# AUTH_SECRET is provided via environment at runtime — never bake secrets into images.
 RUN npx prisma generate
 RUN npm run build
 

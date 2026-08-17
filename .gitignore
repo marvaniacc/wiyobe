@@ -59,3 +59,13 @@ server.log
 tool-results/
 start-dev.sh
 keep-alive.sh
+
+# P0 cleanup — untrack sandbox artifacts and credentials (do not commit)
+.env
+caddy_setup.py
+test_domain.py
+.zscripts/dev.pid
+download/
+upload/
+agent-ctx/
+db/custom.db
