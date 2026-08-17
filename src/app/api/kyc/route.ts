@@ -71,10 +71,41 @@ export async function GET() {
     // Also include any documents not tied to a requirement (legacy uploads)
     const orphanDocs = documents.filter((d) => !d.requirementId)
 
+    // Fetch user's kycVideoPath
+    const userRow = await db.user.findUnique({
+      where: { id: session.id },
+      select: { kycVideoPath: true, kycStatus: true },
+    })
+
+    // Collect video-specific rejection reasons from rejected documents
+    const VIDEO_REJECTION_CODES = new Set([
+      'VIDEO_MISSING', 'VIDEO_TOO_SHORT', 'VIDEO_TOO_LONG',
+      'VIDEO_FACE_NOT_VISIBLE', 'VIDEO_ID_NOT_VISIBLE',
+      'VIDEO_POOR_QUALITY', 'VIDEO_FORMAT_UNSUPPORTED', 'VIDEO_FACE_NOT_MATCHING_ID',
+    ])
+    const allCodes: string[] = []
+    for (const doc of documents) {
+      if (doc.reviewStatus === 'REJECTED' && doc.rejectionReason) {
+        try {
+          const reason = typeof doc.rejectionReason === 'string'
+            ? JSON.parse(doc.rejectionReason)
+            : doc.rejectionReason
+          if (Array.isArray(reason)) {
+            allCodes.push(...reason.filter((c: any) => typeof c === 'string'))
+          }
+        } catch {}
+      }
+    }
+    const rejectionReasons = Array.from(new Set(allCodes))
+    const videoRejected = rejectionReasons.some((c) => VIDEO_REJECTION_CODES.has(c))
+
     return json({
       requirements: merged,
       orphanDocuments: orphanDocs,
-      kycStatus: (session as any).kycStatus || 'PENDING',
+      kycStatus: userRow?.kycStatus || 'PENDING',
+      kycVideoPath: userRow?.kycVideoPath ?? null,
+      videoRejected,
+      rejectionReasons,
     })
   } catch (e) { return handleError(e) }
 }
