@@ -123,6 +123,7 @@ model User {
   // KYC status: PENDING (not started), IN_REVIEW (submitted, awaiting admin),
   // APPROVED (all required docs approved), REJECTED (at least one rejected).
   kycStatus            String       @default("PENDING")
+  kycVideoPath         String?
   kycDocuments      KycDocument[] @relation("kycDocuments")
   kycReviewed       KycDocument[] @relation("kycReviewed")
   ticketsRaised     Ticket[]    @relation("ticketsRaised")
