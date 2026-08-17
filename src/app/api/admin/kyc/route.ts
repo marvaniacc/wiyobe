@@ -44,7 +44,7 @@ export async function GET() {
           orderBy: { uploadedAt: 'desc' },
           include: {
             requirement: {
-              select: { id: true, documentName: true, isRequired: true, order: true },
+              select: { id: true, documentName: true, isRequired: true, order: true, type: true },
             },
           },
         },

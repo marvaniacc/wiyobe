@@ -6,7 +6,7 @@ import { BlockNoteSSRRenderer } from '@/components/editor/blocknote-ssr-renderer
 
 export const dynamic = 'force-dynamic'
 
-const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar']
+const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru']
 
 /**
  * /{locale} — locale-prefixed landing page.

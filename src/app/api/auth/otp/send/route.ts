@@ -16,7 +16,7 @@ const schema = z.object({
     role: z.enum(['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR', 'AFFILIATE']),
     name: z.string().min(2),
     password: z.string().min(6),
-    preferredLanguage: z.enum(['en', 'tr', 'fa', 'ar']).default('en'),
+    preferredLanguage: z.enum(['en', 'tr', 'fa', 'ar', 'ru']).default('en'),
     phone: z.string().optional(),
     country: z.string().optional(),
     city: z.string().optional(),

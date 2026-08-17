@@ -4,7 +4,7 @@ import { getCountrySlug } from '@/lib/countries'
 
 export const dynamic = 'force-dynamic'
 
-const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar']
+const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru']
 
 /**
  * Dynamic sitemap.xml — generated via Next.js App Router native metadata.

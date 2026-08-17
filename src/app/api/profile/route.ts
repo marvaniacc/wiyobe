@@ -22,7 +22,7 @@ const updateSchema = z.object({
   phone: z.string().optional(),
   country: z.string().optional(),
   city: z.string().optional(),
-  preferredLanguage: z.enum(['en', 'tr', 'fa', 'ar']).optional(),
+  preferredLanguage: z.enum(['en', 'tr', 'fa', 'ar', 'ru']).optional(),
   avatarUrl: z.string().optional(),
   // patient
   dateOfBirth: z.string().optional(),

@@ -1,13 +1,15 @@
-// i18n: 4 languages — English, Turkish, Persian, Arabic. RTL for fa/ar.
-export type Locale = 'en' | 'tr' | 'fa' | 'ar'
+// i18n: 5 languages — English, Turkish, Persian, Arabic, Russian. RTL for fa/ar.
+// `ru` falls back to `en` for untranslated keys (translate() handles this).
+export type Locale = 'en' | 'tr' | 'fa' | 'ar' | 'ru'
 
-export const LOCALES: Locale[] = ['en', 'tr', 'fa', 'ar']
+export const LOCALES: Locale[] = ['en', 'tr', 'fa', 'ar', 'ru']
 
 export const LOCALE_META: Record<Locale, { label: string; native: string; dir: 'ltr' | 'rtl'; flag: string }> = {
   en: { label: 'English', native: 'English', dir: 'ltr', flag: '🇬🇧' },
   tr: { label: 'Turkish', native: 'Türkçe', dir: 'ltr', flag: '🇹🇷' },
   fa: { label: 'Persian', native: 'فارسی', dir: 'rtl', flag: '🇮🇷' },
   ar: { label: 'Arabic', native: 'العربية', dir: 'rtl', flag: '🇸🇦' },
+  ru: { label: 'Russian', native: 'Русский', dir: 'ltr', flag: '🇷🇺' },
 }
 
 export function isRTL(locale: Locale): boolean {
@@ -4411,7 +4413,7 @@ const ar: Dict = {
   'admin.kyc': 'KYC verification',
 }
 
-export const DICTS: Record<Locale, Dict> = { en, tr, fa, ar }
+export const DICTS: Record<Locale, Dict> = { en, tr, fa, ar, ru: { ...en } }
 
 export function translate(locale: Locale, key: string, fallback?: string): string {
   return DICTS[locale]?.[key] ?? DICTS.en[key] ?? fallback ?? key

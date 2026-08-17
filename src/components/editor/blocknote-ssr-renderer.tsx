@@ -120,5 +120,41 @@ async function renderBlock(block: any, locale: string, idx: number): Promise<any
   if (type === 'image') {
     return <img key={key} src={props.url || ''} alt={props.caption || ''} className="my-4 w-full rounded-[16px]" />
   }
+
+  // ---- Custom Wishubest blocks (admin-embeddable dynamic widgets) ----
+  // These blocks let admins compose landing pages that pull live data
+  // (provider lists, featured doctors, auth forms) without writing code.
+
+  if (type === 'providerList') {
+    const providerType = (props.providerType as 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR') || 'DOCTOR'
+    const country = typeof props.country === 'string' ? props.country : undefined
+    const limit = typeof props.limit === 'number' ? props.limit : 6
+    const layout = props.layout === 'list' ? 'list' : 'grid'
+    return (
+      <ProviderListRenderer
+        key={key}
+        providerType={providerType}
+        country={country}
+        limit={limit}
+        layout={layout}
+        locale={locale}
+      />
+    )
+  }
+
+  if (type === 'featuredDoctors') {
+    const title = typeof props.title === 'string' ? props.title : 'Top Doctors'
+    const limit = typeof props.limit === 'number' ? props.limit : 4
+    return <FeaturedDoctorsSSR key={key} title={title} limit={limit} locale={locale} />
+  }
+
+  if (type === 'authForm') {
+    const authType = props.type === 'signup' ? 'signup' : 'login'
+    const role = (props.role as 'patient' | 'doctor' | 'hospital' | 'hotel' | 'translator' | 'affiliate') || 'patient'
+    const display = props.display === 'modal' ? 'modal' : 'inline'
+    const buttonText = typeof props.buttonText === 'string' ? props.buttonText : ''
+    return <AuthFormBlockSSR key={key} type={authType} role={role} display={display} buttonText={buttonText} />
+  }
+
   return null
 }

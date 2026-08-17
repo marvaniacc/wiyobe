@@ -9,7 +9,7 @@ const schema = z.object({
   bookingId: z.string(),
   rating: z.number().int().min(1).max(5),
   comment: z.string().min(3),
-  language: z.enum(['en', 'tr', 'fa', 'ar']).default('en'),
+  language: z.enum(['en', 'tr', 'fa', 'ar', 'ru']).default('en'),
 })
 
 export async function POST(req: Request) {

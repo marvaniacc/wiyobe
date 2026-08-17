@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar'] as const
+const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
 const DEFAULT_LOCALE = 'en'
 
 // Routes that should NOT be intercepted by the i18n middleware.

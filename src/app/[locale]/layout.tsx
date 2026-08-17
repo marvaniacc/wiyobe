@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { PublicHeader } from '@/components/shared/public-header'
 import { PublicFooter } from '@/components/shared/public-footer'
 
-const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar'] as const
+const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
 const RTL_LOCALES = ['fa', 'ar']
 
 type LocaleLayoutProps = {
