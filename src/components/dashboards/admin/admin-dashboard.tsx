@@ -4068,6 +4068,8 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'tickets': return <AdminTicketsSection />
     case 'settings': return <AdminSettingsSection />
     case 'locations': return <LocationsSection />
+    case 'tags': return <TagsSection />
+    case 'media-library': return <MediaLibrarySection />
     case 'recycle-bin': return <RecycleBinSection />
     case 'broadcast': return <BroadcastSection />
     case 'kyc-requirements': return <KycRequirementsSection />
@@ -5580,6 +5582,268 @@ function LocationsSection() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Tags Management Section
+// ============================================================================
+function TagsSection() {
+  const { t } = useT()
+  const { data, loading, error, refetch } = useApi<{ tags: any[] }>('/api/admin/tags')
+  const [newTagName, setNewTagName] = React.useState('')
+  const [adding, setAdding] = React.useState(false)
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
+
+  const tags = data?.tags || []
+
+  async function addTag() {
+    if (!newTagName.trim()) return
+    setAdding(true)
+    try {
+      await apiPost('/api/admin/tags', { name: newTagName.trim() })
+      setNewTagName('')
+      toast.success('Tag created')
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to create tag')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function deleteTag(id: string) {
+    setDeletingId(id)
+    try {
+      await apiDelete(`/api/admin/tags/${id}`)
+      toast.success('Tag deleted')
+      refetch()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to delete')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title="Tags" icon="sell" description="Manage blog post tags" />
+        <LoadingCard lines={4} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return <Card><CardContent className="p-6 text-error">{error}</CardContent></Card>
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Tags" description="Manage blog post tags for categorizing content" icon="sell" />
+
+      {/* Add tag form */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="add" size={18} className="text-primary" />
+            Add New Tag
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Tag name (e.g. Cardiology, Turkey, Dental)"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !adding) addTag() }}
+              className="flex-1"
+            />
+            <Button onClick={addTag} disabled={adding || !newTagName.trim()} className="gap-1.5">
+              {adding ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="add" size={16} />}
+              Add Tag
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tags list */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon name="sell" size={18} className="text-primary" />
+            All Tags ({tags.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tags.length === 0 ? (
+            <div className="py-8 text-center">
+              <Icon name="sell" size={32} className="mx-auto text-muted-foreground/50" />
+              <p className="mt-2 text-sm font-medium text-foreground">No tags yet</p>
+              <p className="text-xs text-muted-foreground">Create your first tag above.</p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <div
+                  key={tag.id}
+                  className="group flex items-center gap-2 rounded-full border border-divider bg-surface-secondary px-3 py-1.5 text-sm"
+                >
+                  <Icon name="sell" size={14} className="text-muted-foreground" />
+                  <span className="font-medium text-foreground">{tag.name}</span>
+                  {tag._count?.posts > 0 && (
+                    <span className="text-xs text-muted-foreground">({tag._count.posts} posts)</span>
+                  )}
+                  <button
+                    onClick={() => deleteTag(tag.id)}
+                    disabled={deletingId === tag.id}
+                    className="text-muted-foreground/50 opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                    title="Delete tag"
+                  >
+                    {deletingId === tag.id ? (
+                      <Icon name="progress_activity" size={14} className="animate-spin" />
+                    ) : (
+                      <Icon name="close" size={14} />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================================
+// Media Library Section — full-page media management
+// ============================================================================
+function MediaLibrarySection() {
+  const { t } = useT()
+  const [assets, setAssets] = React.useState<any[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [uploading, setUploading] = React.useState(false)
+  const fileRef = React.useRef<HTMLInputElement>(null)
+
+  const fetchMedia = React.useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/media')
+      const data = await res.json()
+      setAssets(data.assets || [])
+    } catch {
+      setAssets([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => { fetchMedia() }, [fetchMedia])
+
+  async function handleUpload(file: File) {
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/media', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      toast.success('File uploaded')
+      fetchMedia()
+    } catch (e: any) {
+      toast.error(e.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await apiDelete(`/api/media/${id}`)
+      toast.success('File deleted')
+      setAssets(assets.filter((a) => a.id !== id))
+    } catch (e: any) {
+      toast.error(e.message || 'Delete failed')
+    }
+  }
+
+  function formatSize(bytes: number) {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Media Library"
+        description="Upload, browse, and delete media files"
+        icon="perm_media"
+        action={
+          <Button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="gap-1.5"
+          >
+            {uploading ? <Icon name="progress_activity" size={18} className="animate-spin" /> : <Icon name="upload" size={18} />}
+            Upload
+          </Button>
+        }
+      />
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        accept="image/*,video/*,.pdf,.svg"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleUpload(file)
+          if (fileRef.current) fileRef.current.value = ''
+        }}
+      />
+
+      {loading ? (
+        <LoadingCard lines={4} />
+      ) : assets.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <Icon name="image_not_supported" size={32} className="text-muted-foreground/50" />
+            <p className="text-sm font-medium text-foreground">No media files yet</p>
+            <p className="text-xs text-muted-foreground">Click "Upload" to add your first file.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {assets.map((asset) => (
+            <div key={asset.id} className="group relative overflow-hidden rounded-[14px] border border-divider bg-surface">
+              <div className="aspect-square overflow-hidden bg-surface-secondary">
+                {asset.mimeType?.startsWith('image/') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={asset.filePath} alt={asset.fileName} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Icon name="description" size={32} className="text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <div className="p-2">
+                <p className="truncate text-xs font-medium text-foreground" title={asset.fileName}>{asset.fileName}</p>
+                <p className="text-[10px] text-muted-foreground">{formatSize(asset.fileSize)}</p>
+              </div>
+              {/* Hover delete button */}
+              <button
+                onClick={() => handleDelete(asset.id)}
+                className="absolute end-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-error group-hover:opacity-100"
+                title="Delete"
+              >
+                <Icon name="delete" size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

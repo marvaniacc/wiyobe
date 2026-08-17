@@ -846,6 +846,7 @@ model BlogPost {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?                                 // soft delete
+  tags            BlogPostTag[]
 
   @@index([status])
   @@index([authorId])
@@ -931,4 +932,26 @@ model ProviderLocation {
 model SiteSetting {
   key   String  @id
   value String?
+}
+
+// ============================================================================
+// Blog Tags — for categorizing and filtering blog posts
+// ============================================================================
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  posts     BlogPostTag[]
+}
+
+model BlogPostTag {
+  blogPostId String
+  blogPost   BlogPost @relation(fields: [blogPostId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([blogPostId, tagId])
+  @@index([tagId])
 }
