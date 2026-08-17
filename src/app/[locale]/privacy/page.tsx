@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,13 +9,7 @@ const STATIC_PATH = '/privacy'
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description: 'Wishubest Privacy Policy — how we collect, use, store, and protect your personal data on the medical tourism marketplace.',
-  alternates: {
-    canonical: `/{locale}${STATIC_PATH}`,
-    languages: Object.fromEntries([
-      ...SUPPORTED_LOCALES.map((l) => [l, `/${l}${STATIC_PATH}`]),
-      ['x-default', `/en${STATIC_PATH}`],
-    ]),
-  },
+  alternates: buildStaticAlternates('en', 'privacy'),
   openGraph: {
     title: 'Privacy Policy — Wishubest',
     description: 'How we collect, use, store, and protect your personal data on the medical tourism marketplace.',
@@ -50,6 +45,11 @@ export default async function PrivacyPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: buildBreadcrumbJsonLd(locale, 'privacy') }}
+      />
+
       <header className="border-b border-divider pb-6">
         <h1 className="text-4xl font-bold tracking-tight text-foreground">Privacy Policy</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>

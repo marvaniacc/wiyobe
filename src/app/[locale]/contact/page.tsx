@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { getSession } from '@/lib/auth'
 import { ContactForm } from '@/components/shared/contact-form'
+import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,13 +12,7 @@ const STATIC_PATH = '/contact'
 export const metadata: Metadata = {
   title: 'Contact',
   description: 'Get in touch with the Wishubest team — partnerships, press, bug reports, and general inquiries.',
-  alternates: {
-    canonical: `/{locale}${STATIC_PATH}`,
-    languages: Object.fromEntries([
-      ...SUPPORTED_LOCALES.map((l) => [l, `/${l}${STATIC_PATH}`]),
-      ['x-default', `/en${STATIC_PATH}`],
-    ]),
-  },
+  alternates: buildStaticAlternates('en', 'contact'),
   openGraph: {
     title: 'Contact Wishubest',
     description: 'Get in touch with the Wishubest team — partnerships, press, bug reports, and general inquiries.',
@@ -69,6 +64,11 @@ export default async function ContactPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: buildBreadcrumbJsonLd(locale, 'contact') }}
+      />
+
       {/* Hero */}
       <div className="text-center">
         <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-[16px] bg-primary text-primary-foreground">

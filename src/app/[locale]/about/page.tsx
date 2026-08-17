@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,13 +10,7 @@ const STATIC_PATH = '/about'
 export const metadata: Metadata = {
   title: 'About',
   description: 'Learn about Wishubest — the global medical tourism marketplace connecting patients with verified doctors, hospitals, accommodations, and translators worldwide.',
-  alternates: {
-    canonical: `/{locale}${STATIC_PATH}`,
-    languages: Object.fromEntries([
-      ...SUPPORTED_LOCALES.map((l) => [l, `/${l}${STATIC_PATH}`]),
-      ['x-default', `/en${STATIC_PATH}`],
-    ]),
-  },
+  alternates: buildStaticAlternates('en', 'about'),
   openGraph: {
     title: 'About Wishubest',
     description: 'The global medical tourism marketplace connecting patients with verified providers worldwide.',
@@ -77,6 +72,10 @@ export default async function AboutPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: buildBreadcrumbJsonLd(locale, 'about') }}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}

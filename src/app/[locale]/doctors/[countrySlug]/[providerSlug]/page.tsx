@@ -169,8 +169,41 @@ export default async function DoctorDetailPage({
     ? doctor.education.split(',').map((s) => s.trim()).filter(Boolean)
     : []
 
+  // schema.org/Physician JSON-LD — medical-rich-result eligibility.
+  // Built from the same doctor data as the visible profile (no drift).
+  const physicianJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Physician',
+    name,
+    medicalSpecialty: doctor.specialty || 'General Medicine',
+    url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://wishubest.com'}/${locale}/doctors/${countrySlug}/${doctor.slug}`,
+    image: doctor.user?.avatarUrl || undefined,
+    description: doctor.bio || `Verified ${doctor.specialty} in ${doctor.city || countryName}.`,
+    telephone: undefined,
+    priceRange: `${formatCurrency(doctor.consultationFee, 'USD', locale)} consultation`,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: doctor.city || undefined,
+      addressCountry: doctor.country || countryCode,
+    },
+    aggregateRating: doctor.reviewCount > 0 ? {
+      '@type': 'AggregateRating',
+      ratingValue: doctor.rating?.toFixed(1) || '0.0',
+      reviewCount: doctor.reviewCount,
+    } : undefined,
+    knowsLanguage: languages.length > 0 ? languages : undefined,
+    alumniOf: educationItems.length > 0 ? educationItems.map((e) => ({ '@type': 'EducationalOrganization', name: e })) : undefined,
+    hasCredential: certifications.length > 0 ? certifications.map((c) => ({ '@type': 'EducationalOccupationalCredential', name: c })) : undefined,
+    availableService: subSpecialties.length > 0 ? subSpecialties.map((s) => ({ '@type': 'MedicalProcedure', name: s })) : undefined,
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(physicianJsonLd) }}
+      />
+
       {/* Header */}
       <header className="border-b border-divider bg-surface">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-5 sm:px-6">

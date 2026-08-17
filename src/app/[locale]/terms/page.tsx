@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,13 +9,7 @@ const STATIC_PATH = '/terms'
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description: 'Wishubest Terms of Service — the agreement between you and Wishubest governing your use of the medical tourism marketplace.',
-  alternates: {
-    canonical: `/{locale}${STATIC_PATH}`,
-    languages: Object.fromEntries([
-      ...SUPPORTED_LOCALES.map((l) => [l, `/${l}${STATIC_PATH}`]),
-      ['x-default', `/en${STATIC_PATH}`],
-    ]),
-  },
+  alternates: buildStaticAlternates('en', 'terms'),
   openGraph: {
     title: 'Terms of Service — Wishubest',
     description: 'The agreement between you and Wishubest governing your use of the medical tourism marketplace.',
@@ -51,6 +46,11 @@ export default async function TermsPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: buildBreadcrumbJsonLd(locale, 'terms') }}
+      />
+
       <header className="border-b border-divider pb-6">
         <h1 className="text-4xl font-bold tracking-tight text-foreground">Terms of Service</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>
