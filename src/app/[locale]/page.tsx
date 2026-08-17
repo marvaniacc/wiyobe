@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { TriageBot } from '@/components/shared/triage-bot'
+import { BlockNoteSSRRenderer } from '@/components/editor/blocknote-ssr-renderer'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,8 +12,9 @@ const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar']
  * /{locale} — locale-prefixed landing page.
  *
  * 1. If a CustomPage with slug "home" exists and is published, render its
- *    htmlContent (admin-trusted raw HTML/CSS). The TriageBot FAB is also
- *    rendered on top.
+ *    BlockNote JSON content via BlockNoteSSRRenderer. Falls back to raw
+ *    htmlContent (admin-trusted) when content is empty. The TriageBot FAB
+ *    is rendered on top in either case.
  * 2. Otherwise, render a default simple landing page.
  */
 export default async function LocaleHomePage({
@@ -26,13 +28,17 @@ export default async function LocaleHomePage({
   // Check for custom home page
   const homePage = await db.customPage.findUnique({
     where: { slug: 'home', deletedAt: null },
-    select: { htmlContent: true, isPublished: true },
+    select: { content: true, htmlContent: true, isPublished: true, language: true },
   })
 
-  if (homePage?.isPublished && homePage.htmlContent) {
+  if (homePage?.isPublished && (homePage.content || homePage.htmlContent)) {
     return (
       <>
-        <div dangerouslySetInnerHTML={{ __html: homePage.htmlContent }} />
+        <BlockNoteSSRRenderer
+          content={homePage.content}
+          htmlContent={homePage.htmlContent}
+          locale={homePage.language || locale}
+        />
         <TriageBot />
       </>
     )

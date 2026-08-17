@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { BlockNoteSSRRenderer } from '@/components/editor/blocknote-ssr-renderer'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,8 @@ type CustomPage = {
   title: string
   slug: string
   htmlContent: string
+  content: unknown
+  language: string | null
   seoTitle: string | null
   seoDescription: string | null
   focusKeyword: string | null
@@ -103,8 +106,14 @@ export default async function CustomPageRoute({
         </div>
       </header>
 
-      {/* Custom HTML content — rendered as-is (admin-trusted) */}
-      <main dangerouslySetInnerHTML={{ __html: page.htmlContent }} />
+      {/* Custom content — BlockNote JSON rendered via SSR (preferred), falls back to raw htmlContent */}
+      <main>
+        <BlockNoteSSRRenderer
+          content={page.content}
+          htmlContent={page.htmlContent}
+          locale={page.language || locale}
+        />
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-divider bg-surface">

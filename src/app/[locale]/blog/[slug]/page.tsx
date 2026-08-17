@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { formatDate } from '@/lib/money'
-import { renderTiptapToHtml } from '@/lib/tiptap-render'
+import { BlockNoteSSRRenderer } from '@/components/editor/blocknote-ssr-renderer'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -98,8 +98,14 @@ export default async function BlogDetailPage({
   const post = await getPost(slug)
   if (!post) notFound()
 
-  const contentHtml = renderTiptapToHtml(post.content)
   const authorName = post.author?.name || post.author?.email || 'Wishubest'
+
+  // Normalise content shape: BlockNote editor emits an array of blocks;
+  // legacy TipTap docs are `{ type: 'doc', content: [...] }`. Unwrap the
+  // latter so BlockNoteSSRRenderer sees a plain block array.
+  const normalizedContent = Array.isArray(post.content)
+    ? post.content
+    : (post.content as { content?: unknown[] } | null)?.content ?? null
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,11 +160,10 @@ export default async function BlogDetailPage({
           </p>
         )}
 
-        {/* Content — rendered TipTap JSON as HTML, styled with prose */}
-        <div
-          className="prose prose-lg mt-8 max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-[12px] prose-blockquote:border-s-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:ps-4 prose-li:my-1"
-          dangerouslySetInnerHTML={{ __html: contentHtml }}
-        />
+        {/* Content — BlockNote JSON rendered via SSR (no dangerouslySetInnerHTML) */}
+        <div className="prose prose-lg mt-8 max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary prose-img:rounded-[12px] prose-blockquote:border-s-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:ps-4 prose-li:my-1">
+          <BlockNoteSSRRenderer content={normalizedContent} locale={locale} />
+        </div>
 
         {/* Back to blog */}
         <div className="mt-12 border-t border-divider pt-8">

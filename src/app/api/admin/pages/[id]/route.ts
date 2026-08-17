@@ -47,7 +47,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 const patchSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   slug: z.string().max(200).optional(),
+  content: z.any().nullable().optional(),
   htmlContent: z.string().optional(),
+  language: z.string().max(10).nullable().optional(),
   seoTitle: z.string().max(200).nullable().optional(),
   seoDescription: z.string().max(500).nullable().optional(),
   focusKeyword: z.string().max(100).nullable().optional(),
@@ -84,6 +86,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(finalSlug !== undefined ? { slug: finalSlug } : {}),
+        ...(body.content !== undefined ? { content: body.content } : {}),
+        ...(body.language !== undefined ? { language: body.language } : {}),
         ...(body.htmlContent !== undefined ? { htmlContent: body.htmlContent } : {}),
         ...(body.seoTitle !== undefined ? { seoTitle: body.seoTitle } : {}),
         ...(body.seoDescription !== undefined ? { seoDescription: body.seoDescription } : {}),

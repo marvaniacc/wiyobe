@@ -3770,12 +3770,31 @@ type KycReviewProvider = {
   requirements: any[]
 }
 
+/**
+ * Predefined rejection reasons shown as a dropdown in the reject dialog.
+ * Stored as a human-readable string in `KycDocument.rejectionReason` so the
+ * provider frontend can display the message directly without a code lookup.
+ */
+const PREDEFINED_REJECTION_REASONS = [
+  { code: 'BLURRY', label: 'Document is blurry or low quality' },
+  { code: 'EXPIRED', label: 'Document is expired or will expire soon' },
+  { code: 'WRONG_TYPE', label: 'Wrong document type (does not match the requirement)' },
+  { code: 'INCOMPLETE', label: 'Document is cut off or partially visible' },
+  { code: 'REDACTED', label: 'Key information is missing, redacted, or obscured' },
+  { code: 'FORGED', label: 'Document appears forged, altered, or tampered with' },
+  { code: 'FACE_MISMATCH', label: 'Face in the liveness video does not match the ID' },
+  { code: 'ID_NOT_VISIBLE', label: 'ID document not clearly visible in the liveness video' },
+  { code: 'VIDEO_TOO_SHORT', label: 'Liveness video is too short (must be ≥ 3 seconds)' },
+  { code: 'OTHER', label: 'Other reason (specify in notes)' },
+] as const
+
 function KycReviewSection() {
   const { t, locale } = useT()
   const { data, loading, error, refetch } = useApi<{ providers: KycReviewProvider[] }>('/api/admin/kyc')
   const [selectedProvider, setSelectedProvider] = React.useState<KycReviewProvider | null>(null)
   const [rejectTarget, setRejectTarget] = React.useState<{ docId: string; docName: string } | null>(null)
-  const [rejectReason, setRejectReason] = React.useState('')
+  const [rejectPreset, setRejectPreset] = React.useState('')
+  const [rejectNotes, setRejectNotes] = React.useState('')
   const [rejecting, setRejecting] = React.useState(false)
   const [approvingUser, setApprovingUser] = React.useState(false)
 
@@ -3799,16 +3818,19 @@ function KycReviewSection() {
   }
 
   async function handleRejectDoc() {
-    if (!rejectTarget || !rejectReason.trim()) return
+    if (!rejectTarget) return
+    const preset = PREDEFINED_REJECTION_REASONS.find(r => r.code === rejectPreset)
+    const notes = rejectNotes.trim()
+    if (!preset && !notes) return
+    const composed = [preset?.label, notes].filter(Boolean).join(' — ')
     setRejecting(true)
     try {
       await apiPatch(`/api/admin/kyc/${rejectTarget.docId}`, {
         status: 'REJECTED',
-        rejectionReason: rejectReason.trim(),
+        rejectionReason: composed,
       })
       toast.success(t('admin.rejectDocument', 'Document rejected'))
-      setRejectTarget(null)
-      setRejectReason('')
+      setRejectTarget(null); setRejectPreset(''); setRejectNotes('')
       refetch()
       if (selectedProvider) {
         const res = await fetch('/api/admin/kyc')
@@ -4044,7 +4066,7 @@ function KycReviewSection() {
       </Dialog>
 
       {/* Reject dialog */}
-      <Dialog open={!!rejectTarget} onOpenChange={(o) => { if (!o) { setRejectTarget(null); setRejectReason('') } }}>
+      <Dialog open={!!rejectTarget} onOpenChange={(o) => { if (!o) { setRejectTarget(null); setRejectPreset(''); setRejectNotes('') } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -4053,20 +4075,32 @@ function KycReviewSection() {
             </DialogTitle>
             <DialogDescription>{rejectTarget?.docName}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">{t('admin.rejectReason', 'Rejection Reason')}</Label>
-            <Textarea
-              placeholder={t('admin.rejectReasonPlaceholder', 'Explain why this document is being rejected…')}
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={3}
-              maxLength={500}
-              autoFocus
-            />
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.rejectReason', 'Rejection Reason')}</Label>
+              <Select value={rejectPreset} onValueChange={setRejectPreset}>
+                <SelectTrigger><SelectValue placeholder="Select a reason…" /></SelectTrigger>
+                <SelectContent>
+                  {PREDEFINED_REJECTION_REASONS.map(r => (
+                    <SelectItem key={r.code} value={r.code}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{t('admin.rejectNotes', 'Additional notes (optional)')}</Label>
+              <Textarea
+                placeholder={t('admin.rejectNotesPlaceholder', 'Add specific feedback for the provider…')}
+                value={rejectNotes}
+                onChange={(e) => setRejectNotes(e.target.value)}
+                rows={2}
+                maxLength={500}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRejectTarget(null); setRejectReason('') }}>{t('common.cancel', 'Cancel')}</Button>
-            <Button variant="destructive" onClick={handleRejectDoc} disabled={!rejectReason.trim() || rejecting} className="gap-1.5">
+            <Button variant="outline" onClick={() => { setRejectTarget(null); setRejectPreset(''); setRejectNotes('') }}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={handleRejectDoc} disabled={(!rejectPreset && !rejectNotes.trim()) || rejecting} className="gap-1.5">
               {rejecting ? <Icon name="progress_activity" size={16} className="animate-spin" /> : <Icon name="cancel" size={16} />}
               {t('admin.rejectDocument', 'Reject')}
             </Button>

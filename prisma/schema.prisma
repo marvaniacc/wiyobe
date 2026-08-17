@@ -864,13 +864,17 @@ model BlogPost {
   @@index([deletedAt])
 }
 
-/// Custom landing pages with raw HTML/CSS content. Admin-authored, so the
-/// HTML is NOT sanitized (admin is trusted). Rendered via SSR on /[slug].
+/// Custom landing pages. Content is stored as BlockNote JSON (primary) and
+/// rendered via BlockNoteSSRRenderer on /[slug]. A legacy `htmlContent` String
+/// field is kept for raw HTML/CSS pages — admin-authored, NOT sanitized
+/// (admin is trusted).
 model CustomPage {
   id              String   @id @default(cuid())
   title           String
   slug            String   @unique                // kebab-case URL slug
-  htmlContent     String                          // raw HTML/CSS code
+  htmlContent     String                          // raw HTML/CSS code (legacy / fallback)
+  content         Json?                           // BlockNote JSON content (primary; rendered via BlockNoteSSRRenderer)
+  language        String?  @default("en")         // ISO 639-1 locale code (en/tr/fa/ar)
   seoTitle        String?
   seoDescription  String?
   // SEO fields

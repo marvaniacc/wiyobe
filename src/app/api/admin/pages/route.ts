@@ -49,7 +49,10 @@ export async function GET() {
 const createSchema = z.object({
   title: z.string().min(1).max(200),
   slug: z.string().max(200).optional(),
+  // BlockNote JSON content (array of block objects). Stored as Json in DB.
+  content: z.any().nullable().optional(),
   htmlContent: z.string().default(''),
+  language: z.string().max(10).optional(),
   seoTitle: z.string().max(200).nullable().optional(),
   seoDescription: z.string().max(500).nullable().optional(),
   focusKeyword: z.string().max(100).nullable().optional(),
@@ -79,6 +82,8 @@ export async function POST(req: Request) {
       data: {
         title: body.title,
         slug,
+        content: body.content ?? null,
+        language: body.language ?? null,
         htmlContent: body.htmlContent,
         seoTitle: body.seoTitle ?? null,
         seoDescription: body.seoDescription ?? null,
