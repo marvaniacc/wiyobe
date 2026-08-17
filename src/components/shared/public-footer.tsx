@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
+import { CookiePreferencesButton } from '@/components/shared/cookie-preferences-button'
 
 /**
  * PublicFooter — unified public-site footer for SSR pages under /{locale}/...
@@ -103,7 +104,10 @@ export async function PublicFooter({ locale }: { locale: string }) {
         </div>
 
         <div className="mt-8 border-t border-divider pt-6">
-          <p className="text-center text-xs text-muted-foreground">{copyright}</p>
+          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+            <p className="text-center text-xs text-muted-foreground">{copyright}</p>
+            <CookiePreferencesButton />
+          </div>
         </div>
       </div>
     </footer>

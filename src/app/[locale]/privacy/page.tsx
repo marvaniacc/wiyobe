@@ -2,10 +2,19 @@ import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
 
+const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
+const STATIC_PATH = '/privacy'
+
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description: 'Wishubest Privacy Policy — how we collect, use, store, and protect your personal data on the medical tourism marketplace.',
-  alternates: { canonical: '/{locale}/privacy' },
+  alternates: {
+    canonical: `/{locale}${STATIC_PATH}`,
+    languages: Object.fromEntries([
+      ...SUPPORTED_LOCALES.map((l) => [l, `/${l}${STATIC_PATH}`]),
+      ['x-default', `/en${STATIC_PATH}`],
+    ]),
+  },
 }
 
 const LAST_UPDATED = 'August 2026'

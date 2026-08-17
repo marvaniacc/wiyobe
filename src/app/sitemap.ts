@@ -54,6 +54,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       })
     }
+
+    // Static info / legal pages (P5/P6 additions)
+    for (const page of ['about', 'faq', 'contact', 'terms', 'privacy']) {
+      entries.push({
+        url: `${baseUrl}/${locale}/${page}`,
+        lastModified: now,
+        changeFrequency: 'monthly',
+        priority: 0.5,
+      })
+    }
   }
 
   // === Blog posts (all locales) ===

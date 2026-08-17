@@ -3,10 +3,19 @@ import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
 
+const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
+const STATIC_PATH = '/faq'
+
 export const metadata: Metadata = {
   title: 'FAQ',
   description: 'Frequently asked questions about Wishubest — booking, payments, KYC verification, affiliate program, and medical travel.',
-  alternates: { canonical: '/{locale}/faq' },
+  alternates: {
+    canonical: `/{locale}${STATIC_PATH}`,
+    languages: Object.fromEntries([
+      ...SUPPORTED_LOCALES.map((l) => [l, `/${l}${STATIC_PATH}`]),
+      ['x-default', `/en${STATIC_PATH}`],
+    ]),
+  },
 }
 
 type FAQItem = {

@@ -5,10 +5,19 @@ import { ContactForm } from '@/components/shared/contact-form'
 
 export const dynamic = 'force-dynamic'
 
+const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
+const STATIC_PATH = '/contact'
+
 export const metadata: Metadata = {
   title: 'Contact',
   description: 'Get in touch with the Wishubest team — partnerships, press, bug reports, and general inquiries.',
-  alternates: { canonical: '/{locale}/contact' },
+  alternates: {
+    canonical: `/{locale}${STATIC_PATH}`,
+    languages: Object.fromEntries([
+      ...SUPPORTED_LOCALES.map((l) => [l, `/${l}${STATIC_PATH}`]),
+      ['x-default', `/en${STATIC_PATH}`],
+    ]),
+  },
 }
 
 const CONTACT_CHANNELS = [
