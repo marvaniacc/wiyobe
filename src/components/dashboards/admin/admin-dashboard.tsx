@@ -5,8 +5,6 @@ import { Icon } from '@/components/shared/icon'
 import { MessagesSection } from '@/components/chat/messages-section'
 import { useT } from '@/hooks/use-t'
 import { useApi, apiPost, apiPut, apiPatch, apiDelete } from '@/hooks/use-api'
-import { TiptapEditor, type TiptapJSON } from '@/components/admin/tiptap-editor'
-import { TiptapPreview } from '@/components/admin/tiptap-preview'
 import { MediaPicker } from '@/components/shared/media-picker'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { useApp } from '@/stores/app-store'
@@ -2262,11 +2260,16 @@ type BlogPost = {
 function BlogSection() {
   const { t, locale } = useT()
   const { data, loading, error, refetch } = useApi<{ posts: BlogPost[] }>('/api/admin/blog')
-  const [editing, setEditing] = React.useState<BlogPost | null>(null)
-  const [creating, setCreating] = React.useState(false)
+  const goDashboard = useApp((s) => s.goDashboard)
+  const setEditingBlogPostId = useApp((s) => s.setEditingBlogPostId)
   const [previewPost, setPreviewPost] = React.useState<BlogPost | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<BlogPost | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+
+  function openBlogEditor(postId: string | null) {
+    setEditingBlogPostId(postId)
+    goDashboard('blog-editor')
+  }
 
   const posts = data?.posts || []
 
@@ -2302,7 +2305,7 @@ function BlogSection() {
         description={t('admin.blogDesc', 'Write and publish blog posts and marketing pages')}
         icon="article"
         action={
-          <Button onClick={() => setCreating(true)} className="gap-1.5">
+          <Button onClick={() => openBlogEditor(null)} className="gap-1.5">
             <Icon name="add" size={18} />
             {t('admin.newPost', 'New Post')}
           </Button>
@@ -2315,7 +2318,7 @@ function BlogSection() {
             <Icon name="article" size={32} className="text-muted-foreground/50" />
             <p className="text-sm font-medium text-foreground">{t('blog.noPosts', 'No posts yet')}</p>
             <p className="max-w-sm text-xs text-muted-foreground">{t('blog.noPostsDesc', 'Create your first blog post to start publishing content.')}</p>
-            <Button onClick={() => setCreating(true)} className="mt-2 gap-1.5">
+            <Button onClick={() => openBlogEditor(null)} className="mt-2 gap-1.5">
               <Icon name="add" size={16} />
               {t('admin.newPost', 'New Post')}
             </Button>
@@ -2378,7 +2381,7 @@ function BlogSection() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setEditing(post)}
+                        onClick={() => openBlogEditor(post.id)}
                         title={t('common.edit', 'Edit')}
                         className="gap-1"
                       >
@@ -2401,14 +2404,6 @@ function BlogSection() {
           </Table>
         </div>
       )}
-
-      {/* Editor dialog (create or edit) */}
-      <BlogEditorDialog
-        open={creating || !!editing}
-        post={editing}
-        onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null) } }}
-        onSaved={() => { setCreating(false); setEditing(null); refetch() }}
-      />
 
       {/* Delete confirmation */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
@@ -2486,14 +2481,14 @@ function BlogSection() {
 
               {/* Rendered content */}
               <div className="rounded-[14px] border border-divider p-5">
-                <TiptapPreview content={previewPost.content as TiptapJSON} />
+                <div className="text-sm text-muted-foreground">Content preview available in the full-screen editor.</div>
               </div>
             </article>
           )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewPost(null)}>{t('common.close', 'Close')}</Button>
-            <Button onClick={() => { const p = previewPost; setPreviewPost(null); setEditing(p) }} className="gap-1.5">
+            <Button onClick={() => { const p = previewPost; setPreviewPost(null); if (p) openBlogEditor(p.id) }} className="gap-1.5">
               <Icon name="edit" size={16} />
               {t('blog.editPost', 'Edit Post')}
             </Button>
@@ -2503,6 +2498,9 @@ function BlogSection() {
     </div>
   )
 }
+
+// Local type for backward compat with old TipTap JSON content
+type TiptapJSON = { type: string; content?: any[]; attrs?: any; marks?: any[]; text?: string }
 
 function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
   open: boolean
@@ -2656,10 +2654,12 @@ function BlogEditorDialog({ open, post, onOpenChange, onSaved }: {
             )}
           </div>
 
-          {/* Content editor — image insertion is via the TipTap toolbar's Add Image button */}
+          {/* Content editor — now uses BlockNote in the full-screen editor */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">{t('admin.content', 'Content')}</Label>
-            <TiptapEditor content={content} onChange={setContent} />
+            <div className="rounded-[14px] border border-dashed border-divider bg-surface-secondary p-6 text-center text-sm text-muted-foreground">
+              Content editing is available in the full-screen editor. Click "Edit" on a post to open it.
+            </div>
           </div>
 
           {/* SEO Section */}
@@ -2771,10 +2771,15 @@ type CustomPage = {
 function CustomPagesSection() {
   const { t, locale } = useT()
   const { data, loading, error, refetch } = useApi<{ pages: CustomPage[] }>('/api/admin/pages')
-  const [editing, setEditing] = React.useState<CustomPage | null>(null)
-  const [creating, setCreating] = React.useState(false)
+  const goDashboard = useApp((s) => s.goDashboard)
+  const setEditingPageId = useApp((s) => s.setEditingPageId)
   const [deleteTarget, setDeleteTarget] = React.useState<CustomPage | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+
+  function openEditor(pageId: string | null) {
+    setEditingPageId(pageId)
+    goDashboard('page-editor')
+  }
 
   const pages = data?.pages || []
 
@@ -2810,7 +2815,7 @@ function CustomPagesSection() {
         description={t('admin.customPagesDesc', 'Create custom landing pages with raw HTML/CSS')}
         icon="web"
         action={
-          <Button onClick={() => setCreating(true)} className="gap-1.5">
+          <Button onClick={() => openEditor(null)} className="gap-1.5">
             <Icon name="add" size={18} />
             {t('admin.newPage', 'New Page')}
           </Button>
@@ -2823,7 +2828,7 @@ function CustomPagesSection() {
             <Icon name="web" size={32} className="text-muted-foreground/50" />
             <p className="text-sm font-medium text-foreground">{t('pages.noPages', 'No custom pages yet')}</p>
             <p className="max-w-sm text-xs text-muted-foreground">{t('pages.noPagesDesc', 'Create custom landing pages like /about-us or /services with your own HTML/CSS code.')}</p>
-            <Button onClick={() => setCreating(true)} className="mt-2 gap-1.5">
+            <Button onClick={() => openEditor(null)} className="mt-2 gap-1.5">
               <Icon name="add" size={16} />
               {t('admin.newPage', 'New Page')}
             </Button>
@@ -2871,7 +2876,7 @@ function CustomPagesSection() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setEditing(page)}
+                        onClick={() => openEditor(page.id)}
                         title={t('common.edit', 'Edit')}
                         className="gap-1"
                       >
@@ -2894,13 +2899,6 @@ function CustomPagesSection() {
           </Table>
         </div>
       )}
-
-      <CustomPageEditorDialog
-        open={creating || !!editing}
-        page={editing}
-        onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null) } }}
-        onSaved={() => { setCreating(false); setEditing(null); refetch() }}
-      />
 
       {/* Delete confirmation */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
