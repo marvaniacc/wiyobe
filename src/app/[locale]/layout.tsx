@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { db } from '@/lib/db'
 import { PublicHeader } from '@/components/shared/public-header'
 import { PublicFooter } from '@/components/shared/public-footer'
+import { CookieConsentBanner } from '@/components/shared/cookie-consent-banner'
 
 const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
 const RTL_LOCALES = ['fa', 'ar']
@@ -72,6 +73,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
       <PublicHeader locale={locale} />
       <main className="flex-1">{children}</main>
       <PublicFooter locale={locale} />
+      <CookieConsentBanner locale={locale} />
     </div>
   )
 }
