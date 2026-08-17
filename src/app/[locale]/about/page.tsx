@@ -36,6 +36,9 @@ export const metadata: Metadata = {
  * Renders the brand mission, how-it-works steps, and CTAs. This route is
  * linked from the PublicFooter's "Resources" column. No DB queries — pure
  * server-rendered static content for SEO.
+ *
+ * Embeds schema.org/Organization JSON-LD structured data so search engines
+ * can populate the Google Knowledge Graph panel for the Wishubest brand.
  */
 export default async function AboutPage({
   params,
@@ -44,8 +47,41 @@ export default async function AboutPage({
 }) {
   const { locale } = await params
 
+  // Build schema.org/Organization JSON-LD for the Wishubest brand entity.
+  // Helps Google/Bing populate the Knowledge Graph panel in brand SERPs.
+  const orgJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Wishubest',
+    alternateName: 'Wishubest — Global Medical Tourism Marketplace',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'https://wishubest.com',
+    logo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://wishubest.com'}/og/wishubest-default.png`,
+    description:
+      'Global medical tourism marketplace connecting patients with verified doctors, hospitals, accommodations, and translators worldwide.',
+    slogan: 'Global Medical Tourism Marketplace',
+    sameAs: [
+      // Placeholder social profiles — fill in when brand accounts are live.
+      // 'https://twitter.com/wishubest',
+      // 'https://www.linkedin.com/company/wishubest',
+      // 'https://www.instagram.com/wishubest',
+    ],
+    contactPoint: [
+      {
+        '@type': 'ContactPoint',
+        contactType: 'customer support',
+        email: 'hello@wishubest.com',
+        availableLanguage: ['English', 'Turkish', 'Persian', 'Arabic', 'Russian'],
+      },
+    ],
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+      />
+
       {/* Hero */}
       <div className="text-center">
         <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-[16px] bg-primary text-primary-foreground">

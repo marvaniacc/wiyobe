@@ -149,6 +149,10 @@ const FAQ_SECTIONS: FAQSection[] = [
  * (Booking, Payments, KYC, Affiliate, Medical & legal) with material icons.
  * Each item is an accordion-style <details> element for native accessibility
  * (no client JS required).
+ *
+ * Embeds schema.org/FAQPage JSON-LD structured data so search engines
+ * (Google, Bing) can render the Q&As as rich results (accordion FAQ in
+ * SERP). Generated from the same FAQ_SECTIONS array to avoid duplication.
  */
 export default async function FAQPage({
   params,
@@ -157,8 +161,30 @@ export default async function FAQPage({
 }) {
   const { locale } = await params
 
+  // Build schema.org/FAQPage JSON-LD from the same data source as the
+  // visible accordion. Avoids drift between visible content + structured data.
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ_SECTIONS.flatMap((section) =>
+      section.items.map((item) => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.a,
+        },
+      })),
+    ),
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+
       {/* Hero */}
       <div className="text-center">
         <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-[16px] bg-primary text-primary-foreground">
