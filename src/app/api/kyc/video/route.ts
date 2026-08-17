@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       where: { id: session.id },
       data: {
         kycVideoPath: filePath,
-        kycStatus: userKycStatus === 'APPROVED' ? 'APPROVED' : 'IN_REVIEW',
+        kycStatus: userKycStatus === 'APPROVED' ? 'APPROVED' : 'PENDING',
       },
     })
 
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
 
     return json({
       kycVideoPath: filePath,
-      kycStatus: userKycStatus === 'APPROVED' ? 'APPROVED' : 'IN_REVIEW',
+      kycStatus: userKycStatus === 'APPROVED' ? 'APPROVED' : 'PENDING',
     }, 201)
   } catch (e) { return handleError(e) }
 }

@@ -209,11 +209,11 @@ export async function POST(req: Request) {
       },
     })
 
-    // Update the user's kycStatus to IN_REVIEW (if not already APPROVED)
+    // Update the user's kycStatus to PENDING (if not already APPROVED)
     if (userKycStatus !== 'APPROVED') {
       await db.user.update({
         where: { id: session.id },
-        data: { kycStatus: 'IN_REVIEW' },
+        data: { kycStatus: 'PENDING' },
       })
     }
 
