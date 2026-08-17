@@ -42,6 +42,14 @@ const DEFAULT_COLUMNS: Array<{ title: string; links: FooterLink[] }> = [
     links: [
       { label: 'Blog', link: '/{locale}/blog' },
       { label: 'About', link: '/{locale}/about' },
+      { label: 'Contact', link: '/{locale}/contact' },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Terms of Service', link: '/{locale}/terms' },
+      { label: 'Privacy Policy', link: '/{locale}/privacy' },
     ],
   },
 ]
