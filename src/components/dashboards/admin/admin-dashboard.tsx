@@ -3562,6 +3562,7 @@ function KycRequirementsSection() {
                 <TableRow>
                   <TableHead className="w-12">#</TableHead>
                   <TableHead>{t('admin.documentName', 'Document Name')}</TableHead>
+                  <TableHead>{t('kyc.requirementType', 'Type')}</TableHead>
                   <TableHead>{t('admin.documentDesc', 'Description')}</TableHead>
                   <TableHead className="text-center">{t('kyc.required', 'Required')}</TableHead>
                   <TableHead className="text-center">{t('kyc.submissions', 'Submissions')}</TableHead>
@@ -3578,6 +3579,17 @@ function KycRequirementsSection() {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm font-medium text-foreground">{req.documentName}</span>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const typeMeta = KYC_TYPE_META[req.type as KycRequirementType] || KYC_TYPE_META.IMAGE
+                        return (
+                          <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium', typeMeta.cls)}>
+                            <Icon name={typeMeta.icon} size={12} fill />
+                            {typeMeta.label}
+                          </span>
+                        )
+                      })()}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">{req.description || '—'}</span>
@@ -3787,6 +3799,14 @@ const PREDEFINED_REJECTION_REASONS = [
   { code: 'VIDEO_TOO_SHORT', label: 'Liveness video is too short (must be ≥ 3 seconds)' },
   { code: 'OTHER', label: 'Other reason (specify in notes)' },
 ] as const
+
+/** Visual metadata for each KYC requirement type (badge styling + icon). */
+type KycRequirementType = 'IMAGE' | 'DOCUMENT' | 'VIDEO'
+const KYC_TYPE_META: Record<KycRequirementType, { icon: string; label: string; cls: string }> = {
+  IMAGE: { icon: 'image', label: 'Image', cls: 'border-info/20 bg-info/5 text-info' },
+  DOCUMENT: { icon: 'description', label: 'PDF', cls: 'border-primary/20 bg-primary/5 text-primary' },
+  VIDEO: { icon: 'videocam', label: 'Video', cls: 'border-warning/20 bg-warning/5 text-warning' },
+}
 
 function KycReviewSection() {
   const { t, locale } = useT()

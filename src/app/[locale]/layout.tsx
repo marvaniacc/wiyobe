@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { db } from '@/lib/db'
+import { PublicHeader } from '@/components/shared/public-header'
+import { PublicFooter } from '@/components/shared/public-footer'
 
 const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar'] as const
 const RTL_LOCALES = ['fa', 'ar']
@@ -43,15 +45,16 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       template: `%s — ${siteName}`,
     },
     description: defaultSeoDescription,
-    lang: locale,
   }
 }
 
 /**
- * Locale layout — validates the locale from the URL and sets the
- * `<html lang>` and `dir` attributes for accessibility and SEO.
+ * Locale layout — validates the locale from the URL, sets `dir` for RTL
+ * locales, and renders the SiteSetting-driven PublicHeader + PublicFooter
+ * around all public pages under `/{locale}/...`.
  *
- * This layout wraps ALL public pages under `/{locale}/...`.
+ * The `<html lang>` attribute is set by the root layout (src/app/layout.tsx)
+ * based on the `x-locale` header forwarded by middleware.
  */
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params
@@ -65,8 +68,10 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   const dir = isRTL ? 'rtl' : 'ltr'
 
   return (
-    <div lang={locale} dir={dir} className="min-h-screen bg-background">
-      {children}
+    <div dir={dir} className="flex min-h-screen flex-col bg-background">
+      <PublicHeader locale={locale} />
+      <main className="flex-1">{children}</main>
+      <PublicFooter locale={locale} />
     </div>
   )
 }

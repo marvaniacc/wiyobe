@@ -60,8 +60,11 @@ export function middleware(req: NextRequest) {
   const firstSegment = segments[0]
 
   if (firstSegment && SUPPORTED_LOCALES.includes(firstSegment as any)) {
-    // Already has a locale prefix — let it through
-    return NextResponse.next()
+    // Already has a locale prefix — forward the locale to layouts via a
+    // request header so the root layout can set <html lang> correctly.
+    const requestHeaders = new Headers(req.headers)
+    requestHeaders.set('x-locale', firstSegment)
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   // No locale prefix — detect and redirect
