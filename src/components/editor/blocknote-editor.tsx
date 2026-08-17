@@ -6,6 +6,7 @@ import { useCreateBlockNote } from '@blocknote/react'
 import '@blocknote/core/style.css'
 import '@blocknote/react/style.css'
 import '@blocknote/mantine/style.css'
+import { wishubestSchema } from './wishubest-blocks'
 
 class EditorErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; errorMessage: string }> {
   constructor(props: { children: ReactNode }) {
@@ -38,6 +39,7 @@ function BlockNoteEditorInner({ initialContent, onChange }: { initialContent: an
     : undefined
 
   const editor = useCreateBlockNote({
+    schema: wishubestSchema,
     initialContent: safeContent as any,
   })
 
