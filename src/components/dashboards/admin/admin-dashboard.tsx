@@ -3878,7 +3878,6 @@ function KycReviewSection() {
                       </div>
                       <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><Icon name="description" size={12} />{p.kycDocuments.length} docs</span>
-                        {p.kycVideoPath && <span className="flex items-center gap-1 text-primary"><Icon name="videocam" size={12} />Video</span>}
                         {pendingDocs > 0 && <span className="flex items-center gap-1 text-warning"><Icon name="hourglass_top" size={12} />{pendingDocs} pending</span>}
                         <span className="flex items-center gap-1 text-success"><Icon name="check_circle" size={12} />{approvedDocs} approved</span>
                       </div>
@@ -3942,11 +3941,16 @@ function KycReviewSection() {
                           <span>{formatDate(doc.uploadedAt, locale)}</span>
                         </div>
 
-                        {/* Preview — images and PDFs */}
+                        {/* Preview — images, videos, and PDFs */}
                         {doc.dataUrl && doc.fileType?.startsWith('image/') && (
                           <div className="overflow-hidden rounded-[10px] border border-divider">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={doc.dataUrl} alt={doc.fileName} className="max-h-48 w-full object-contain bg-surface-secondary" />
+                          </div>
+                        )}
+                        {doc.dataUrl && doc.fileType?.startsWith('video/') && (
+                          <div className="overflow-hidden rounded-[10px] border border-divider bg-black">
+                            <video src={doc.dataUrl} controls playsInline className="max-h-48 w-full bg-black" />
                           </div>
                         )}
                         {doc.dataUrl && doc.fileType === 'application/pdf' && (
@@ -3955,7 +3959,7 @@ function KycReviewSection() {
                             View PDF
                           </a>
                         )}
-                        {doc.dataUrl && !doc.fileType?.startsWith('image/') && doc.fileType !== 'application/pdf' && (
+                        {doc.dataUrl && !doc.fileType?.startsWith('image/') && !doc.fileType?.startsWith('video/') && doc.fileType !== 'application/pdf' && (
                           <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
                             <Icon name="download" size={16} />
                             Download
@@ -3993,28 +3997,6 @@ function KycReviewSection() {
                   </div>
                 )
               })}
-
-              {/* Liveness Video Verification */}
-              <div className="rounded-[14px] border border-divider p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Icon name="videocam" size={18} className="text-primary" />
-                  <p className="text-sm font-medium text-foreground">Liveness Verification Video</p>
-                </div>
-                {selectedProvider.kycVideoPath ? (
-                  <video
-                    src={selectedProvider.kycVideoPath}
-                    controls
-                    playsInline
-                    className="w-full rounded-[10px] border border-divider bg-black"
-                    style={{ maxHeight: '360px' }}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-1 py-6 text-center">
-                    <Icon name="videocam_off" size={24} className="text-muted-foreground/50" />
-                    <p className="text-xs text-muted-foreground">No liveness video uploaded</p>
-                  </div>
-                )}
-              </div>
 
               {/* Approve user button */}
               <div className="border-t border-divider pt-4">

@@ -10,11 +10,13 @@ import type { ProviderType } from '@prisma/client'
 export const dynamic = 'force-dynamic'
 
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'kyc')
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
+const MAX_FILE_SIZE_IMAGE = 5 * 1024 * 1024 // 5 MB for images/PDFs
+const MAX_FILE_SIZE_VIDEO = 15 * 1024 * 1024 // 15 MB for videos
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp',
   'application/pdf',
+  'video/webm', 'video/mp4', 'video/quicktime', 'video/x-msvideo',
 ])
 
 function getExtension(fileName: string, mimeType: string): string {
@@ -23,8 +25,9 @@ function getExtension(fileName: string, mimeType: string): string {
   const map: Record<string, string> = {
     'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
     'image/webp': '.webp', 'image/bmp': '.bmp', 'application/pdf': '.pdf',
+    'video/webm': '.webm', 'video/mp4': '.mp4', 'video/quicktime': '.mov',
   }
-  return map[mimeType] || ''
+  return map[mimeType] || '.bin'
 }
 
 /**
@@ -71,10 +74,10 @@ export async function GET() {
     // Also include any documents not tied to a requirement (legacy uploads)
     const orphanDocs = documents.filter((d) => !d.requirementId)
 
-    // Fetch user's kycVideoPath
+    // Fetch user's kycStatus
     const userRow = await db.user.findUnique({
       where: { id: session.id },
-      select: { kycVideoPath: true, kycStatus: true },
+      select: { kycStatus: true },
     })
 
     // Collect video-specific rejection reasons from rejected documents
@@ -103,7 +106,6 @@ export async function GET() {
       requirements: merged,
       orphanDocuments: orphanDocs,
       kycStatus: userRow?.kycStatus || 'PENDING',
-      kycVideoPath: userRow?.kycVideoPath ?? null,
       videoRejected,
       rejectionReasons,
     })
@@ -138,12 +140,14 @@ export async function POST(req: Request) {
 
     // Validate MIME type
     if (!ALLOWED_MIME_TYPES.has(file.type)) {
-      return error(400, `File type "${file.type}" is not allowed. Allowed: images (JPEG, PNG, GIF, WebP, BMP) and PDF.`)
+      return error(400, `File type "${file.type}" is not allowed. Allowed: images, PDF, and video (WebM, MP4, MOV).`)
     }
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      return error(400, 'File too large (max 5MB)')
+    // Validate file size (videos get 15MB, images/PDFs get 5MB)
+    const isVideo = file.type.startsWith('video/')
+    const maxSize = isVideo ? MAX_FILE_SIZE_VIDEO : MAX_FILE_SIZE_IMAGE
+    if (file.size > maxSize) {
+      return error(400, `File too large (max ${Math.round(maxSize / (1024 * 1024))}MB for ${isVideo ? 'video' : 'images/PDF'})`)
     }
 
     // Verify the requirement exists and belongs to the caller's provider type

@@ -38,7 +38,6 @@ export async function GET() {
         email: true,
         role: true,
         kycStatus: true,
-        kycVideoPath: true,
         preferredLanguage: true,
         createdAt: true,
         kycDocuments: {
