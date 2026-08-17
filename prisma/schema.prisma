@@ -955,3 +955,33 @@ model BlogPostTag {
   @@id([blogPostId, tagId])
   @@index([tagId])
 }
+
+// ============================================================================
+// Locations — standardized countries and cities for SEO and filtering
+// ============================================================================
+
+model Country {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isoCode   String   @unique
+  slug      String   @unique
+  flag      String?
+  isActive  Boolean  @default(true)
+  cities    City[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String
+  countryId String
+  country   Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([countryId, slug])
+  @@index([countryId])
+}
