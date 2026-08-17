@@ -64,10 +64,21 @@ export async function generateMetadata({
   const metaDescription = post.seoDescription || post.excerpt || post.title
   const images = post.coverImage ? [{ url: post.coverImage, width: 1200, height: 630, alt: post.title }] : undefined
 
+  // Hreflang alternates — blog posts exist at the same slug across all locales.
+  const blogHreflangs: Record<string, string> = {
+    'x-default': `/en/blog/${post.slug}`,
+  }
+  for (const l of ['en', 'tr', 'fa', 'ar', 'ru']) {
+    blogHreflangs[l] = `/${l}/blog/${post.slug}`
+  }
+
   return {
     title: `${metaTitle} — Wishubest Blog`,
     description: metaDescription,
-    alternates: { canonical: post.canonicalUrl || url },
+    alternates: {
+      canonical: post.canonicalUrl || url,
+      languages: blogHreflangs,
+    },
     robots: post.noIndex ? { index: false, follow: false } : undefined,
     keywords: post.focusKeyword ? [post.focusKeyword] : undefined,
     openGraph: {

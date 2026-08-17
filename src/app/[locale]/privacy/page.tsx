@@ -15,6 +15,18 @@ export const metadata: Metadata = {
       ['x-default', `/en${STATIC_PATH}`],
     ]),
   },
+  openGraph: {
+    title: 'Privacy Policy — Wishubest',
+    description: 'How we collect, use, store, and protect your personal data on the medical tourism marketplace.',
+    type: 'website',
+    images: [{ url: '/og/wishubest-default.png', width: 1344, height: 768, alt: 'Wishubest Privacy Policy' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Privacy Policy — Wishubest',
+    description: 'How we collect, use, store, and protect your personal data on the medical tourism marketplace.',
+    images: ['/og/wishubest-default.png'],
+  },
 }
 
 const LAST_UPDATED = 'August 2026'

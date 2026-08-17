@@ -16,6 +16,18 @@ export const metadata: Metadata = {
       ['x-default', `/en${STATIC_PATH}`],
     ]),
   },
+  openGraph: {
+    title: 'About Wishubest',
+    description: 'The global medical tourism marketplace connecting patients with verified providers worldwide.',
+    type: 'website',
+    images: [{ url: '/og/wishubest-default.png', width: 1344, height: 768, alt: 'Wishubest — Global Medical Tourism Marketplace' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'About Wishubest',
+    description: 'The global medical tourism marketplace connecting patients with verified providers worldwide.',
+    images: ['/og/wishubest-default.png'],
+  },
 }
 
 /**

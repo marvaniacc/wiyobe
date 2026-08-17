@@ -92,6 +92,7 @@ export async function generateMetadata({
         'tr': `/tr/hotels/${countrySlug}/${hotel.slug}`,
         'fa': `/fa/hotels/${countrySlug}/${hotel.slug}`,
         'ar': `/ar/hotels/${countrySlug}/${hotel.slug}`,
+        'ru': `/ru/hotels/${countrySlug}/${hotel.slug}`,
         'x-default': `/en/hotels/${countrySlug}/${hotel.slug}`,
       },
     },

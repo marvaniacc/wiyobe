@@ -110,6 +110,7 @@ export async function generateMetadata({
         'tr': `/tr/doctors/${countrySlug}/${doctor.slug}`,
         'fa': `/fa/doctors/${countrySlug}/${doctor.slug}`,
         'ar': `/ar/doctors/${countrySlug}/${doctor.slug}`,
+        'ru': `/ru/doctors/${countrySlug}/${doctor.slug}`,
         'x-default': `/en/doctors/${countrySlug}/${doctor.slug}`,
       },
     },

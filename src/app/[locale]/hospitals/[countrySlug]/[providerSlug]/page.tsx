@@ -103,6 +103,7 @@ export async function generateMetadata({
         'tr': `/tr/hospitals/${countrySlug}/${hospital.slug}`,
         'fa': `/fa/hospitals/${countrySlug}/${hospital.slug}`,
         'ar': `/ar/hospitals/${countrySlug}/${hospital.slug}`,
+        'ru': `/ru/hospitals/${countrySlug}/${hospital.slug}`,
         'x-default': `/en/hospitals/${countrySlug}/${hospital.slug}`,
       },
     },

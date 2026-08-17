@@ -15,6 +15,18 @@ export const metadata: Metadata = {
       ['x-default', `/en${STATIC_PATH}`],
     ]),
   },
+  openGraph: {
+    title: 'Terms of Service — Wishubest',
+    description: 'The agreement between you and Wishubest governing your use of the medical tourism marketplace.',
+    type: 'website',
+    images: [{ url: '/og/wishubest-default.png', width: 1344, height: 768, alt: 'Wishubest Terms of Service' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Terms of Service — Wishubest',
+    description: 'The agreement between you and Wishubest governing your use of the medical tourism marketplace.',
+    images: ['/og/wishubest-default.png'],
+  },
 }
 
 const LAST_UPDATED = 'August 2026'

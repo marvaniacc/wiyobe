@@ -16,6 +16,18 @@ export const metadata: Metadata = {
       ['x-default', `/en${STATIC_PATH}`],
     ]),
   },
+  openGraph: {
+    title: 'FAQ — Wishubest',
+    description: 'Frequently asked questions about booking, payments, KYC verification, affiliate program, and medical travel.',
+    type: 'website',
+    images: [{ url: '/og/wishubest-default.png', width: 1344, height: 768, alt: 'Wishubest FAQ' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'FAQ — Wishubest',
+    description: 'Frequently asked questions about booking, payments, KYC verification, affiliate program, and medical travel.',
+    images: ['/og/wishubest-default.png'],
+  },
 }
 
 type FAQItem = {

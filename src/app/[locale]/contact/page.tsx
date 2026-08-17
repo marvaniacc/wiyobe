@@ -18,6 +18,18 @@ export const metadata: Metadata = {
       ['x-default', `/en${STATIC_PATH}`],
     ]),
   },
+  openGraph: {
+    title: 'Contact Wishubest',
+    description: 'Get in touch with the Wishubest team — partnerships, press, bug reports, and general inquiries.',
+    type: 'website',
+    images: [{ url: '/og/wishubest-default.png', width: 1344, height: 768, alt: 'Contact Wishubest' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Contact Wishubest',
+    description: 'Get in touch with the Wishubest team — partnerships, press, bug reports, and general inquiries.',
+    images: ['/og/wishubest-default.png'],
+  },
 }
 
 const CONTACT_CHANNELS = [
