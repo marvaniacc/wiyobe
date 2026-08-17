@@ -17,7 +17,7 @@ export async function GET() {
     const session = await getSession()
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
 
-    const providerRoles = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']
+    const providerRoles: Array<'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR'> = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']
 
     // Find providers who are not yet approved OR have pending documents
     const providers = await db.user.findMany({

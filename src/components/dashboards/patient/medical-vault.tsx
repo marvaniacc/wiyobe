@@ -214,7 +214,7 @@ export function ManageAccessDialog({
         <DialogFooter className="border-t border-divider p-4">
           <div className="flex w-full items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              {t('vault.accessCount', { count: selected.size }) || `${selected.size} doctor(s) with access`}
+              {t('vault.accessCount', `${selected.size} doctor(s) with access`)}
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>

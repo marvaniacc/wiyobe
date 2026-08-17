@@ -34,8 +34,8 @@ export async function POST(req: Request) {
 
     // Query users based on targetRole
     const where = targetRole === 'ALL'
-      ? { status: { not: 'SUSPENDED' } }
-      : { role: targetRole, status: { not: 'SUSPENDED' } }
+      ? { status: { not: 'SUSPENDED' as 'SUSPENDED' } }
+      : { role: targetRole, status: { not: 'SUSPENDED' as 'SUSPENDED' } }
 
     const users = await db.user.findMany({
       where,

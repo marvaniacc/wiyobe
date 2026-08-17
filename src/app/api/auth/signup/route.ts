@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     // All users (including providers) get ACTIVE status immediately.
     // The dashboard lock mechanism (kycStatus !== APPROVED) restricts
     // providers to only the KYC and Profile sections until verified.
-    const status = 'ACTIVE'
+    const status: string = 'ACTIVE'
 
     const user = await db.user.create({
       data: {

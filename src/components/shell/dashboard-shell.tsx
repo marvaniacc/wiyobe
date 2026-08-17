@@ -109,7 +109,6 @@ const ROLE_LABEL_KEY: Record<string, string> = {
 // ============================================================================
 // Admin sidebar — 9 accordion groups
 // ============================================================================
-type NavItem = { key: string; labelKey: string; icon: string }
 type NavGroup = { groupKey: string; labelKey: string; icon: string; items: NavItem[] }
 
 const ADMIN_NAV_GROUPS: NavGroup[] = [
