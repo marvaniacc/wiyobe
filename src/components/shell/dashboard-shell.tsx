@@ -233,6 +233,8 @@ export function DashboardShell() {
     try { await fetch('/api/auth/signout', { method: 'POST' }) } catch {}
     signOut()
     toast.success('Signed out')
+    // Direct redirect to /en — avoids the clunky spinner → redirect UX
+    window.location.href = '/en'
   }
 
   const isFullScreenEditor = section === 'page-editor' || section === 'blog-editor'

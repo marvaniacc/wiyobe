@@ -34,7 +34,7 @@ export function DefaultLanding() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/auth/signup', { cache: 'no-store' })
+        const res = await fetch('/api/auth/session', { cache: 'no-store' })
         const data = await res.json()
         if (!cancelled) {
           if (data.session) {

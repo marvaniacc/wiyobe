@@ -1,5 +1,4 @@
 import { db } from '@/lib/db'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { BlockNoteSSRRenderer } from '@/components/editor/blocknote-ssr-renderer'
@@ -88,41 +87,16 @@ export default async function CustomPageRoute({
   const page = await getPage(slug)
   if (!page) notFound()
 
+  // NOTE: The [locale]/layout.tsx already wraps this page with <PublicHeader>
+  // + <main> + <PublicFooter>. Do NOT render our own header/footer here —
+  // that would cause double headers/footers.
   return (
-    <div className="min-h-screen bg-background">
-      {/* Minimal header — brand + back to app */}
-      <header className="border-b border-divider bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
-            <span>←</span>
-            <span>Wishubest</span>
-          </Link>
-          <Link
-            href={`/${locale}/blog`}
-            className="rounded-full border border-divider px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-          >
-            Blog
-          </Link>
-        </div>
-      </header>
-
-      {/* Custom content — BlockNote JSON rendered via SSR (preferred), falls back to raw htmlContent */}
-      <main>
-        <BlockNoteSSRRenderer
-          content={page.content}
-          htmlContent={page.htmlContent}
-          locale={page.language || locale}
-        />
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-divider bg-surface">
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-          <p className="text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Wishubest — Global Medical Tourism Marketplace
-          </p>
-        </div>
-      </footer>
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <BlockNoteSSRRenderer
+        content={page.content}
+        htmlContent={page.htmlContent}
+        locale={page.language || locale}
+      />
     </div>
   )
 }

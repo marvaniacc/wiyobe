@@ -72,6 +72,31 @@ export function AuthForm({
   const turnstileRef = useRef<HTMLDivElement>(null)
   const turnstileWidgetId = useRef<string | null>(null)
 
+  // Session check — if user is already logged in, show "already logged in"
+  // card instead of the form. Prevents logged-in users from seeing signup
+  // forms on public Custom Pages (e.g. an admin visiting /en/doctor-signup).
+  const [existingSession, setExistingSession] = useState<{ name: string | null; role: string; email: string } | null>(null)
+  const [sessionChecked, setSessionChecked] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.session) {
+          setExistingSession(data.session)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSessionChecked(true))
+  }, [])
+
+  // If logged in and type is 'login', auto-redirect to dashboard
+  useEffect(() => {
+    if (existingSession && type === 'login') {
+      router.push('/dashboard')
+    }
+  }, [existingSession, type, router])
+
   // Form state
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -241,6 +266,70 @@ export function AuthForm({
 
   const heading = buttonText || (isSignup ? `Sign up as a ${ROLE_LABELS[role]}` : 'Welcome back')
   const ctaLabel = isSignup ? 'Create Account' : 'Sign In'
+
+  // Session check not yet completed — show nothing (prevents flash of form
+  // for logged-in users who should see the "already logged in" card instead)
+  if (!sessionChecked) {
+    return (
+      <div className={cn('mx-auto w-full max-w-2xl', display === 'inline' && 'py-8')}>
+        <div className="flex h-48 items-center justify-center rounded-[16px] border border-divider bg-surface">
+          <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-divider border-t-primary" />
+        </div>
+      </div>
+    )
+  }
+
+  // User is already logged in — show "already logged in" card instead of the form.
+  // For login type, auto-redirect to /dashboard (handled in useEffect above).
+  // For signup type, show a card with the user's info + dashboard/signout links.
+  if (existingSession) {
+    return (
+      <div className={cn('mx-auto w-full max-w-2xl', display === 'inline' && 'py-8')}>
+        <Card className="overflow-hidden border-divider shadow-xl">
+          <CardHeader className="bg-gradient-to-br from-primary/5 to-transparent pb-6">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-[14px] bg-success/10 text-success">
+                <span className="material-symbols-outlined" style={{ fontSize: 24 }} aria-hidden>
+                  check_circle
+                </span>
+              </div>
+              <div>
+                <CardTitle className="text-xl">You&apos;re already logged in</CardTitle>
+                <CardDescription className="mt-1">
+                  You are signed in as <strong>{existingSession.name || existingSession.email}</strong> ({existingSession.role})
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                size="lg"
+                className="flex-1 gap-2"
+                onClick={() => router.push('/dashboard')}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }} aria-hidden>
+                  dashboard
+                </span>
+                Go to Dashboard
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="flex-1 gap-2 text-error hover:bg-error/5"
+                onClick={() => { window.location.href = '/api/auth/signout' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }} aria-hidden>
+                  logout
+                </span>
+                Sign out
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className={cn('mx-auto w-full max-w-2xl', display === 'inline' && 'py-8')}>
