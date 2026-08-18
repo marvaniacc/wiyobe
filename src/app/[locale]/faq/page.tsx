@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
+import { ssrT } from '@/lib/ssr-i18n'
 
 export const dynamic = 'force-dynamic'
 
@@ -156,6 +157,17 @@ export default async function FAQPage({
 }) {
   const { locale } = await params
 
+  // FAQ_SECTIONS is defined at module scope (cannot call ssrT there),
+  // so we map each section index to its i18n key here and translate the
+  // title at render time. Order MUST match FAQ_SECTIONS above.
+  const SECTION_TITLE_KEYS = [
+    'faq.booking',
+    'faq.payments',
+    'faq.kyc',
+    'faq.affiliate',
+    'faq.medical',
+  ] as const
+
   // Build schema.org/FAQPage JSON-LD from the same data source as the
   // visible accordion. Avoids drift between visible content + structured data.
   const faqJsonLd = {
@@ -192,16 +204,16 @@ export default async function FAQPage({
           </span>
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-          Frequently Asked Questions
+          {ssrT(locale, 'faq.title', 'Frequently Asked Questions')}
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-          Everything you need to know about booking, payments, verification, and more.
+          {ssrT(locale, 'faq.subtitle', 'Everything you need to know about booking, payments, verification, and more.')}
         </p>
       </div>
 
       {/* Sections */}
       <div className="mt-12 space-y-10">
-        {FAQ_SECTIONS.map((section) => (
+        {FAQ_SECTIONS.map((section, sIdx) => (
           <section key={section.title}>
             <div className="flex items-center gap-2">
               <span
@@ -211,7 +223,7 @@ export default async function FAQPage({
               >
                 {section.icon}
               </span>
-              <h2 className="text-xl font-semibold text-foreground">{section.title}</h2>
+              <h2 className="text-xl font-semibold text-foreground">{ssrT(locale, SECTION_TITLE_KEYS[sIdx], section.title)}</h2>
             </div>
             <div className="mt-4 space-y-2">
               {section.items.map((item, idx) => (
@@ -241,9 +253,9 @@ export default async function FAQPage({
 
       {/* Contact CTA */}
       <div className="mt-16 rounded-[24px] border border-divider bg-gradient-to-br from-primary/5 to-transparent p-8 text-center sm:p-12">
-        <h2 className="text-2xl font-bold text-foreground">Still have questions?</h2>
+        <h2 className="text-2xl font-bold text-foreground">{ssrT(locale, 'faq.ctaTitle', 'Still have questions?')}</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Our support team is here to help. Reach out and we&apos;ll respond within 24 hours.
+          {ssrT(locale, 'faq.ctaDesc', 'Our support team is here to help. Reach out and we\'ll respond within 24 hours.')}
         </p>
         <Link
           href={`/${locale}/contact`}
@@ -252,7 +264,7 @@ export default async function FAQPage({
           <span className="material-symbols-outlined" style={{ fontSize: 18 }} aria-hidden>
             contact_support
           </span>
-          Contact us
+          {ssrT(locale, 'faq.contact', 'Contact us')}
         </Link>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
+import { ssrT } from '@/lib/ssr-i18n'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,13 +53,13 @@ export default async function TermsPage({
       />
 
       <header className="border-b border-divider pb-6">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground">Terms of Service</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>
+        <h1 className="text-4xl font-bold tracking-tight text-foreground">{ssrT(locale, 'terms.title', 'Terms of Service')}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{ssrT(locale, 'terms.lastUpdated', 'Last updated')}: {LAST_UPDATED}</p>
       </header>
 
       <div className="prose prose-lg mt-8 max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary">
         <section>
-          <h2>1. Acceptance of terms</h2>
+          <h2>1. {ssrT(locale, 'terms.acceptance', 'Acceptance of terms')}</h2>
           <p>
             By accessing or using Wishubest (the &quot;Platform&quot;), you agree to be
             bound by these Terms of Service and our Privacy Policy. If you do not
@@ -67,7 +68,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>2. Description of service</h2>
+          <h2>2. {ssrT(locale, 'terms.service', 'Description of service')}</h2>
           <p>
             Wishubest is an online marketplace that connects patients with verified
             doctors, hospitals, accommodations, and translators for medical
@@ -78,7 +79,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>3. Eligibility &amp; accounts</h2>
+          <h2>3. {ssrT(locale, 'terms.eligibility', 'Eligibility & accounts')}</h2>
           <p>
             You must be at least 18 years old and legally capable of entering into
             contracts to use the Platform. You agree to provide accurate, current,
@@ -90,7 +91,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>4. Provider verification (KYC)</h2>
+          <h2>4. {ssrT(locale, 'terms.kyc', 'Provider verification (KYC)')}</h2>
           <p>
             Providers (doctors, hospitals, hotels, translators) must complete our
             KYC verification process before being listed as &quot;verified&quot;.
@@ -101,7 +102,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>5. Bookings &amp; payments</h2>
+          <h2>5. {ssrT(locale, 'terms.bookings', 'Bookings & payments')}</h2>
           <p>
             Bookings made through the Platform are subject to the cancellation
             policy displayed on each provider&apos;s listing. Platform payments are
@@ -114,7 +115,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>6. Affiliate program</h2>
+          <h2>6. {ssrT(locale, 'terms.affiliate', 'Affiliate program')}</h2>
           <p>
             Affiliates earn a flat percentage of the platform commission on
             referred bookings, tracked via a 30-day cookie. Affiliates are not
@@ -126,7 +127,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>7. Prohibited conduct</h2>
+          <h2>7. {ssrT(locale, 'terms.prohibited', 'Prohibited conduct')}</h2>
           <p>You agree not to:</p>
           <ul>
             <li>Violate any applicable law or regulation.</li>
@@ -139,7 +140,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>8. Medical disclaimer</h2>
+          <h2>8. {ssrT(locale, 'terms.disclaimer', 'Medical disclaimer')}</h2>
           <p>
             The Platform does not provide medical advice, diagnosis, or treatment.
             Always seek the advice of a qualified healthcare provider with any
@@ -152,7 +153,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>9. Limitation of liability</h2>
+          <h2>9. {ssrT(locale, 'terms.liability', 'Limitation of liability')}</h2>
           <p>
             To the maximum extent permitted by law, Wishubest, its directors,
             employees, and affiliates shall not be liable for any indirect,
@@ -163,7 +164,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>10. Changes to these terms</h2>
+          <h2>10. {ssrT(locale, 'terms.changes', 'Changes to these terms')}</h2>
           <p>
             We may modify these Terms from time to time. Material changes will be
             announced via the Platform or by email. Continued use after the
@@ -172,7 +173,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>11. Governing law</h2>
+          <h2>11. {ssrT(locale, 'terms.governing', 'Governing law')}</h2>
           <p>
             These Terms are governed by the laws of the jurisdiction in which
             Wishubest is incorporated, without regard to conflict-of-law principles.
@@ -182,7 +183,7 @@ export default async function TermsPage({
         </section>
 
         <section>
-          <h2>12. Contact</h2>
+          <h2>12. {ssrT(locale, 'terms.contact', 'Contact')}</h2>
           <p>
             Questions about these Terms can be sent to{' '}
             <a href="mailto:legal@wishubest.com">legal@wishubest.com</a> or via our{' '}

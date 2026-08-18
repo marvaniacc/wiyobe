@@ -61,7 +61,9 @@ function getDefaultColumns(locale: string): Array<{ title: string; links: Footer
 }
 
 export async function PublicFooter({ locale }: { locale: string }) {
-  const configRow = await db.siteSetting.findUnique({ where: { key: 'footerConfig' } })
+  // Per-locale footer config with fallback: footerConfig_{locale} → footerConfig
+  const configRow = (await db.siteSetting.findUnique({ where: { key: `footerConfig_${locale}` } }))
+    ?? (await db.siteSetting.findUnique({ where: { key: 'footerConfig' } }))
   const config = parseFooterConfig(configRow?.value)
   const defaultCols = getDefaultColumns(locale)
   const columns = config?.columns?.length ? config.columns : defaultCols

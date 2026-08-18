@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import { getSession } from '@/lib/auth'
 import { ContactForm } from '@/components/shared/contact-form'
 import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
+import { ssrT } from '@/lib/ssr-i18n'
+import { type Locale } from '@/lib/i18n'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,17 +33,20 @@ const CONTACT_CHANNELS = [
   {
     icon: 'mail',
     label: 'Email',
+    labelKey: 'contact.email',
     value: 'hello@wishubest.com',
     href: 'mailto:hello@wishubest.com',
   },
   {
     icon: 'support_agent',
     label: 'Support',
+    labelKey: 'contact.support',
     value: '24-hour response on weekdays',
   },
   {
     icon: 'schedule',
     label: 'Hours',
+    labelKey: 'contact.hours',
     value: 'Mon–Fri, 9:00–18:00 (GMT+3)',
   },
 ]
@@ -77,10 +82,10 @@ export default async function ContactPage({
           </span>
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-          Contact us
+          {ssrT(locale, 'contact.title', 'Contact us')}
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-          Questions, partnerships, press, or bug reports — we&apos;d love to hear from you.
+          {ssrT(locale, 'contact.subtitle', 'Questions, partnerships, press, or bug reports — we\'d love to hear from you.')}
         </p>
       </div>
 
@@ -101,7 +106,7 @@ export default async function ContactPage({
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {ch.label}
+                  {ssrT(locale, ch.labelKey, ch.label)}
                 </p>
                 {ch.href ? (
                   <a
@@ -121,7 +126,7 @@ export default async function ContactPage({
         {/* Form or CTA */}
         <div className="lg:col-span-2">
           {session ? (
-            <ContactForm />
+            <ContactForm locale={locale as Locale} />
           ) : (
             <div className="flex flex-col items-center gap-4 rounded-[24px] border border-dashed border-divider bg-surface p-8 text-center sm:p-12">
               <div className="flex size-14 items-center justify-center rounded-[16px] bg-primary/10 text-primary">
@@ -135,12 +140,10 @@ export default async function ContactPage({
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-foreground">
-                  Sign in to submit a ticket
+                  {ssrT(locale, 'contact.guestTitle', 'Sign in to submit a ticket')}
                 </h2>
                 <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                  To track your inquiry and receive a response, please sign in or
-                  create an account. Your message becomes a support ticket visible
-                  in your dashboard.
+                  {ssrT(locale, 'contact.guestDesc', 'To track your inquiry and receive a response, please sign in or create an account. Your message becomes a support ticket visible in your dashboard.')}
                 </p>
               </div>
               <div className="mt-2 flex flex-wrap justify-center gap-3">

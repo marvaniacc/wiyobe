@@ -39,9 +39,12 @@ export async function PublicHeader({ locale }: { locale: string }) {
   const session = await getSession()
   const isAuth = !!session
 
-  // Read dynamic header config from SiteSetting
-  const configKey = isAuth ? 'headerConfigLogged' : 'headerConfigGuest'
-  const configRow = await db.siteSetting.findUnique({ where: { key: configKey } })
+  // Read dynamic header config from SiteSetting — per-locale with fallback
+  // Try headerConfigGuest_{locale} first, fall back to headerConfigGuest (default)
+  const baseKey = isAuth ? 'headerConfigLogged' : 'headerConfigGuest'
+  const localizedKey = `${baseKey}_${locale}`
+  const configRow = (await db.siteSetting.findUnique({ where: { key: localizedKey } }))
+    ?? (await db.siteSetting.findUnique({ where: { key: baseKey } }))
   const config = parseHeaderConfig(configRow?.value)
 
   // Default nav links (used when config is not set)

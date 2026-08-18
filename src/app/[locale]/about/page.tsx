@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
+import { ssrT } from '@/lib/ssr-i18n'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,7 +90,7 @@ export default async function AboutPage({
           </span>
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-          About Wishubest
+          {ssrT(locale, 'about.title', 'About Wishubest')}
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
           The global medical tourism marketplace — connecting patients with verified
@@ -99,7 +100,7 @@ export default async function AboutPage({
 
       {/* Mission */}
       <section className="mt-16">
-        <h2 className="text-2xl font-semibold text-foreground">Our mission</h2>
+        <h2 className="text-2xl font-semibold text-foreground">{ssrT(locale, 'about.mission', 'Our mission')}</h2>
         <p className="mt-4 text-base leading-relaxed text-muted-foreground">
           Medical travel should be safe, transparent, and accessible. Wishubest
           brings every part of the journey — from finding the right specialist to
@@ -112,22 +113,22 @@ export default async function AboutPage({
 
       {/* How it works */}
       <section className="mt-16">
-        <h2 className="text-2xl font-semibold text-foreground">How it works</h2>
+        <h2 className="text-2xl font-semibold text-foreground">{ssrT(locale, 'about.howItWorks', 'How it works')}</h2>
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
           {[
             {
               icon: 'search',
-              title: '1. Compare providers',
+              title: `1. ${ssrT(locale, 'about.compare', 'Compare providers')}`,
               desc: 'Browse verified doctors, hospitals, hotels, and translators. Filter by country, specialty, language, and price.',
             },
             {
               icon: 'verified_user',
-              title: '2. Book securely',
+              title: `2. ${ssrT(locale, 'about.book', 'Book securely')}`,
               desc: 'Book with confidence — every provider has passed KYC. Platform payments are escrowed until your appointment is confirmed.',
             },
             {
               icon: 'flight_takeoff',
-              title: '3. Travel & recover',
+              title: `3. ${ssrT(locale, 'about.travel', 'Travel & recover')}`,
               desc: 'Coordinate your trip with translators and accommodation. Access your medical records and chat with your provider in-app.',
             },
           ].map((step) => (
@@ -150,9 +151,9 @@ export default async function AboutPage({
       {/* Trust signals */}
       <section className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { icon: 'verified', label: 'KYC-verified providers', desc: 'Every doctor, hospital, hotel, and translator passes identity verification.' },
-          { icon: 'lock', label: 'Escrowed payments', desc: 'Funds are released to the provider only after your booking is confirmed.' },
-          { icon: 'translate', label: 'Multilingual support', desc: 'Book translators and chat in 5 languages — English, Turkish, Persian, Arabic, Russian.' },
+          { icon: 'verified', label: ssrT(locale, 'about.verified', 'KYC-verified providers'), desc: 'Every doctor, hospital, hotel, and translator passes identity verification.' },
+          { icon: 'lock', label: ssrT(locale, 'about.escrow', 'Escrowed payments'), desc: 'Funds are released to the provider only after your booking is confirmed.' },
+          { icon: 'translate', label: ssrT(locale, 'about.multilingual', 'Multilingual support'), desc: 'Book translators and chat in 5 languages — English, Turkish, Persian, Arabic, Russian.' },
         ].map((sig) => (
           <div key={sig.label} className="flex items-start gap-3 rounded-[12px] bg-surface-secondary p-4">
             <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }} aria-hidden>
@@ -168,22 +169,22 @@ export default async function AboutPage({
 
       {/* CTA */}
       <section className="mt-16 rounded-[24px] border border-divider bg-gradient-to-br from-primary/5 to-transparent p-8 text-center sm:p-12">
-        <h2 className="text-2xl font-bold text-foreground">Ready to find your provider?</h2>
+        <h2 className="text-2xl font-bold text-foreground">{ssrT(locale, 'about.ctaTitle', 'Ready to find your provider?')}</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Browse verified doctors, hospitals, hotels, and translators worldwide.
+          {ssrT(locale, 'about.ctaDesc', 'Browse verified doctors, hospitals, hotels, and translators worldwide.')}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Link
             href={`/${locale}/doctors`}
             className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Browse Doctors
+            {ssrT(locale, 'about.browse', 'Browse Doctors')}
           </Link>
           <Link
             href="/dashboard"
             className="rounded-full border border-divider px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
           >
-            Sign up
+            {ssrT(locale, 'about.signup', 'Sign up')}
           </Link>
         </div>
       </section>

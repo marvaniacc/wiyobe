@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Icon } from '@/components/shared/icon'
+import { translate, type Locale } from '@/lib/i18n'
 
 const TOPICS = [
   { value: 'general', label: 'General Inquiry' },
@@ -37,7 +38,8 @@ const PRIORITIES = [
  * select is prefixed to the subject so admins can triage by topic at a
  * glance. Requires an authenticated session (the parent page gates this).
  */
-export function ContactForm() {
+export function ContactForm({ locale = 'en' }: { locale?: Locale }) {
+  const t = (k: string, f: string) => translate(locale, k, f)
   const [topic, setTopic] = useState('general')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
@@ -55,7 +57,7 @@ export function ContactForm() {
     }
     setSubmitting(true)
     try {
-      const topicLabel = TOPICS.find((t) => t.value === topic)?.label || 'General'
+      const topicLabel = TOPICS.find((topicOpt) => topicOpt.value === topic)?.label || 'General'
       const fullSubject = `${topicLabel}: ${trimmedSubject}`.slice(0, 200)
       const res = await fetch('/api/tickets', {
         method: 'POST',
@@ -90,22 +92,22 @@ export function ContactForm() {
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="topic" className="text-sm font-medium">Topic</Label>
+          <Label htmlFor="topic" className="text-sm font-medium">{t('contact.topic', 'Topic')}</Label>
           <Select value={topic} onValueChange={setTopic}>
             <SelectTrigger id="topic" className="h-11">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TOPICS.map((t) => (
-                <SelectItem key={t.value} value={t.value}>
-                  {t.label}
+              {TOPICS.map((tOpt) => (
+                <SelectItem key={tOpt.value} value={tOpt.value}>
+                  {tOpt.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="priority" className="text-sm font-medium">Priority</Label>
+          <Label htmlFor="priority" className="text-sm font-medium">{t('contact.priority', 'Priority')}</Label>
           <Select value={priority} onValueChange={setPriority}>
             <SelectTrigger id="priority" className="h-11">
               <SelectValue />
@@ -122,7 +124,7 @@ export function ContactForm() {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="subject" className="text-sm font-medium">Subject</Label>
+        <Label htmlFor="subject" className="text-sm font-medium">{t('contact.subject', 'Subject')}</Label>
         <Input
           id="subject"
           value={subject}
@@ -135,7 +137,7 @@ export function ContactForm() {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="message" className="text-sm font-medium">Message</Label>
+        <Label htmlFor="message" className="text-sm font-medium">{t('contact.message', 'Message')}</Label>
         <Textarea
           id="message"
           value={message}
@@ -160,7 +162,7 @@ export function ContactForm() {
           ) : (
             <Icon name="send" size={16} />
           )}
-          {submitting ? 'Sending…' : 'Send message'}
+          {submitting ? t('contact.sending', 'Sending…') : t('contact.send', 'Send message')}
         </Button>
       </div>
     </form>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { buildBreadcrumbJsonLd, buildStaticAlternates } from '@/lib/seo'
+import { ssrT } from '@/lib/ssr-i18n'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,13 +52,13 @@ export default async function PrivacyPage({
       />
 
       <header className="border-b border-divider pb-6">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>
+        <h1 className="text-4xl font-bold tracking-tight text-foreground">{ssrT(locale, 'privacy.title', 'Privacy Policy')}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{ssrT(locale, 'privacy.lastUpdated', 'Last updated')}: {LAST_UPDATED}</p>
       </header>
 
       <div className="prose prose-lg mt-8 max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-primary">
         <section>
-          <h2>1. Overview</h2>
+          <h2>1. {ssrT(locale, 'privacy.overview', 'Overview')}</h2>
           <p>
             Wishubest (&quot;we&quot;, &quot;us&quot;) respects your privacy. This
             Policy explains what data we collect, why we collect it, how long we
@@ -68,7 +69,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>2. Data we collect</h2>
+          <h2>2. {ssrT(locale, 'privacy.data', 'Data we collect')}</h2>
           <h3>2.1 Data you provide</h3>
           <ul>
             <li>Account data: name, email, phone, country, city, preferred language.</li>
@@ -85,7 +86,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>3. How we use your data</h2>
+          <h2>3. {ssrT(locale, 'privacy.use', 'How we use your data')}</h2>
           <ul>
             <li>To provide, operate, and improve the Platform and its features.</li>
             <li>To verify provider identity and credentials (KYC) before listing.</li>
@@ -96,7 +97,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>4. Legal basis (GDPR)</h2>
+          <h2>4. {ssrT(locale, 'privacy.legalBasis', 'Legal basis (GDPR)')}</h2>
           <p>We process personal data on the following legal bases:</p>
           <ul>
             <li><strong>Consent</strong> — for marketing communications and non-essential cookies.</li>
@@ -107,7 +108,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>5. Data retention</h2>
+          <h2>5. {ssrT(locale, 'privacy.retention', 'Data retention')}</h2>
           <p>
             We retain personal data only as long as necessary for the purposes set
             out above or as required by law. KYC documents are retained for the
@@ -119,7 +120,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>6. Sharing of data</h2>
+          <h2>6. {ssrT(locale, 'privacy.sharing', 'Sharing of data')}</h2>
           <p>
             We do not sell your personal data. We share data only with:
           </p>
@@ -132,7 +133,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>7. File storage</h2>
+          <h2>7. {ssrT(locale, 'privacy.storage', 'File storage')}</h2>
           <p>
             Uploaded files (KYC documents, medical records, media library assets)
             are saved to the local filesystem on our server under{' '}
@@ -145,7 +146,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>8. Cookies</h2>
+          <h2>8. {ssrT(locale, 'privacy.cookies', 'Cookies')}</h2>
           <p>
             We use essential cookies (session, locale) and a 30-day affiliate
             referral cookie. Non-essential cookies require your consent, which you
@@ -155,7 +156,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>9. Your rights</h2>
+          <h2>9. {ssrT(locale, 'privacy.rights', 'Your rights')}</h2>
           <p>Subject to applicable law, you have the right to:</p>
           <ul>
             <li>Access the personal data we hold about you.</li>
@@ -173,7 +174,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>10. Security</h2>
+          <h2>10. {ssrT(locale, 'privacy.security', 'Security')}</h2>
           <p>
             We use industry-standard measures to protect your data: TLS for
             transit, scrypt for password hashing, HMAC-signed session cookies,
@@ -184,7 +185,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>11. International transfers</h2>
+          <h2>11. {ssrT(locale, 'privacy.transfers', 'International transfers')}</h2>
           <p>
             Your data may be processed in countries other than your own. By using
             the Platform, you consent to such transfers subject to appropriate
@@ -193,7 +194,7 @@ export default async function PrivacyPage({
         </section>
 
         <section>
-          <h2>12. Changes to this policy</h2>
+          <h2>12. {ssrT(locale, 'privacy.changes', 'Changes to this policy')}</h2>
           <p>
             We may update this Policy from time to time. Material changes will be
             announced via the Platform or by email. Continued use after the
