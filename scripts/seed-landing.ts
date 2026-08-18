@@ -145,7 +145,7 @@ async function main() {
   console.log('🌱 Seeding default landing page…')
 
   await db.customPage.upsert({
-    where: { slug: 'home' },
+    where: { slug_language: { slug: 'home', language: 'en' } },
     update: {
       title: 'Home',
       htmlContent: LANDING_HTML,

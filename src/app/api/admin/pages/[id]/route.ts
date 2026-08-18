@@ -56,7 +56,7 @@ const patchSchema = z.object({
   slug: z.string().max(200).optional(),
   content: z.any().nullable().optional(),
   htmlContent: z.string().optional(),
-  language: z.string().max(10).nullable().optional(),
+  language: z.string().max(10).optional(),
   seoTitle: z.string().max(200).nullable().optional(),
   seoDescription: z.string().max(500).nullable().optional(),
   focusKeyword: z.string().max(100).nullable().optional(),

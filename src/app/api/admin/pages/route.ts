@@ -91,7 +91,7 @@ export async function POST(req: Request) {
         title: body.title,
         slug,
         content: body.content ?? null,
-        language: body.language ?? null,
+        language: body.language ?? 'en',
         htmlContent: body.htmlContent,
         seoTitle: body.seoTitle ?? null,
         seoDescription: body.seoDescription ?? null,
