@@ -31,7 +31,8 @@ export function PageEditorFullScreen() {
   useEffect(() => {
     if (!editingPageId) { setLoading(false); return }
     setLoading(true)
-    fetch(`/api/admin/pages/${editingPageId}`).then(r => r.json()).then((page) => {
+    fetch(`/api/admin/pages/${editingPageId}`).then(r => r.json()).then((data) => {
+      const page = data.page || data
       setTitle(page.title || ''); setSlug(page.slug || ''); setContent(page.content || null)
       setLanguage(page.language || 'en'); setIsPublished(page.isPublished || false)
     }).catch(() => toast.error('Failed to load page')).finally(() => setLoading(false))
@@ -43,7 +44,7 @@ export function PageEditorFullScreen() {
     try {
       const payload = { title: title.trim(), slug: slug.trim() || undefined, content, language, isPublished }
       if (editingPageId) { await apiPatch(`/api/admin/pages/${editingPageId}`, payload); toast.success('Page saved') }
-      else { const res = await apiPost<any>('/api/admin/pages', payload); setEditingPageId(res.id); toast.success('Page created') }
+      else { const res = await apiPost<any>('/api/admin/pages', payload); setEditingPageId(res.page?.id || res.id); toast.success('Page created') }
     } catch (e: any) { toast.error(e.message || 'Failed to save') } finally { setSaving(false) }
   }
 
@@ -95,7 +96,8 @@ export function BlogEditorFullScreen() {
   useEffect(() => {
     if (!editingBlogPostId) { setLoading(false); return }
     setLoading(true)
-    fetch(`/api/admin/blog/${editingBlogPostId}`).then(r => r.json()).then((post) => {
+    fetch(`/api/admin/blog/${editingBlogPostId}`).then(r => r.json()).then((data) => {
+      const post = data.post || data
       setTitle(post.title || ''); setSlug(post.slug || ''); setExcerpt(post.excerpt || '')
       setContent(post.content || null); setCoverImage(post.coverImage || '')
       setLanguage(post.language || 'en'); setIsPublished(post.status === 'PUBLISHED')
@@ -108,7 +110,7 @@ export function BlogEditorFullScreen() {
     try {
       const payload = { title: title.trim(), slug: slug.trim() || undefined, excerpt: excerpt.trim(), content, coverImage: coverImage || null, language, status: isPublished ? 'PUBLISHED' : 'DRAFT' }
       if (editingBlogPostId) { await apiPatch(`/api/admin/blog/${editingBlogPostId}`, payload); toast.success('Blog post saved') }
-      else { const res = await apiPost<any>('/api/admin/blog', payload); setEditingBlogPostId(res.id); toast.success('Blog post created') }
+      else { const res = await apiPost<any>('/api/admin/blog', payload); setEditingBlogPostId(res.post?.id || res.id); toast.success('Blog post created') }
     } catch (e: any) { toast.error(e.message || 'Failed to save') } finally { setSaving(false) }
   }
 
