@@ -10,6 +10,7 @@ const EXCLUDED_PATHS = [
   '/api',
   '/_next',
   '/dashboard',
+  '/login',
   '/robots.txt',
   '/sitemap.xml',
   '/favicon.ico',
@@ -78,6 +79,6 @@ export function middleware(req: NextRequest) {
 export const config = {
   // Match all paths except excluded ones
   matcher: [
-    '/((?!api|_next/static|_next/image|dashboard|robots\\.txt|sitemap\\.xml|favicon\\.ico|uploads|$).*)',
+    '/((?!api|_next/static|_next/image|dashboard|login|robots\\.txt|sitemap\\.xml|favicon\\.ico|uploads|$).*)',
   ],
 }
