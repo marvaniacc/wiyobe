@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
+import { ssrT } from '@/lib/ssr-i18n'
 import { CookiePreferencesButton } from '@/components/shared/cookie-preferences-button'
 
 /**
  * PublicFooter — unified public-site footer for SSR pages under /{locale}/...
  *
- * Reads `footerConfig` from SiteSetting (optional JSON with custom links).
- * Falls back to a default set of links (Doctors, Hospitals, Blog, About) +
- * copyright.
+ * All default labels are translated via ssrT(locale, key, fallback).
+ * Admin can override with a `footerConfig` SiteSetting (single JSON for
+ * all locales — custom config is NOT translated, only the defaults are).
  */
 type FooterLink = { label: string; link: string }
 type FooterConfig = {
@@ -28,40 +29,44 @@ function parseFooterConfig(json: string | null | undefined): FooterConfig | null
   }
 }
 
-const DEFAULT_COLUMNS: Array<{ title: string; links: FooterLink[] }> = [
-  {
-    title: 'Providers',
-    links: [
-      { label: 'Doctors', link: '/{locale}/doctors' },
-      { label: 'Hospitals', link: '/{locale}/hospitals' },
-      { label: 'Hotels', link: '/{locale}/hotels' },
-      { label: 'Translators', link: '/{locale}/translators' },
-    ],
-  },
-  {
-    title: 'Resources',
-    links: [
-      { label: 'Blog', link: '/{locale}/blog' },
-      { label: 'About', link: '/{locale}/about' },
-      { label: 'FAQ', link: '/{locale}/faq' },
-      { label: 'Contact', link: '/{locale}/contact' },
-    ],
-  },
-  {
-    title: 'Legal',
-    links: [
-      { label: 'Terms of Service', link: '/{locale}/terms' },
-      { label: 'Privacy Policy', link: '/{locale}/privacy' },
-    ],
-  },
-]
+/** Build the default footer columns with i18n-translated labels. */
+function getDefaultColumns(locale: string): Array<{ title: string; links: FooterLink[] }> {
+  return [
+    {
+      title: ssrT(locale, 'footer.providers', 'Providers'),
+      links: [
+        { label: ssrT(locale, 'public.verifiedDoctors', 'Doctors'), link: '/{locale}/doctors' },
+        { label: ssrT(locale, 'public.verifiedHospitals', 'Hospitals'), link: '/{locale}/hospitals' },
+        { label: ssrT(locale, 'footer.hotels', 'Hotels'), link: '/{locale}/hotels' },
+        { label: ssrT(locale, 'footer.translators', 'Translators'), link: '/{locale}/translators' },
+      ],
+    },
+    {
+      title: ssrT(locale, 'footer.resources', 'Resources'),
+      links: [
+        { label: ssrT(locale, 'public.blogTitle', 'Blog'), link: '/{locale}/blog' },
+        { label: ssrT(locale, 'footer.about', 'About'), link: '/{locale}/about' },
+        { label: ssrT(locale, 'footer.faq', 'FAQ'), link: '/{locale}/faq' },
+        { label: ssrT(locale, 'footer.contact', 'Contact'), link: '/{locale}/contact' },
+      ],
+    },
+    {
+      title: ssrT(locale, 'footer.legal', 'Legal'),
+      links: [
+        { label: ssrT(locale, 'footer.terms', 'Terms of Service'), link: '/{locale}/terms' },
+        { label: ssrT(locale, 'footer.privacy', 'Privacy Policy'), link: '/{locale}/privacy' },
+      ],
+    },
+  ]
+}
 
 export async function PublicFooter({ locale }: { locale: string }) {
   const configRow = await db.siteSetting.findUnique({ where: { key: 'footerConfig' } })
   const config = parseFooterConfig(configRow?.value)
-  const columns = config?.columns?.length ? config.columns : DEFAULT_COLUMNS
+  const defaultCols = getDefaultColumns(locale)
+  const columns = config?.columns?.length ? config.columns : defaultCols
   const year = new Date().getFullYear()
-  const copyright = config?.copyright || `© ${year} Wishubest — Global Medical Tourism Marketplace`
+  const copyright = config?.copyright || `© ${year} Wishubest — ${ssrT(locale, 'footer.copyrightSuffix', 'Global Medical Tourism Marketplace')}`
 
   return (
     <footer className="border-t border-divider bg-surface">
@@ -76,7 +81,7 @@ export async function PublicFooter({ locale }: { locale: string }) {
               <span>Wishubest</span>
             </Link>
             <p className="mt-2 text-sm text-muted-foreground">
-              Global Medical Tourism Marketplace — Compare and book verified providers worldwide.
+              {ssrT(locale, 'footer.brandDesc', 'Global Medical Tourism Marketplace — Compare and book verified providers worldwide.')}
             </p>
           </div>
 

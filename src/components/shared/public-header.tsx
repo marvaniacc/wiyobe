@@ -52,7 +52,7 @@ export async function PublicHeader({ locale }: { locale: string }) {
   ]
   const navLinks = config?.menuItems?.length ? config.menuItems : defaultLinks
   const ctaText = config?.ctaLabel || (isAuth ? undefined : 'Login / Sign Up')
-  const ctaHref = config?.ctaLink || '/login'
+  const ctaHref = config?.ctaLink || `/${locale}/login`
   const logoText = 'Wishubest'
 
   return (
