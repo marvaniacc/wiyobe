@@ -16,12 +16,20 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-async function ensureUniqueSlug(baseSlug: string, excludeId?: string): Promise<string> {
+/**
+ * Ensure slug + language combination is unique. If a page with the same
+ * slug already exists for the SAME language, append a numeric suffix.
+ * Allows the same slug for DIFFERENT languages (e.g. "home" in en + fa).
+ */
+async function ensureUniqueSlug(baseSlug: string, language: string, excludeId?: string): Promise<string> {
   let slug = baseSlug
   let n = 1
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const existing = await db.customPage.findUnique({ where: { slug }, select: { id: true } })
+    const existing = await db.customPage.findFirst({
+      where: { slug, language },
+      select: { id: true },
+    })
     if (!existing || existing.id === excludeId) return slug
     n++
     slug = `${baseSlug}-${n}`
@@ -76,7 +84,7 @@ export async function POST(req: Request) {
 
     const baseSlug = body.slug ? slugify(body.slug) : slugify(body.title)
     if (!baseSlug) return error(400, 'Could not generate a valid slug from the title')
-    const slug = await ensureUniqueSlug(baseSlug)
+    const slug = await ensureUniqueSlug(baseSlug, body.language || 'en')
 
     const page = await db.customPage.create({
       data: {

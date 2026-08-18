@@ -25,9 +25,11 @@ export default async function LocaleHomePage({
   const { locale } = await params
   if (!SUPPORTED_LOCALES.includes(locale)) notFound()
 
-  // Check for custom home page
-  const homePage = await db.customPage.findUnique({
-    where: { slug: 'home', deletedAt: null },
+  // Check for custom home page for THIS locale
+  // The compound unique [slug, language] allows separate "home" pages
+  // per locale (e.g. slug="home" language="en" AND slug="home" language="fa")
+  const homePage = await db.customPage.findFirst({
+    where: { slug: 'home', language: locale, deletedAt: null, isPublished: true },
     select: { content: true, htmlContent: true, isPublished: true, language: true },
   })
 

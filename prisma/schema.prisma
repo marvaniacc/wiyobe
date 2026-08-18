@@ -868,13 +868,18 @@ model BlogPost {
 /// rendered via BlockNoteSSRRenderer on /[slug]. A legacy `htmlContent` String
 /// field is kept for raw HTML/CSS pages — admin-authored, NOT sanitized
 /// (admin is trusted).
+///
+/// The compound unique [slug, language] allows the SAME slug to exist
+/// for different locales — e.g. slug="home" with language="en" AND
+/// slug="home" with language="fa". This enables locale-specific landing
+/// pages.
 model CustomPage {
   id              String   @id @default(cuid())
   title           String
-  slug            String   @unique                // kebab-case URL slug
+  slug            String                          // kebab-case URL slug (NOT unique alone — see @@unique below)
   htmlContent     String                          // raw HTML/CSS code (legacy / fallback)
   content         Json?                           // BlockNote JSON content (primary; rendered via BlockNoteSSRRenderer)
-  language        String?  @default("en")         // ISO 639-1 locale code (en/tr/fa/ar)
+  language        String   @default("en")         // ISO 639-1 locale code (en/tr/fa/ar/ru) — non-nullable for compound unique
   seoTitle        String?
   seoDescription  String?
   // SEO fields
@@ -886,8 +891,10 @@ model CustomPage {
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?                        // soft delete
 
+  @@unique([slug, language])
   @@index([isPublished])
   @@index([deletedAt])
+  @@index([slug])
 }
 
 /// Internal media library — files uploaded to public/uploads/ and tracked

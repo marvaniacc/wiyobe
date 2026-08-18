@@ -23,13 +23,14 @@ type CustomPage = {
 }
 
 /**
- * Fetch a single published custom page by slug for public rendering.
- * Unpublished pages and non-existent slugs trigger a 404 via notFound().
+ * Fetch a single published custom page by slug + locale for public rendering.
+ * The compound unique [slug, language] allows the same slug to exist for
+ * different locales. Unpublished pages and non-existent slugs trigger 404.
  */
-async function getPage(slug: string): Promise<CustomPage | null> {
-  const page = await db.customPage.findUnique({ where: { slug } })
-  // Only published, non-soft-deleted pages are publicly accessible.
-  if (!page || !page.isPublished || page.deletedAt) return null
+async function getPage(slug: string, locale: string): Promise<CustomPage | null> {
+  const page = await db.customPage.findFirst({
+    where: { slug, language: locale, isPublished: true, deletedAt: null },
+  })
   return page
 }
 
@@ -43,7 +44,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string; slug: string }>
 }): Promise<Metadata> {
   const { locale, slug } = await params
-  const page = await getPage(slug)
+  const page = await getPage(slug, locale)
   if (!page) {
     return { title: 'Page not found — Wishubest' }
   }
@@ -84,7 +85,7 @@ export default async function CustomPageRoute({
   params: Promise<{ locale: string; slug: string }>
 }) {
   const { locale, slug } = await params
-  const page = await getPage(slug)
+  const page = await getPage(slug, locale)
   if (!page) notFound()
 
   // NOTE: The [locale]/layout.tsx already wraps this page with <PublicHeader>
