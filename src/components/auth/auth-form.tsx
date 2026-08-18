@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,30 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Icon } from '@/components/shared/icon'
 import { toast } from 'sonner'
-import { LANGUAGES } from '@/lib/languages'
 import { cn } from '@/lib/utils'
 
 type AuthType = 'login' | 'signup'
 type Role = 'patient' | 'doctor' | 'hospital' | 'hotel' | 'translator' | 'affiliate'
-
-type Country = { id: string; name: string; isoCode: string; flag?: string | null }
-type City = { id: string; name: string }
-
-// Extend window for Turnstile
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (el: HTMLElement, opts: {
-        sitekey: string
-        callback: (token: string) => void
-        'error-callback'?: () => void
-        theme?: 'light' | 'dark' | 'auto'
-      }) => string
-      reset: (id?: string) => void
-      remove: (id: string) => void
-    }
-  }
-}
 
 type AuthFormProps = {
   type?: AuthType
@@ -41,25 +21,25 @@ type AuthFormProps = {
   buttonText?: string
 }
 
-const ROLE_LABELS: Record<Role, string> = {
-  patient: 'Patient',
-  doctor: 'Doctor',
-  hospital: 'Hospital',
-  hotel: 'Hotel / Suite',
-  translator: 'Translator',
-  affiliate: 'Affiliate',
-}
+const ROLE_OPTIONS: { value: Role; label: string; icon: string }[] = [
+  { value: 'patient', label: 'Patient', icon: 'personal_injury' },
+  { value: 'doctor', label: 'Doctor', icon: 'medical_services' },
+  { value: 'hospital', label: 'Hospital', icon: 'local_hospital' },
+  { value: 'hotel', label: 'Hotel', icon: 'hotel' },
+  { value: 'translator', label: 'Translator', icon: 'translate' },
+  { value: 'affiliate', label: 'Affiliate', icon: 'campaign' },
+]
 
 /**
- * AuthForm — premium shadcn/ui Card layout for signup/signin.
+ * AuthForm — simplified signup/login form.
  *
- * Features:
- *  - 2-column grid for inputs (sm:grid-cols-2)
- *  - Role-specific fields (DOCTOR: license+specialty, HOTEL: star rating, etc.)
- *  - Dynamic Country + City dropdowns (fetched from /api/admin/locations)
- *  - TRANSLATOR: language tag input (multi-select from LANGUAGES list)
- *  - Cloudflare Turnstile anti-bot widget
- *  - Redirects to /dashboard on success
+ * Fields:
+ *  - Name (signup only, full width)
+ *  - Email + Password (2-column grid)
+ *  - Role select (signup only, full width)
+ *
+ * No role-specific fields, no country/city, no Turnstile.
+ * Country/city selection moves to provider locations in the dashboard.
  */
 export function AuthForm({
   type = 'signup',
@@ -69,22 +49,25 @@ export function AuthForm({
 }: AuthFormProps) {
   const router = useRouter()
   const isSignup = type === 'signup'
-  const turnstileRef = useRef<HTMLDivElement>(null)
-  const turnstileWidgetId = useRef<string | null>(null)
 
   // Session check — if user is already logged in, show "already logged in"
-  // card instead of the form. Prevents logged-in users from seeing signup
-  // forms on public Custom Pages (e.g. an admin visiting /en/doctor-signup).
+  // card instead of the form.
   const [existingSession, setExistingSession] = useState<{ name: string | null; role: string; email: string } | null>(null)
   const [sessionChecked, setSessionChecked] = useState(false)
 
+  // Form state
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [selectedRole, setSelectedRole] = useState<Role>(role)
+  const [submitting, setSubmitting] = useState(false)
+
+  // Session check on mount
   useEffect(() => {
     fetch('/api/auth/session', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
-        if (data.session) {
-          setExistingSession(data.session)
-        }
+        if (data.session) setExistingSession(data.session)
       })
       .catch(() => {})
       .finally(() => setSessionChecked(true))
@@ -97,146 +80,22 @@ export function AuthForm({
     }
   }, [existingSession, type, router])
 
-  // Form state
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [phone, setPhone] = useState('')
-  const [specialty, setSpecialty] = useState('')
-  const [medicalLicenseNumber, setMedicalLicenseNumber] = useState('')
-  const [businessRegNumber, setBusinessRegNumber] = useState('')
-  const [starRating, setStarRating] = useState('3')
-  const [specialization, setSpecialization] = useState('')
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([])
-
-  // Location state
-  const [countries, setCountries] = useState<Country[]>([])
-  const [cities, setCities] = useState<City[]>([])
-  const [countryId, setCountryId] = useState('')
-  const [cityId, setCityId] = useState('')
-  const [countryName, setCountryName] = useState('')
-  const [cityName, setCityName] = useState('')
-
-  // Turnstile token
-  const [cfToken, setCfToken] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  // Fetch countries on mount
-  useEffect(() => {
-    fetch('/api/admin/locations')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.countries) setCountries(data.countries)
-      })
-      .catch(() => {})
-  }, [])
-
-  // Fetch cities when country changes
-  useEffect(() => {
-    if (!countryId) {
-      setCities([])
-      return
-    }
-    fetch(`/api/admin/locations?countryId=${countryId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.cities) setCities(data.cities)
-      })
-      .catch(() => setCities([]))
-  }, [countryId])
-
-  // Load Turnstile widget
-  useEffect(() => {
-    const siteKey = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY
-    if (!siteKey || !turnstileRef.current) return
-
-    function tryRender() {
-      if (window.turnstile && turnstileRef.current) {
-        try {
-          turnstileWidgetId.current = window.turnstile.render(turnstileRef.current, {
-            sitekey: siteKey!,
-            callback: (token: string) => setCfToken(token),
-            'error-callback': () => setCfToken(''),
-            theme: 'light',
-          })
-        } catch {
-          /* Turnstile not ready */
-        }
-      }
-    }
-
-    // Load script if needed
-    const existing = document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')
-    if (!existing) {
-      const script = document.createElement('script')
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
-      script.async = true
-      script.defer = true
-      script.onload = () => tryRender()
-      document.head.appendChild(script)
-    } else {
-      tryRender()
-    }
-
-    // Poll for turnstile to be ready (script might still be loading)
-    const interval = setInterval(() => {
-      if (window.turnstile && !turnstileWidgetId.current) {
-        tryRender()
-        if (turnstileWidgetId.current) clearInterval(interval)
-      }
-    }, 500)
-
-    return () => {
-      clearInterval(interval)
-      if (turnstileWidgetId.current && window.turnstile) {
-        try {
-          window.turnstile.remove(turnstileWidgetId.current)
-        } catch { /* ignore */ }
-      }
-    }
-  }, [])
-
-  function toggleLanguage(code: string) {
-    setSelectedLanguages((prev) =>
-      prev.includes(code) ? prev.filter((l) => l !== code) : [...prev, code]
-    )
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!email.trim() || !password.trim()) return
     if (isSignup && !name.trim()) return
-
-    // Require Turnstile token (only if site key is configured)
-    const siteKey = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY
-    if (siteKey && !cfToken) {
-      toast.error('Please complete the security verification.')
-      return
-    }
 
     setSubmitting(true)
 
     const payload: Record<string, unknown> = {
       email: email.trim(),
       password: password.trim(),
-      role: role.toUpperCase(),
-      cfToken,
     }
 
     if (isSignup) {
       payload.name = name.trim()
+      payload.role = selectedRole.toUpperCase()
       payload.preferredLanguage = 'en'
-      if (phone) payload.phone = phone.trim()
-      if (countryId) payload.countryId = countryId
-      if (cityId) payload.cityId = cityId
-      if (countryName) payload.country = countryName
-      if (cityName) payload.city = cityName
-      if (specialty) payload.specialty = specialty.trim()
-      if (medicalLicenseNumber) payload.medicalLicenseNumber = medicalLicenseNumber.trim()
-      if (businessRegNumber) payload.businessRegNumber = businessRegNumber.trim()
-      if (starRating) payload.starRating = parseInt(starRating)
-      if (specialization) payload.specialization = specialization.trim()
-      if (selectedLanguages.length > 0) payload.languages = selectedLanguages.join(',')
     }
 
     try {
@@ -254,24 +113,18 @@ export function AuthForm({
       router.refresh()
     } catch (err: any) {
       toast.error(err.message || 'Authentication failed')
-      // Reset Turnstile on error
-      if (turnstileWidgetId.current && window.turnstile) {
-        try { window.turnstile.reset(turnstileWidgetId.current) } catch { /* ignore */ }
-      }
-      setCfToken('')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const heading = buttonText || (isSignup ? `Sign up as a ${ROLE_LABELS[role]}` : 'Welcome back')
+  const heading = buttonText || (isSignup ? 'Create your account' : 'Welcome back')
   const ctaLabel = isSignup ? 'Create Account' : 'Sign In'
 
-  // Session check not yet completed — show nothing (prevents flash of form
-  // for logged-in users who should see the "already logged in" card instead)
+  // Session check not yet completed — show loading spinner
   if (!sessionChecked) {
     return (
-      <div className={cn('mx-auto w-full max-w-2xl', display === 'inline' && 'py-8')}>
+      <div className={cn('mx-auto w-full max-w-md', display === 'inline' && 'py-8')}>
         <div className="flex h-48 items-center justify-center rounded-[16px] border border-divider bg-surface">
           <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-divider border-t-primary" />
         </div>
@@ -279,12 +132,10 @@ export function AuthForm({
     )
   }
 
-  // User is already logged in — show "already logged in" card instead of the form.
-  // For login type, auto-redirect to /dashboard (handled in useEffect above).
-  // For signup type, show a card with the user's info + dashboard/signout links.
+  // User is already logged in — show "already logged in" card
   if (existingSession) {
     return (
-      <div className={cn('mx-auto w-full max-w-2xl', display === 'inline' && 'py-8')}>
+      <div className={cn('mx-auto w-full max-w-md', display === 'inline' && 'py-8')}>
         <Card className="overflow-hidden border-divider shadow-xl">
           <CardHeader className="bg-gradient-to-br from-primary/5 to-transparent pb-6">
             <div className="flex items-center gap-3">
@@ -296,7 +147,7 @@ export function AuthForm({
               <div>
                 <CardTitle className="text-xl">You&apos;re already logged in</CardTitle>
                 <CardDescription className="mt-1">
-                  You are signed in as <strong>{existingSession.name || existingSession.email}</strong> ({existingSession.role})
+                  Signed in as <strong>{existingSession.name || existingSession.email}</strong> ({existingSession.role})
                 </CardDescription>
               </div>
             </div>
@@ -331,10 +182,10 @@ export function AuthForm({
     )
   }
 
+  // Main form
   return (
-    <div className={cn('mx-auto w-full max-w-2xl', display === 'inline' && 'py-8')}>
+    <div className={cn('mx-auto w-full max-w-md', display === 'inline' && 'py-8')}>
       <Card className="overflow-hidden border-divider shadow-xl">
-        {/* Header with gradient */}
         <CardHeader className="bg-gradient-to-br from-primary/5 to-transparent pb-6">
           <div className="flex items-center gap-3">
             <div className="flex size-12 items-center justify-center rounded-[14px] bg-primary text-primary-foreground">
@@ -355,7 +206,7 @@ export function AuthForm({
 
         <CardContent className="p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name — full width for signup */}
+            {/* Name — signup only */}
             {isSignup && (
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
@@ -370,7 +221,7 @@ export function AuthForm({
               </div>
             )}
 
-            {/* Email + Password — 2 columns */}
+            {/* Email + Password */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-sm font-medium">Email</Label>
@@ -398,187 +249,34 @@ export function AuthForm({
               </div>
             </div>
 
-            {/* Role-specific fields */}
-            {isSignup && role === 'patient' && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Phone Number</Label>
-                  <Input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 555 000 0000"
-                    className="h-11"
-                  />
-                </div>
-              </div>
-            )}
-
-            {isSignup && role === 'doctor' && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Medical License Number</Label>
-                  <Input
-                    value={medicalLicenseNumber}
-                    onChange={(e) => setMedicalLicenseNumber(e.target.value)}
-                    placeholder="ML-12345678"
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Specialty</Label>
-                  <Input
-                    value={specialty}
-                    onChange={(e) => setSpecialty(e.target.value)}
-                    placeholder="Cardiology"
-                    className="h-11"
-                  />
-                </div>
-              </div>
-            )}
-
-            {isSignup && role === 'hospital' && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Business Registration Number</Label>
-                  <Input
-                    value={businessRegNumber}
-                    onChange={(e) => setBusinessRegNumber(e.target.value)}
-                    placeholder="BR-12345678"
-                    className="h-11"
-                  />
-                </div>
-              </div>
-            )}
-
-            {isSignup && role === 'hotel' && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Star Rating</Label>
-                  <Select value={starRating} onValueChange={setStarRating}>
-                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <SelectItem key={s} value={String(s)}>{'★'.repeat(s)} {s} Star{s > 1 ? 's' : ''}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Business Registration Number</Label>
-                  <Input
-                    value={businessRegNumber}
-                    onChange={(e) => setBusinessRegNumber(e.target.value)}
-                    placeholder="BR-12345678"
-                    className="h-11"
-                  />
-                </div>
-              </div>
-            )}
-
-            {isSignup && role === 'translator' && (
-              <>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Specialization</Label>
-                    <Input
-                      value={specialization}
-                      onChange={(e) => setSpecialization(e.target.value)}
-                      placeholder="Medical, Legal, General"
-                      className="h-11"
-                    />
-                  </div>
-                </div>
-                {/* Language tag input */}
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Languages</Label>
-                  <div className="flex flex-wrap gap-2 rounded-[12px] border border-input bg-background p-3">
-                    {selectedLanguages.map((code) => {
-                      const lang = LANGUAGES.find((l) => l.code === code)
-                      return (
-                        <button
-                          key={code}
-                          type="button"
-                          onClick={() => toggleLanguage(code)}
-                          className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
-                        >
-                          {lang?.name || code}
-                          <span className="material-symbols-outlined" style={{ fontSize: 12 }} aria-hidden>close</span>
-                        </button>
-                      )
-                    })}
-                    <select
-                      value=""
-                      onChange={(e) => { if (e.target.value) toggleLanguage(e.target.value) }}
-                      className="border-0 bg-transparent text-sm text-muted-foreground outline-none"
-                    >
-                      <option value="">+ Add language…</option>
-                      {LANGUAGES.filter((l) => !selectedLanguages.includes(l.code)).map((l) => (
-                        <option key={l.code} value={l.code}>{l.name} ({l.native})</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Country + City dropdowns — all roles for signup */}
+            {/* Role select — signup only */}
             {isSignup && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Country</Label>
-                  <Select
-                    value={countryId}
-                    onValueChange={(v) => {
-                      const c = countries.find((c) => c.id === v)
-                      setCountryId(v)
-                      setCountryName(c?.name || '')
-                      setCityId('')
-                      setCityName('')
-                    }}
-                  >
-                    <SelectTrigger className="h-11"><SelectValue placeholder="Select country…" /></SelectTrigger>
-                    <SelectContent>
-                      {countries.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.flag ? `${c.flag} ` : ''}{c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">City</Label>
-                  <Select
-                    value={cityId}
-                    onValueChange={(v) => {
-                      const c = cities.find((c) => c.id === v)
-                      setCityId(v)
-                      setCityName(c?.name || '')
-                    }}
-                    disabled={!countryId || cities.length === 0}
-                  >
-                    <SelectTrigger className="h-11"><SelectValue placeholder={countryId ? 'Select city…' : 'Select country first'} /></SelectTrigger>
-                    <SelectContent>
-                      {cities.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {/* Turnstile widget */}
-            {process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY && (
-              <div className="flex justify-center pt-2">
-                <div ref={turnstileRef} />
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">I want to sign up as a…</Label>
+                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as Role)}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_OPTIONS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        <span className="flex items-center gap-2">
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }} aria-hidden>
+                            {r.icon}
+                          </span>
+                          {r.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
             {/* Submit button */}
             <Button
               type="submit"
-              disabled={submitting || (!!process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY && !cfToken)}
+              disabled={submitting || !email.trim() || !password.trim() || (isSignup && !name.trim())}
               className="mt-2 h-11 w-full gap-2"
             >
               {submitting ? (

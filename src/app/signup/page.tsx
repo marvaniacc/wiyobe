@@ -1,4 +1,4 @@
-import { SignupClient } from '@/components/auth/signup-client'
+import { AuthForm } from '@/components/auth/auth-form'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
@@ -11,13 +11,10 @@ export const metadata: Metadata = {
 }
 
 /**
- * /signup — standalone signup page with role selector.
+ * /signup — standalone signup page.
  *
- * Shows role buttons (Patient, Doctor, Hospital, Hotel, Translator, Affiliate).
- * Clicking a role renders the AuthForm with that role pre-filled.
- *
- * This is a FIXED-URL fallback that always works — even if shortcode-based
- * auth on Custom Pages isn't set up.
+ * Renders the simplified AuthForm (name + email + password + role select).
+ * Role is a dropdown INSIDE the form — no external role selector buttons.
  */
 export default function SignupPage() {
   return (
@@ -33,8 +30,8 @@ export default function SignupPage() {
         <span>Wishubest</span>
       </Link>
 
-      {/* Role selector + AuthForm */}
-      <SignupClient />
+      {/* AuthForm with role select built in */}
+      <AuthForm type="signup" role="patient" />
 
       {/* Login link */}
       <p className="mt-6 text-center text-sm text-muted-foreground">

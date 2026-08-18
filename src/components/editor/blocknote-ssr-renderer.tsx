@@ -2,7 +2,6 @@ import { type ReactNode } from 'react'
 import { ProviderListRenderer } from './blocks/provider-list-renderer'
 import { AuthFormBlockSSR } from './blocks/auth-form-block-ssr'
 import { FeaturedDoctorsSSR } from './blocks/featured-doctors-ssr'
-import { AuthForm } from '@/components/auth/auth-form'
 
 type BlockNoteSSRRendererProps = {
   content: any
@@ -152,13 +151,18 @@ function renderHtmlWithShortcodes(html: string): ReactNode[] {
     }
     // Module rendering
     if (seg.module === 'auth') {
-      const type = seg.attrs.type === 'login' ? 'login' : 'signup'
-      const role = (seg.attrs.role as any) || 'patient'
-      const display = seg.attrs.display === 'modal' ? 'modal' : 'inline'
-      const buttonText = seg.attrs.buttonText || ''
+      // Auth forms are now handled by standalone /login and /signup pages.
+      // Shortcode-based auth on Custom Pages is deprecated.
       return (
-        <div key={`module-${idx}`} className="my-8">
-          <AuthForm type={type} role={role} display={display} buttonText={buttonText} />
+        <div key={`module-${idx}`} className="my-8 rounded-[16px] border border-dashed border-divider p-6 text-center">
+          <p className="text-sm font-medium text-foreground">Auth Form</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use{' '}
+            <a href="/login" className="font-medium text-primary hover:underline">/login</a>
+            {' '}or{' '}
+            <a href="/signup" className="font-medium text-primary hover:underline">/signup</a>
+            {' '}instead.
+          </p>
         </div>
       )
     }
@@ -196,13 +200,17 @@ async function renderBlock(block: any, locale: string, idx: number): Promise<any
       }
 
       if (moduleName === 'auth') {
-        const authType = attrs.type === 'login' ? 'login' : 'signup'
-        const authRole = (attrs.role as any) || 'patient'
-        const authDisplay = attrs.display === 'modal' ? 'modal' : 'inline'
-        const authButtonText = attrs.buttonText || ''
+        // Auth forms are now handled by standalone /login and /signup pages.
         return (
-          <div key={key} className="my-8">
-            <AuthForm type={authType} role={authRole} display={authDisplay} buttonText={authButtonText} />
+          <div key={key} className="my-8 rounded-[16px] border border-dashed border-divider p-6 text-center">
+            <p className="text-sm font-medium text-foreground">Auth Form</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use{' '}
+              <a href="/login" className="font-medium text-primary hover:underline">/login</a>
+              {' '}or{' '}
+              <a href="/signup" className="font-medium text-primary hover:underline">/signup</a>
+              {' '}instead.
+            </p>
           </div>
         )
       }
