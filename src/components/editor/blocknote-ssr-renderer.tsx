@@ -242,14 +242,17 @@ async function renderBlock(block: any, locale: string, idx: number): Promise<any
         let am: RegExpExecArray | null
         while ((am = ap.exec(as)) !== null) { a[am[1]] = am[2] }
         if (mn === 'auth') {
+          // Auth forms are now handled by standalone /login and /signup pages.
           parts.push(
-            <div key={`module-${partIdx++}`} className="my-4">
-              <AuthForm
-                type={a.type === 'login' ? 'login' : 'signup'}
-                role={(a.role as any) || 'patient'}
-                display={a.display === 'modal' ? 'modal' : 'inline'}
-                buttonText={a.buttonText || ''}
-              />
+            <div key={`module-${partIdx++}`} className="my-4 rounded-[16px] border border-dashed border-divider p-6 text-center">
+              <p className="text-sm font-medium text-foreground">Auth Form</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Use{' '}
+                <a href="/login" className="font-medium text-primary hover:underline">/login</a>
+                {' '}or{' '}
+                <a href="/signup" className="font-medium text-primary hover:underline">/signup</a>
+                {' '}instead.
+              </p>
             </div>
           )
         }
