@@ -129,7 +129,7 @@ export function AuthForm({
       if (window.turnstile && turnstileRef.current) {
         try {
           turnstileWidgetId.current = window.turnstile.render(turnstileRef.current, {
-            sitekey: siteKey,
+            sitekey: siteKey!,
             callback: (token: string) => setCfToken(token),
             'error-callback': () => setCfToken(''),
             theme: 'light',
