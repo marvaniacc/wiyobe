@@ -180,6 +180,79 @@ async function renderBlock(block: any, locale: string, idx: number): Promise<any
 
   if (type === 'paragraph') {
     const text = extractText(content)
+
+    // Check if the paragraph text contains a shortcode like
+    // [[module:auth type="signup" role="doctor"]]
+    // If so, render the module component instead of plain text.
+    const shortcodeMatch = text.match(/\[\[module:(\w+)((?:\s+\w+="[^"]*")*)\s*\]\]/)
+    if (shortcodeMatch) {
+      const moduleName = shortcodeMatch[1]
+      const attrsStr = shortcodeMatch[2] || ''
+      const attrs: Record<string, string> = {}
+      const attrPattern = /\s+(\w+)="([^"]*)"/g
+      let attrMatch: RegExpExecArray | null
+      while ((attrMatch = attrPattern.exec(attrsStr)) !== null) {
+        attrs[attrMatch[1]] = attrMatch[2]
+      }
+
+      if (moduleName === 'auth') {
+        const authType = attrs.type === 'login' ? 'login' : 'signup'
+        const authRole = (attrs.role as any) || 'patient'
+        const authDisplay = attrs.display === 'modal' ? 'modal' : 'inline'
+        const authButtonText = attrs.buttonText || ''
+        return (
+          <div key={key} className="my-8">
+            <AuthForm type={authType} role={authRole} display={authDisplay} buttonText={authButtonText} />
+          </div>
+        )
+      }
+      // Unknown module — render as info box
+      return (
+        <div key={key} className="rounded-[12px] border border-dashed border-divider p-4 text-center text-sm text-muted-foreground">
+          Unknown module: {moduleName}
+        </div>
+      )
+    }
+
+    // Also check if the shortcode is embedded within other text
+    // (e.g., "Sign up here: [[module:auth...]]")
+    if (text.includes('[[module:')) {
+      // Split the text at shortcode boundaries and render each part
+      const parts: ReactNode[] = []
+      const pattern = /\[\[module:(\w+)((?:\s+\w+="[^"]*")*)\s*\]\]/g
+      let lastIndex = 0
+      let match: RegExpExecArray | null
+      let partIdx = 0
+      while ((match = pattern.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(<span key={`text-${partIdx++}`}>{text.slice(lastIndex, match.index)}</span>)
+        }
+        const mn = match[1]
+        const as = match[2] || ''
+        const a: Record<string, string> = {}
+        const ap = /\s+(\w+)="([^"]*)"/g
+        let am: RegExpExecArray | null
+        while ((am = ap.exec(as)) !== null) { a[am[1]] = am[2] }
+        if (mn === 'auth') {
+          parts.push(
+            <div key={`module-${partIdx++}`} className="my-4">
+              <AuthForm
+                type={a.type === 'login' ? 'login' : 'signup'}
+                role={(a.role as any) || 'patient'}
+                display={a.display === 'modal' ? 'modal' : 'inline'}
+                buttonText={a.buttonText || ''}
+              />
+            </div>
+          )
+        }
+        lastIndex = pattern.lastIndex
+      }
+      if (lastIndex < text.length) {
+        parts.push(<span key={`text-${partIdx++}`}>{text.slice(lastIndex)}</span>)
+      }
+      return <div key={key}>{parts}</div>
+    }
+
     return <p key={key} className="my-2 text-base leading-relaxed text-foreground">{text}</p>
   }
   if (type === 'heading') {
