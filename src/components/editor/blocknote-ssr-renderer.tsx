@@ -1,6 +1,7 @@
 import { ProviderListRenderer } from './blocks/provider-list-renderer'
 import { AuthFormBlockSSR } from './blocks/auth-form-block-ssr'
 import { FeaturedDoctorsSSR } from './blocks/featured-doctors-ssr'
+import { AuthForm } from '@/components/auth/auth-form'
 
 type BlockNoteSSRRendererProps = {
   content: any
@@ -84,10 +85,89 @@ export async function BlockNoteSSRRenderer({ content, htmlContent, locale = 'en'
   }
 
   if (htmlContent && typeof htmlContent === 'string') {
-    return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+    // Parse shortcodes like [[module:auth type="signup" role="doctor"]]
+    // from the raw HTML and render React components in their place.
+    return <div className="blocknote-ssr-renderer">{renderHtmlWithShortcodes(htmlContent)}</div>
   }
 
   return null
+}
+
+/* -------------------------------------------------------------------------
+ * Shortcode parser — extracts [[module:NAME attr="value"]] patterns from
+ * raw HTML strings and renders React components in their place.
+ *
+ * Supported shortcodes:
+ *   [[module:auth type="signup" role="doctor"]]
+ *   [[module:auth type="login" role="patient"]]
+ *
+ * The parser splits the HTML into segments and renders:
+ *  - HTML segments via dangerouslySetInnerHTML
+ *  - Module segments via the corresponding React component
+ * ----------------------------------------------------------------------- */
+
+type ShortcodeSegment =
+  | { kind: 'html'; content: string }
+  | { kind: 'module'; module: string; attrs: Record<string, string> }
+
+function parseShortcodes(html: string): ShortcodeSegment[] {
+  const segments: ShortcodeSegment[] = []
+  // Match [[module:NAME attr1="val1" attr2="val2"]]
+  const pattern = /\[\[module:(\w+)((?:\s+\w+="[^"]*")*)\s*\]\]/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(html)) !== null) {
+    // Push preceding HTML
+    if (match.index > lastIndex) {
+      segments.push({ kind: 'html', content: html.slice(lastIndex, match.index) })
+    }
+    // Parse module + attrs
+    const module = match[1]
+    const attrsStr = match[2] || ''
+    const attrs: Record<string, string> = {}
+    const attrPattern = /\s+(\w+)="([^"]*)"/g
+    let attrMatch: RegExpExecArray | null
+    while ((attrMatch = attrPattern.exec(attrsStr)) !== null) {
+      attrs[attrMatch[1]] = attrMatch[2]
+    }
+    segments.push({ kind: 'module', module, attrs })
+    lastIndex = pattern.lastIndex
+  }
+
+  // Push trailing HTML
+  if (lastIndex < html.length) {
+    segments.push({ kind: 'html', content: html.slice(lastIndex) })
+  }
+
+  return segments
+}
+
+function renderHtmlWithShortcodes(html: string): React.ReactNode[] {
+  const segments = parseShortcodes(html)
+  return segments.map((seg, idx) => {
+    if (seg.kind === 'html') {
+      return <div key={`html-${idx}`} dangerouslySetInnerHTML={{ __html: seg.content }} />
+    }
+    // Module rendering
+    if (seg.module === 'auth') {
+      const type = seg.attrs.type === 'login' ? 'login' : 'signup'
+      const role = (seg.attrs.role as any) || 'patient'
+      const display = seg.attrs.display === 'modal' ? 'modal' : 'inline'
+      const buttonText = seg.attrs.buttonText || ''
+      return (
+        <div key={`module-${idx}`} className="my-8">
+          <AuthForm type={type} role={role} display={display} buttonText={buttonText} />
+        </div>
+      )
+    }
+    // Future: support other modules here (doctors, hospitals, etc.)
+    return (
+      <div key={`unknown-${idx}`} className="rounded-[12px] border border-dashed border-divider p-4 text-center text-sm text-muted-foreground">
+        Unknown module: {seg.module}
+      </div>
+    )
+  })
 }
 
 async function renderBlock(block: any, locale: string, idx: number): Promise<any> {

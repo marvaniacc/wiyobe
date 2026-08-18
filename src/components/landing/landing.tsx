@@ -1,4 +1,5 @@
 'use client'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useApp } from '@/stores/app-store'
 import { Icon } from '@/components/shared/icon'
@@ -24,7 +25,7 @@ const ROLES = [
 ] as const
 
 export function LandingPage() {
-  const goAuth = useApp((s) => s.goAuth)
+  const router = useRouter()
   const locale = useApp((s) => s.locale)
   const setLocale = useApp((s) => s.setLocale)
   const theme = useApp((s) => s.theme)
@@ -87,7 +88,7 @@ export function LandingPage() {
                 <Button
                   variant="outline"
                   className="flex-1 justify-start gap-3 h-auto py-4"
-                  onClick={() => goAuth('signin', role)}
+                  onClick={() => router.push(`/${locale}`)}
                 >
                   <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', color)}>
                     <Icon name={icon} size={20} fill />
@@ -102,7 +103,7 @@ export function LandingPage() {
             <p className="text-sm text-muted-foreground">
               {t('auth.welcome')} ·{' '}
               <button
-                onClick={() => goAuth('signup', 'PATIENT')}
+                onClick={() => router.push(`/${locale}`)}
                 className="font-medium text-primary hover:underline"
               >
                 {t('common.signup')}

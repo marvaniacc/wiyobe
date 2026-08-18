@@ -164,6 +164,7 @@ const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [
       { key: 'blog', labelKey: 'admin.blogPosts', icon: 'article' },
       { key: 'custom-pages', labelKey: 'admin.customPages', icon: 'web' },
+      { key: 'shortcodes', labelKey: 'admin.shortcodes', icon: 'code_blocks' },
       { key: 'media-library', labelKey: 'admin.mediaLibrary', icon: 'perm_media' },
       { key: 'tags', labelKey: 'dash.tags', icon: 'sell' },
       { key: 'locations', labelKey: 'dash.locations', icon: 'public' },

@@ -4132,6 +4132,105 @@ function KycReviewSection() {
 }
 
 // ============================================================================
+// Section: Shortcodes — copy-pasteable shortcode reference for admins
+// ============================================================================
+
+type ShortcodeDef = {
+  code: string
+  description: string
+  category: 'Auth' | 'Content' | 'Providers'
+}
+
+const SHORTCODES: ShortcodeDef[] = [
+  // Auth
+  { code: '[[module:auth type="signup" role="patient"]]', description: 'Sign-up form for patients', category: 'Auth' },
+  { code: '[[module:auth type="signup" role="doctor"]]', description: 'Sign-up form for doctors (with license + specialty fields)', category: 'Auth' },
+  { code: '[[module:auth type="signup" role="hospital"]]', description: 'Sign-up form for hospitals (with business reg. number)', category: 'Auth' },
+  { code: '[[module:auth type="signup" role="hotel"]]', description: 'Sign-up form for hotels (with star rating + business reg.)', category: 'Auth' },
+  { code: '[[module:auth type="signup" role="translator"]]', description: 'Sign-up form for translators (with specialization + languages)', category: 'Auth' },
+  { code: '[[module:auth type="login" role="patient"]]', description: 'Login form (role is optional, defaults to patient)', category: 'Auth' },
+  // Providers
+  { code: '[[module:doctors country="TR" limit="4"]]', description: 'Featured doctors carousel (top-rated, filtered by country)', category: 'Providers' },
+]
+
+const SHORTCODE_CATEGORIES = ['Auth', 'Providers', 'Content'] as const
+
+function ShortcodesSection() {
+  const { t } = useT()
+  const [copied, setCopied] = React.useState<string | null>(null)
+
+  function copyToClipboard(code: string) {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(code)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setCopied(null), 2000)
+    }).catch(() => {
+      toast.error('Failed to copy')
+    })
+  }
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title="Shortcodes"
+        description="Copy-paste these into Custom Page HTML blocks to embed dynamic widgets"
+        icon="code_blocks"
+      />
+
+      <div className="mt-6 space-y-8">
+        {SHORTCODE_CATEGORIES.map((cat) => {
+          const items = SHORTCODES.filter((s) => s.category === cat)
+          if (items.length === 0) return null
+          return (
+            <div key={cat}>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{cat}</h2>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {items.map((sc) => (
+                  <div
+                    key={sc.code}
+                    className="flex items-center justify-between gap-3 rounded-[14px] border border-divider bg-surface p-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <code className="block truncate text-sm font-mono text-primary">{sc.code}</code>
+                      <p className="mt-1 text-xs text-muted-foreground">{sc.description}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(sc.code)}
+                      className="shrink-0 gap-1.5"
+                    >
+                      <Icon name={copied === sc.code ? 'check' : 'content_copy'} size={14} />
+                      {copied === sc.code ? 'Copied' : 'Copy'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Usage note */}
+        <div className="rounded-[16px] border border-info/20 bg-info/5 p-4">
+          <div className="flex items-start gap-3">
+            <Icon name="info" size={20} className="shrink-0 text-info" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">How to use shortcodes</p>
+              <p className="mt-1">
+                Paste a shortcode into the <strong>HTML content</strong> field of a Custom Page.
+                The SSR renderer will parse the shortcode and render the corresponding React component
+                in its place. Shortcodes work in both the BlockNote HTML fallback and the raw HTML
+                content field.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // Main exported component
 // ============================================================================
 
@@ -4149,6 +4248,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'promo-codes': return <PromoCodesSection />
     case 'blog': return <BlogSection />
     case 'custom-pages': return <CustomPagesSection />
+    case 'shortcodes': return <ShortcodesSection />
     case 'cancellations': return <CancellationsSection />
     case 'payouts': return <PayoutsSection />
     case 'ledger': return <LedgerSection />

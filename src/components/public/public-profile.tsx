@@ -1,4 +1,5 @@
 'use client'
+import { useRouter } from 'next/navigation'
 import { useApp } from '@/stores/app-store'
 import { Icon } from '@/components/shared/icon'
 import { StarRating } from '@/components/shared/star-rating'
@@ -30,9 +31,9 @@ const TYPE_LABEL_KEY: Record<string, string> = {
 }
 
 export function PublicProfilePage() {
+  const router = useRouter()
   const view = useApp((s) => s.view)
   const goLanding = useApp((s) => s.goLanding)
-  const goAuth = useApp((s) => s.goAuth)
   const locale = useApp((s) => s.locale)
   const setLocale = useApp((s) => s.setLocale)
   const { t, dir } = useT()
@@ -67,8 +68,8 @@ export function PublicProfilePage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" onClick={() => goAuth('signin', 'PATIENT')}>{t('common.signin')}</Button>
-          <Button size="sm" variant="outline" onClick={() => goAuth('signup', 'PATIENT')}>{t('common.signup')}</Button>
+          <Button size="sm" onClick={() => router.push(`/${locale}`)}>{t('common.signin')}</Button>
+          <Button size="sm" variant="outline" onClick={() => router.push(`/${locale}`)}>{t('common.signup')}</Button>
         </div>
       </header>
 
@@ -245,11 +246,11 @@ export function PublicProfilePage() {
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('common.from')}</p>
                       <p className="text-3xl font-bold text-foreground">{formatCurrency(profile.consultationFee, 'USD', locale)}</p>
                     </div>
-                    <Button size="lg" className="w-full gap-2" onClick={() => goAuth('signup', 'PATIENT')}>
+                    <Button size="lg" className="w-full gap-2" onClick={() => router.push(`/${locale}`)}>
                       <Icon name="event_available" size={18} />
                       {t('common.bookNow')}
                     </Button>
-                    <Button size="lg" variant="outline" className="w-full gap-2" onClick={() => goAuth('signin', 'PATIENT')}>
+                    <Button size="lg" variant="outline" className="w-full gap-2" onClick={() => router.push(`/${locale}`)}>
                       {t('common.signin')}
                     </Button>
                     <p className="text-center text-xs text-muted-foreground">{t('landing.feature.secure.desc')}</p>

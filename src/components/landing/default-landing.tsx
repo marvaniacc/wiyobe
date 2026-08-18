@@ -1,21 +1,24 @@
 'use client'
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useApp } from '@/stores/app-store'
 import { isRTL, type Locale } from '@/lib/i18n'
 import { LandingPage } from '@/components/landing/landing'
-import { AuthScreen } from '@/components/auth/auth-screen'
 import { DashboardShell } from '@/components/shell/dashboard-shell'
 import { PublicProfilePage } from '@/components/public/public-profile'
 
 /**
- * Default landing — the original client-side SPA shell that handles session
- * bootstrapping, auth, the Zustand dashboard, and query-param routing.
+ * Default landing — the SPA shell that handles session bootstrapping and
+ * the Zustand dashboard.
  *
- * This is rendered when no published CustomPage with slug "home" exists.
- * When a "home" custom page DOES exist, the server component in page.tsx
- * renders its HTML instead and never reaches this component.
+ * Auth is NO LONGER handled here. Unauthenticated users are redirected to
+ * /{locale} (the public SSR landing page). Authentication now happens on
+ * public Custom Pages via the shortcode [[module:auth type="signup" role="X"]].
+ *
+ * This component ONLY renders the dashboard if the user is logged in.
  */
 export function DefaultLanding() {
+  const router = useRouter()
   const session = useApp((s) => s.session)
   const sessionLoading = useApp((s) => s.sessionLoading)
   const setSession = useApp((s) => s.setSession)
@@ -80,23 +83,6 @@ export function DefaultLanding() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle ?auth=signup&role=X or ?auth=signin&role=X — role-locked auth
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const authMode = params.get('auth')
-    const roleParam = params.get('role')?.toUpperCase()
-    if (authMode && roleParam) {
-      const validRoles = ['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR', 'AFFILIATE', 'ADMIN']
-      if (validRoles.includes(roleParam)) {
-        const mode = authMode === 'signup' ? 'signup' : 'signin'
-        useApp.getState().goAuth(mode, roleParam, true) // roleLocked = true
-      }
-      // Clean URL
-      const newUrl = window.location.pathname + window.location.hash
-      window.history.replaceState({}, document.title, newUrl)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   // sync locale from session once
   useEffect(() => {
     if (session?.preferredLanguage) setLocale(session.preferredLanguage as Locale)
@@ -110,42 +96,31 @@ export function DefaultLanding() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [locale, theme])
 
-  // if a session exists and we're on landing/auth, go to dashboard (restore last section if available)
+  // If a session exists and we're on landing, go to dashboard (restore last section if available)
   useEffect(() => {
-    if (session && (view.name === 'landing' || view.name === 'auth')) {
+    if (session && view.name === 'landing') {
       const lastSection = useApp.getState().lastSection
       goDashboard(lastSection || 'overview')
     }
-    if (!session && view.name === 'dashboard') {
-      useApp.getState().goLanding()
+    // If no session, redirect to /en (the public SSR landing page)
+    if (!session && !sessionLoading && view.name === 'dashboard') {
+      router.push('/en')
     }
-  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, sessionLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Browser back button support — push history state on view changes,
-  // intercept popstate to navigate back within the app instead of exiting
+  // Browser back button support
   useEffect(() => {
-    // Push a state whenever the view changes (so back button has something to go back to)
-    if (view.name === 'dashboard' || view.name === 'auth') {
-      window.history.pushState({ appView: view.name, section: view.name === 'dashboard' ? view.section : undefined }, '')
+    if (view.name === 'dashboard') {
+      window.history.pushState({ appView: view.name, section: view.section }, '')
     }
 
     const handlePopState = (e: PopStateEvent) => {
-      // If there's app state in the history entry, restore it
-      if (e.state?.appView) {
-        if (e.state.appView === 'dashboard' && session) {
-          useApp.getState().goDashboard(e.state.section || 'overview')
-        } else if (e.state.appView === 'auth' && !session) {
-          useApp.getState().goAuth('signin', 'PATIENT')
-        } else {
-          useApp.getState().goLanding()
-        }
+      if (e.state?.appView === 'dashboard' && session) {
+        useApp.getState().goDashboard(e.state.section || 'overview')
+      } else if (session) {
+        useApp.getState().goDashboard('overview')
       } else {
-        // No app state — go to landing (or dashboard if logged in)
-        if (session) {
-          useApp.getState().goDashboard('overview')
-        } else {
-          useApp.getState().goLanding()
-        }
+        router.push('/en')
       }
     }
 
@@ -167,9 +142,18 @@ export function DefaultLanding() {
   // Public profile is viewable without login
   if (view.name === 'public-profile') return <PublicProfilePage />
 
+  // No session → redirect to /en (public SSR landing with shortcode-based auth)
   if (!session) {
-    if (view.name === 'auth') return <AuthScreen />
-    return <LandingPage />
+    // Only redirect if we're not already on /dashboard — this prevents
+    // infinite redirect loops. The actual redirect happens in the useEffect above.
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-divider border-t-primary" />
+          <p className="text-sm text-muted-foreground">Redirecting…</p>
+        </div>
+      </div>
+    )
   }
 
   return <DashboardShell />

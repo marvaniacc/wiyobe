@@ -23,18 +23,57 @@ const signupSchema = z.object({
   phone: z.string().optional(),
   country: z.string().optional(),
   city: z.string().optional(),
+  countryId: z.string().optional(),
+  cityId: z.string().optional(),
   specialty: z.string().optional(),
   languages: z.string().optional(),
+  medicalLicenseNumber: z.string().optional(),
+  businessRegNumber: z.string().optional(),
+  starRating: z.number().int().min(1).max(5).optional(),
+  specialization: z.string().optional(),
   website: z.string().optional(),
   socialMedia: z.string().optional(),
   referralCode: z.string().optional(),
+  cfToken: z.string().optional(),
 })
+
+/**
+ * Verify Cloudflare Turnstile token. Skips verification if no secret key
+ * is configured (dev mode). Returns true on success, false on failure.
+ */
+async function verifyTurnstileToken(token: string | undefined): Promise<boolean> {
+  const secret = process.env.CF_TURNSTILE_SECRET_KEY
+  if (!secret || !token) {
+    // No secret key configured or no token — allow in dev mode
+    return true
+  }
+  try {
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret,
+        response: token,
+      }),
+    })
+    const data = await res.json()
+    return data.success === true
+  } catch {
+    return false
+  }
+}
 
 export async function POST(req: Request) {
   try {
     const body = await parseBody(req, signupSchema)
     const existing = await db.user.findUnique({ where: { email: body.email } })
     if (existing) return error(409, 'An account with this email already exists.')
+
+    // Verify Cloudflare Turnstile token (anti-bot)
+    const turnstileOk = await verifyTurnstileToken(body.cfToken)
+    if (!turnstileOk) {
+      return error(403, 'Security verification failed. Please try again.')
+    }
 
     // Registration control: check if signup is open for this role
     const providerRoles = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'] as const
