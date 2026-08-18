@@ -286,6 +286,44 @@ async function renderBlock(block: any, locale: string, idx: number): Promise<any
     return <img key={key} src={props.url || ''} alt={props.caption || ''} className="my-4 w-full rounded-[16px]" />
   }
 
+  // ---- codeBlock ----
+  // Admins often paste raw HTML into a code block. If the content looks
+  // like HTML (starts with <), render it as raw HTML via
+  // dangerouslySetInnerHTML. Otherwise, render as a styled <pre><code>.
+  if (type === 'codeBlock') {
+    const text = extractText(content)
+    const lang = props.language || 'text'
+    const trimmed = text.trim()
+
+    // Check if the content is HTML (starts with <, <!DOCTYPE, or <html)
+    if (trimmed.startsWith('<')) {
+      // Parse shortcodes from the HTML content before rendering
+      const segments = parseShortcodes(trimmed)
+      if (segments.length > 0) {
+        return (
+          <div key={key} className="blocknote-codeblock-html">
+            {renderHtmlWithShortcodes(trimmed)}
+          </div>
+        )
+      }
+      // No shortcodes — render raw HTML directly
+      return (
+        <div
+          key={key}
+          className="blocknote-codeblock-html"
+          dangerouslySetInnerHTML={{ __html: trimmed }}
+        />
+      )
+    }
+
+    // Non-HTML code block — render as styled <pre><code>
+    return (
+      <pre key={key} className="my-4 overflow-x-auto rounded-[12px] border border-divider bg-surface-secondary p-4">
+        <code className={`language-${lang} text-sm text-foreground`}>{text}</code>
+      </pre>
+    )
+  }
+
   // ---- Custom Wishubest blocks (admin-embeddable dynamic widgets) ----
   // These blocks let admins compose landing pages that pull live data
   // (provider lists, featured doctors, auth forms) without writing code.
