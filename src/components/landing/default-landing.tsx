@@ -3,7 +3,6 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '@/stores/app-store'
 import { isRTL, type Locale } from '@/lib/i18n'
-import { LandingPage } from '@/components/landing/landing'
 import { DashboardShell } from '@/components/shell/dashboard-shell'
 import { PublicProfilePage } from '@/components/public/public-profile'
 

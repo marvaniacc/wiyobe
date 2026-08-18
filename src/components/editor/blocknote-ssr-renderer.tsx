@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react'
 import { ProviderListRenderer } from './blocks/provider-list-renderer'
 import { AuthFormBlockSSR } from './blocks/auth-form-block-ssr'
 import { FeaturedDoctorsSSR } from './blocks/featured-doctors-ssr'
@@ -143,7 +144,7 @@ function parseShortcodes(html: string): ShortcodeSegment[] {
   return segments
 }
 
-function renderHtmlWithShortcodes(html: string): React.ReactNode[] {
+function renderHtmlWithShortcodes(html: string): ReactNode[] {
   const segments = parseShortcodes(html)
   return segments.map((seg, idx) => {
     if (seg.kind === 'html') {
