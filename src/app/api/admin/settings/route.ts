@@ -6,6 +6,23 @@ import { z } from 'zod'
 export const dynamic = 'force-dynamic'
 
 /**
+ * Determine which table a setting key belongs to:
+ * - SiteSetting: siteName, tagline, logoUrl, SEO defaults, and
+ *   headerConfig*/footerConfig* (including locale variants like
+ *   headerConfigGuest_fa)
+ * - Setting: everything else (legacy config)
+ */
+function isSiteSettingKey(key: string): boolean {
+  const exactKeys = new Set([
+    'siteName', 'tagline', 'logoUrl',
+    'defaultSeoTitle', 'defaultSeoDescription',
+  ])
+  if (exactKeys.has(key)) return true
+  if (key.startsWith('headerConfig') || key.startsWith('footerConfig')) return true
+  return false
+}
+
+/**
  * GET /api/admin/settings
  *
  * Returns all platform settings (both Setting and SiteSetting models)
@@ -36,10 +53,8 @@ const updateSchema = z.object({
 /**
  * PUT /api/admin/settings
  *
- * Bulk-upsert settings. Routes each key to the appropriate model:
- * - SiteSetting keys (siteName, tagline, logoUrl, defaultSeoTitle,
- *   defaultSeoDescription) go to the SiteSetting table.
- * - All other keys go to the Setting table (legacy).
+ * Bulk-upsert settings. Routes each key to the appropriate model
+ * (SiteSetting or Setting) based on isSiteSettingKey().
  */
 export async function PUT(req: Request) {
   try {
@@ -47,12 +62,43 @@ export async function PUT(req: Request) {
     if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
     const { settings } = await parseBody(req, updateSchema)
 
-    const SITE_SETTING_KEYS = new Set([
-      'siteName', 'tagline', 'logoUrl', 'defaultSeoTitle', 'defaultSeoDescription',
-    ])
-
     for (const [key, value] of Object.entries(settings)) {
-      if (SITE_SETTING_KEYS.has(key)) {
+      if (isSiteSettingKey(key)) {
+        await db.siteSetting.upsert({
+          where: { key },
+          update: { value },
+          create: { key, value },
+        })
+      } else {
+        await db.setting.upsert({
+          where: { key },
+          update: { value },
+          create: { key, value },
+        })
+      }
+    }
+
+    return json({ ok: true })
+  } catch (e) { return handleError(e) }
+}
+
+const patchSchema = z.record(z.string(), z.string())
+
+/**
+ * PATCH /api/admin/settings
+ *
+ * Upsert individual settings (key-value pairs). Body is a flat object
+ * like { headerConfigGuest: '{"menuItems":[...]}', footerConfig: '...' }.
+ * Routes each key to the correct table via isSiteSettingKey().
+ */
+export async function PATCH(req: Request) {
+  try {
+    const session = await getSession()
+    if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
+    const body = await parseBody(req, patchSchema)
+
+    for (const [key, value] of Object.entries(body)) {
+      if (isSiteSettingKey(key)) {
         await db.siteSetting.upsert({
           where: { key },
           update: { value },
