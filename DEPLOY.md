@@ -1,85 +1,98 @@
-# MedTravel — Production Deployment Guide
+# Wishubest (MedTravel) — Production Deployment Guide
 
-## Quick Deploy to Vercel (Recommended)
+This deployment is **native** (Node.js + PostgreSQL + pm2 + Caddy). Docker has
+been fully removed from the server — the old Docker-based deploy flow is
+obsolete.
 
-### 1. Prepare Environment Variables
-Create a `.env` file (or set in Vercel dashboard) with:
+## Production Topology (current VPS)
 
-```env
-DATABASE_URL=postgresql://user:password@host:5432/medtravel
-AUTH_SECRET=<generate with: openssl rand -hex 32>
-STRIPE_SECRET_KEY=sk_live_your_live_key
-GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
-SMTP_HOST=smtp.resend.com
-SMTP_PORT=587
-SMTP_USER=resend
-SMTP_PASSWORD=your_resend_api_key
-EMAIL_FROM=noreply@yourdomain.com
-NEXT_PUBLIC_APP_URL=https://yourdomain.com
-```
+| Component   | What it is                                  | Runs as                     |
+|-------------|---------------------------------------------|-----------------------------|
+| Next.js app | `next start` on port 3000                   | pm2 process `wishubest`     |
+| PostgreSQL  | native PostgreSQL 16, db `wishubest`        | systemd service `postgresql`|
+| Caddy       | TLS + reverse proxy 443 → localhost:3000    | systemd service `caddy`     |
+| Backups     | build tars + DB dumps in `/var/backups`     | deploy.sh / manual          |
 
-### 2. Switch to PostgreSQL
-Update `prisma/schema.prisma`:
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-```
+## Deploy (one command)
 
-Then run:
 ```bash
-bun run db:push    # Push schema to PostgreSQL
-bun run db:generate # Regenerate client
+cd /root/wiyobe
+bash deploy.sh
 ```
 
-### 3. Deploy to Vercel
+`deploy.sh` does, in order:
+
+1. Backs up the current `.next` build and the database (rollback point).
+2. `git pull` (branch `main`, falls back to `opencode-work`).
+3. `npm install`, then `npx prisma db push` (the project's migration tool).
+4. `npm run build`, then **checks `.next/BUILD_ID` exists** — this is the
+   **build gate**. If it's missing, the build is rolled back and the script
+   exits non-zero. (This prevents the exact 502/crash-loop class of outage
+   from Phase 0.)
+5. `pm2 restart wishubest --max-restarts 10` — the process auto-shuts instead
+   of crash-looping forever.
+6. Waits up to 60s for `localhost:3000` to respond (health gate); exits
+   non-zero if the app never comes up.
+
+## Rollback
+
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel --prod
+cd /root/wiyobe
+bash rollback.sh        # restores newest build backup + restarts
 ```
 
-Or connect your GitHub repo at https://vercel.com/new and auto-deploy on push.
+Backups live in `/var/backups/wiyobe-deploy/` (last 5 builds, last 8 DB dumps).
 
-### 4. Post-Deploy
-- Run the seed script to create admin account:
-  ```bash
-  bun run scripts/seed.ts
-  ```
-- Set up Stripe webhooks (optional) at https://dashboard.stripe.com/webhooks
-- Configure Google OAuth redirect URI in Google Cloud Console
+## Manual operations
 
-## Environment Variables Reference
+```bash
+pm2 status              # is wishubest online?
+pm2 logs wishubest      # app logs
+pm2 restart wishubest   # restart after config-only change
+npx prisma db push      # apply schema changes (project standard migration tool)
+bash scripts/seed.ts    # re-seed demo data (npx tsx scripts/seed.ts)
+```
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `AUTH_SECRET` | Yes | HMAC secret for session tokens |
-| `STRIPE_SECRET_KEY` | No* | Stripe API key (empty = mock mode) |
-| `GOOGLE_CLIENT_ID` | No* | Google OAuth client ID (empty = demo mode) |
-| `SMTP_HOST` | No* | SMTP server for emails (empty = console log) |
-| `SMTP_PORT` | No | SMTP port (default 587) |
-| `SMTP_USER` | No | SMTP username |
-| `SMTP_PASSWORD` | No | SMTP password |
-| `EMAIL_FROM` | No | From email address |
-| `NEXT_PUBLIC_APP_URL` | Yes | Public app URL for links |
+## Environment Variables
 
-*If empty, the feature uses a dev/mock mode that still works for testing.
+See `.env` on the server — complete, all keys present. Current status:
 
-## Features by Configuration
+| Variable | Status | Notes |
+|----------|--------|-------|
+| `DATABASE_URL` | ✅ set | native Postgres on localhost:5432 |
+| `AUTH_SECRET` | ✅ set | also used for OTP HMAC + payload encryption |
+| `NEXT_PUBLIC_APP_URL` | ✅ set | https://wishubest.com |
+| `NEXT_PUBLIC_APP_NAME` | ✅ set | Wishubest |
+| `NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY` / `CF_TURNSTILE_SECRET_KEY` | ✅ set | Turnstile enabled |
+| `SMTP_*`, `EMAIL_FROM` | ⬜ empty | emails log to console (dev mode) |
+| `STRIPE_SECRET_KEY` | ⬜ empty | charges are mocked (`ch_mock_*`) |
+| `GOOGLE_CLIENT_ID` | ⬜ empty | real Google OAuth disabled (demo login only in non-prod) |
+| `GOOGLE_GEMINI_API_KEY` | ⬜ empty | AI triage uses fallback |
+| `VIDEO_PROVIDER` | ✅ set | whereby (no API key) |
+| `SUPABASE_URL` / key | ⬜ empty | uploads use local disk fallback |
+| `TRANSLATION_*` | ⬜ empty | translations skipped |
 
-| Feature | Without Config | With Config |
-|---------|---------------|-------------|
-| Payments | Mock charges (`ch_mock_*`) | Real Stripe charges |
-| Google Login | Demo dialog (enter email) | Real Google OAuth |
-| Email OTP | Code shown in toast + console log | Real email sent |
-| Database | SQLite (local file) | PostgreSQL (production) |
+## Security hardening applied (Phase 2)
 
-## Default Admin Account
-After seeding:
+- `handleError` no longer leaks internal error messages/stack traces to clients.
+- Debug API route (`/api/debug/home`) deleted.
+- Rate limiting (in-memory, per IP + per email): OTP send, OTP verify,
+  sign-in, sign-up.
+- OTP codes stored as HMAC hashes; signup payloads AES-256-GCM encrypted
+  with `AUTH_SECRET` (plaintext never touches the DB).
+- Google ID-token validation now requires: issuer = accounts.google.com,
+  `aud` = `GOOGLE_CLIENT_ID` (real tokens rejected when unconfigured),
+  `email_verified = true`.
+- Booking slot claim is atomic (`UPDATE ... WHERE isBooked=false` inside a
+  transaction) — concurrent double-booking of the same slot is impossible.
+- Money arithmetic converted to integer cents (`src/lib/money.ts`,
+  `src/lib/ledger.ts`); affiliate rate unified at 25% of platform commission.
+- Email uniqueness enforced case-insensitively via `User.emailLower` unique
+  index (added through the standard `prisma db push` + backfill script
+  `scripts/migrate-email-lower.ts`).
+
+## Default Admin Account (demo seed)
+
 - Email: `admin@medtravel.com`
 - Password: `admin123`
-- **Change this immediately after first login in production!**
+- **Change this immediately in production!**

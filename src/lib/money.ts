@@ -1,40 +1,91 @@
-// Decimal/money helpers — all amounts stored as strings in SQLite
-export function toDec(n: number | string): string {
-  const v = typeof n === 'string' ? parseFloat(n) : n
-  if (!isFinite(v)) return '0'
-  return v.toFixed(2)
+// Money helpers — all amounts stored as decimal strings ("12.34").
+// All arithmetic is performed in integer cents to avoid float rounding
+// errors. Values are converted to cents on the way in and back to decimal
+// strings on the way out, so callers keep working with the same string API.
+
+// Parse a decimal string/number into integer cents. Returns NaN on garbage.
+function toCents(v: string | number | null | undefined): number {
+  if (v == null || v === '') return 0
+  const s = typeof v === 'number' ? String(v) : String(v).trim()
+  if (s === '0' || s === '-0') return 0
+  const neg = s.startsWith('-')
+  const abs = neg ? s.slice(1) : s
+  const [whole, frac = ''] = abs.split('.')
+  const w = parseInt(whole, 10)
+  const f = parseInt((frac + '00').slice(0, 2).padEnd(2, '0'), 10)
+  if (!Number.isFinite(w)) return NaN
+  const cents = w * 100 + f
+  return neg ? -cents : cents
+}
+
+// Format integer cents back to a fixed 2-decimal string.
+function fromCents(cents: number): string {
+  if (!Number.isFinite(cents)) return '0.00'
+  const neg = cents < 0
+  const abs = Math.abs(cents)
+  const whole = Math.floor(abs / 100)
+  const frac = abs % 100
+  return `${neg ? '-' : ''}${whole}.${String(frac).padStart(2, '0')}`
+}
+
+export function toDec(n: number | string | null | undefined): string {
+  const c = toCents(n)
+  return Number.isNaN(c) ? '0.00' : fromCents(c)
 }
 
 export function addDec(...vals: (string | number | null | undefined)[]): string {
-  const sum = vals.reduce<number>((acc, v) => acc + (v == null ? 0 : typeof v === 'string' ? parseFloat(v) || 0 : v), 0)
-  return sum.toFixed(2)
+  let sum = 0
+  for (const v of vals) {
+    const c = toCents(v)
+    if (Number.isNaN(c)) return '0.00'
+    sum += c
+  }
+  return fromCents(sum)
 }
 
-export function subDec(a: string | number, b: string | number): string {
-  const av = typeof a === 'string' ? parseFloat(a) || 0 : a
-  const bv = typeof b === 'string' ? parseFloat(b) || 0 : b
-  return (av - bv).toFixed(2)
+export function subDec(a: string | number | null | undefined, b: string | number | null | undefined): string {
+  const ac = toCents(a)
+  const bc = toCents(b)
+  if (Number.isNaN(ac) || Number.isNaN(bc)) return '0.00'
+  return fromCents(ac - bc)
 }
 
-export function mulDec(a: string | number, b: string | number): string {
-  const av = typeof a === 'string' ? parseFloat(a) || 0 : a
-  const bv = typeof b === 'string' ? parseFloat(b) || 0 : b
-  return (av * bv).toFixed(2)
+export function mulDec(a: string | number | null | undefined, b: string | number | null | undefined): string {
+  const ac = toCents(a)
+  const bc = toCents(b)
+  if (Number.isNaN(ac) || Number.isNaN(bc)) return '0.00'
+  // a * b in cents (a is already cents, so multiply by b's numeric value / 100)
+  // To stay exact: (ac * bc) / 100 rounded.
+  return fromCents(Math.round((ac * bc) / 100))
 }
 
-export function cmpDec(a: string | number, b: string | number): number {
-  const av = typeof a === 'string' ? parseFloat(a) || 0 : a
-  const bv = typeof b === 'string' ? parseFloat(b) || 0 : b
-  return av < bv ? -1 : av > bv ? 1 : 0
+export function cmpDec(a: string | number | null | undefined, b: string | number | null | undefined): number {
+  const ac = toCents(a)
+  const bc = toCents(b)
+  if (Number.isNaN(ac) || Number.isNaN(bc)) return 0
+  return ac < bc ? -1 : ac > bc ? 1 : 0
 }
 
-export function gteZero(a: string | number): boolean {
-  const av = typeof a === 'string' ? parseFloat(a) || 0 : a
-  return av >= 0
+export function gteZero(a: string | number | null | undefined): boolean {
+  const c = toCents(a)
+  return !Number.isNaN(c) && c >= 0
 }
 
-export function formatCurrency(amount: string | number, currency = 'USD', locale = 'en'): string {
-  const v = typeof amount === 'string' ? parseFloat(amount) || 0 : amount
+// Convert a decimal string to integer cents (e.g. "12.34" -> 1234).
+// Useful for any consumer that needs raw integer math.
+export function toCentsInt(v: string | number | null | undefined): number {
+  const c = toCents(v)
+  return Number.isNaN(c) ? 0 : c
+}
+
+// Convert integer cents back to a decimal string.
+export function fromCentsInt(cents: number): string {
+  return fromCents(cents)
+}
+
+export function formatCurrency(amount: string | number | null | undefined, currency = 'USD', locale = 'en'): string {
+  const cents = toCents(amount)
+  const v = Number.isNaN(cents) ? 0 : cents / 100
   try {
     return new Intl.NumberFormat(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar' : locale === 'tr' ? 'tr-TR' : 'en-US', {
       style: 'currency',

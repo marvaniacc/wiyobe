@@ -1,13 +1,15 @@
 import { db } from '@/lib/db'
-import { addDec, mulDec, subDec } from '@/lib/money'
+import { subDec, toCentsInt, fromCentsInt } from '@/lib/money'
 import type { ProviderType } from '@prisma/client'
 
-// Get commission rates (platform + affiliate) for a provider type
+// Get commission rates (platform + affiliate) for a provider type.
+// affiliateRate = % of the PLATFORM commission that the affiliate earns
+// (matches the CommissionRate model default of 25).
 export async function getCommissionRate(pt: ProviderType): Promise<{ platformRate: string; affiliateRate: string }> {
   const cr = await db.commissionRate.findUnique({ where: { providerType: pt } })
   return {
     platformRate: cr?.rate ?? '12',
-    affiliateRate: cr?.affiliateRate ?? '3',
+    affiliateRate: cr?.affiliateRate ?? '25',
   }
 }
 
@@ -52,8 +54,8 @@ export async function recordPaymentLedger(opts: {
   description?: string
 }) {
   const { bookingId, paymentId, amount, commissionRate, providerUserId } = opts
-  const commission = mulDec(amount, commissionRate).replace(/^/, '') // %
-  const commissionAmount = (parseFloat(amount) * (parseFloat(commissionRate) / 100)).toFixed(2)
+  // commission = amount * rate%  (integer cents math)
+  const commissionAmount = fromCentsInt(Math.round((toCentsInt(amount) * parseFloat(commissionRate)) / 100))
   const providerNet = subDec(amount, commissionAmount)
 
   await db.ledgerEntry.createMany({
@@ -96,10 +98,12 @@ export async function recordRefundLedger(opts: {
   description?: string
 }) {
   const { bookingId, paymentId, refundAmount, commissionRate, providerUserId, originalAmount } = opts
-  // proportional commission reversal
-  const ratio = parseFloat(originalAmount) > 0 ? parseFloat(refundAmount) / parseFloat(originalAmount) : 1
-  const commissionReversal = (parseFloat(refundAmount) * (parseFloat(commissionRate) / 100)).toFixed(2)
+  // proportional commission reversal (integer cents math)
+  const commissionReversal = fromCentsInt(Math.round((toCentsInt(refundAmount) * parseFloat(commissionRate)) / 100))
   const providerDebit = subDec(refundAmount, commissionReversal)
+  const ratioPct = toCentsInt(originalAmount) > 0
+    ? Math.round((toCentsInt(refundAmount) / toCentsInt(originalAmount)) * 100)
+    : 100
 
   await db.ledgerEntry.createMany({
     data: [
@@ -107,14 +111,14 @@ export async function recordRefundLedger(opts: {
         type: 'REFUND_PATIENT',
         bookingId,
         paymentId,
-        amount: (-parseFloat(refundAmount)).toFixed(2),
-        description: `Refund to patient (${(ratio * 100).toFixed(0)}% of ${originalAmount})`,
+        amount: fromCentsInt(-toCentsInt(refundAmount)),
+        description: `Refund to patient (${ratioPct}% of ${originalAmount})`,
       },
       {
         type: 'REFUND_COMMISSION_REVERSAL',
         bookingId,
         paymentId,
-        amount: (-parseFloat(commissionReversal)).toFixed(2),
+        amount: fromCentsInt(-toCentsInt(commissionReversal)),
         description: `Commission reversal on refund`,
       },
       {
@@ -122,7 +126,7 @@ export async function recordRefundLedger(opts: {
         bookingId,
         paymentId,
         userId: providerUserId,
-        amount: (-parseFloat(providerDebit)).toFixed(2),
+        amount: fromCentsInt(-toCentsInt(providerDebit)),
         description: `Provider debit on refund`,
       },
     ],
@@ -143,7 +147,7 @@ export async function getProviderBalance(providerUserId: string) {
   let lifetime = 0
   let paidOut = 0
   for (const e of entries) {
-    const amt = parseFloat(e.amount)
+    const amt = toCentsInt(e.amount)
     lifetime += amt
     if (e.type === 'PAYOUT') {
       paidOut += Math.abs(amt)
@@ -171,9 +175,9 @@ export async function getProviderBalance(providerUserId: string) {
     }
   }
   return {
-    available: available.toFixed(2),
-    pending: pending.toFixed(2),
-    lifetime: (available + pending + paidOut).toFixed(2),
-    paidOut: paidOut.toFixed(2),
+    available: fromCentsInt(available),
+    pending: fromCentsInt(pending),
+    lifetime: fromCentsInt(available + pending + paidOut),
+    paidOut: fromCentsInt(paidOut),
   }
 }

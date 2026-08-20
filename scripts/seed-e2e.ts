@@ -24,7 +24,7 @@ async function main() {
     where: { email: 'admin@medtravel.com' },
     update: {},
     create: {
-      email: 'admin@medtravel.com',
+      email: 'admin@medtravel.com', emailLower: 'admin@medtravel.com',
       passwordHash: hashPassword('admin123'),
       role: 'ADMIN',
       status: 'ACTIVE',
@@ -61,7 +61,7 @@ async function main() {
     where: { email: 'affiliate@medtravel.com' },
     update: {},
     create: {
-      email: 'affiliate@medtravel.com',
+      email: 'affiliate@medtravel.com', emailLower: 'affiliate@medtravel.com',
       passwordHash: hashPassword('affiliate123'),
       role: 'AFFILIATE',
       status: 'ACTIVE',
@@ -96,7 +96,7 @@ async function main() {
     where: { email: 'doctor@medtravel.com' },
     update: { referredByAffiliateId: affiliate.id },
     create: {
-      email: 'doctor@medtravel.com',
+      email: 'doctor@medtravel.com', emailLower: 'doctor@medtravel.com',
       passwordHash: hashPassword('doctor123'),
       role: 'DOCTOR',
       status: 'ACTIVE',
@@ -186,7 +186,7 @@ async function main() {
     where: { email: 'patient@medtravel.com' },
     update: {},
     create: {
-      email: 'patient@medtravel.com',
+      email: 'patient@medtravel.com', emailLower: 'patient@medtravel.com',
       passwordHash: hashPassword('patient123'),
       role: 'PATIENT',
       status: 'ACTIVE',

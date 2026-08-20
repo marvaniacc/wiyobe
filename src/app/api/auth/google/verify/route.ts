@@ -22,6 +22,8 @@ interface GoogleUserInfo {
   locale?: string
 }
 
+const GOOGLE_ISS_ALLOWED = new Set(['https://accounts.google.com', 'accounts.google.com'])
+
 async function verifyGoogleIdToken(idToken: string): Promise<GoogleUserInfo | null> {
   // Verify the ID token using Google's tokeninfo endpoint
   try {
@@ -30,10 +32,15 @@ async function verifyGoogleIdToken(idToken: string): Promise<GoogleUserInfo | nu
     })
     if (!res.ok) return null
     const data = await res.json()
-    // Verify audience matches our client ID if configured
-    if (process.env.GOOGLE_CLIENT_ID && data.aud !== process.env.GOOGLE_CLIENT_ID) {
-      return null
-    }
+    // Reject tokens not issued by Google
+    if (!GOOGLE_ISS_ALLOWED.has(data.iss)) return null
+    // Require the token to be minted for OUR client ID. If no client ID is
+    // configured, reject real tokens entirely — accepting any aud would let
+    // tokens minted for other apps authenticate here.
+    if (!process.env.GOOGLE_CLIENT_ID) return null
+    if (data.aud !== process.env.GOOGLE_CLIENT_ID) return null
+    // Require a verified email — Google only sets this true after ownership proof.
+    if (!(data.email_verified === 'true' || data.email_verified === true)) return null
     return {
       sub: data.sub,
       email: data.email,
@@ -103,7 +110,7 @@ export async function POST(req: Request) {
     }
 
     // Check if a user with this email exists (link accounts)
-    user = await db.user.findUnique({ where: { email } })
+    user = await db.user.findUnique({ where: { emailLower: email } })
     if (user) {
       // Link the Google ID to the existing account
       await db.user.update({
@@ -132,6 +139,7 @@ export async function POST(req: Request) {
     user = await db.user.create({
       data: {
         email,
+        emailLower: email,
         googleId,
         authProvider: 'google',
         emailVerified: new Date(),

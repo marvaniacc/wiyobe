@@ -1,6 +1,8 @@
 import { db } from '@/lib/db'
 import { hashPassword, setSessionCookie } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
+import { hashOtpCode, decryptPayload } from '@/lib/crypto'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 import { z } from 'zod'
 import crypto from 'crypto'
 import { cookies } from 'next/headers'
@@ -8,6 +10,8 @@ import { cookies } from 'next/headers'
 export const dynamic = 'force-dynamic'
 
 const MAX_ATTEMPTS = 5
+const IP_MAX_VERIFIES = 15
+const IP_WINDOW_MS = 15 * 60 * 1000
 
 const schema = z.object({
   email: z.string().email(),
@@ -20,6 +24,9 @@ const schema = z.object({
 export async function POST(req: Request) {
   try {
     const body = await parseBody(req, schema)
+
+    const ipCheck = rateLimit(`otp-verify:ip:${clientIp(req)}`, IP_MAX_VERIFIES, IP_WINDOW_MS)
+    if (!ipCheck.allowed) return error(429, 'Too many verification attempts. Please try again later.')
 
     // Find the latest valid OTP for this email+purpose
     const otp = await db.otpCode.findFirst({
@@ -43,8 +50,8 @@ export async function POST(req: Request) {
       return error(429, 'Too many attempts. Please request a new code.')
     }
 
-    // Verify code
-    if (otp.code !== body.code) {
+    // Verify code — the stored value is an HMAC hash of the code
+    if (otp.code !== hashOtpCode(body.code)) {
       await db.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } })
       const remaining = MAX_ATTEMPTS - (otp.attempts + 1)
       return error(400, `Invalid code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`)
@@ -56,7 +63,7 @@ export async function POST(req: Request) {
     // === SIGNUP: create the user ===
     if (body.purpose === 'signup') {
       if (!otp.payload) return error(400, 'Missing signup data. Please start over.')
-      const data = JSON.parse(otp.payload)
+      const data = JSON.parse(decryptPayload(otp.payload))
 
       // Registration control: check if signup is open for this role
       const providerRoles = ['DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR'] as const
@@ -76,6 +83,7 @@ export async function POST(req: Request) {
       const user = await db.user.create({
         data: {
           email: body.email,
+          emailLower: body.email.toLowerCase(),
           passwordHash: hashPassword(data.password),
           role: data.role,
           status: status as any,
@@ -201,7 +209,7 @@ export async function POST(req: Request) {
 
     // === SIGNIN: log the user in ===
     if (body.purpose === 'signin') {
-      const user = await db.user.findUnique({ where: { email: body.email } })
+      const user = await db.user.findUnique({ where: { emailLower: body.email.toLowerCase() } })
       if (!user) return error(404, 'Account not found.')
       if (user.status === 'SUSPENDED') return error(403, 'Your account has been suspended.')
       if (user.status === 'PENDING') return error(403, 'Your account is pending admin approval.')
@@ -219,7 +227,7 @@ export async function POST(req: Request) {
     // === RESET: set new password ===
     if (body.purpose === 'reset') {
       if (!body.newPassword) return error(400, 'New password is required.')
-      const user = await db.user.findUnique({ where: { email: body.email } })
+      const user = await db.user.findUnique({ where: { emailLower: body.email.toLowerCase() } })
       if (!user) return error(404, 'Account not found.')
       await db.user.update({
         where: { id: user.id },

@@ -1,5 +1,7 @@
 import { db } from '@/lib/db'
 import { json, error, handleError, parseBody } from '@/lib/api'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
+import { hashOtpCode, encryptPayload } from '@/lib/crypto'
 import { z } from 'zod'
 import crypto from 'crypto'
 
@@ -7,6 +9,12 @@ export const dynamic = 'force-dynamic'
 
 const OTP_TTL_MINUTES = 10
 const RESEND_COOLDOWN_SEC = 45
+
+// Per-IP + per-email send limits (anti-spam)
+const IP_MAX_SENDS = 10
+const IP_WINDOW_MS = 60 * 60 * 1000
+const EMAIL_MAX_SENDS = 5
+const EMAIL_WINDOW_MS = 60 * 60 * 1000
 
 const schema = z.object({
   email: z.string().email(),
@@ -30,16 +38,24 @@ export async function POST(req: Request) {
   try {
     const body = await parseBody(req, schema)
 
+    // Rate limiting — per IP and per email
+    const ip = clientIp(req)
+    const ipCheck = rateLimit(`otp-send:ip:${ip}`, IP_MAX_SENDS, IP_WINDOW_MS)
+    if (!ipCheck.allowed) return error(429, 'Too many requests. Please try again later.')
+    const emailKey = body.email.toLowerCase()
+    const emailCheck = rateLimit(`otp-send:email:${emailKey}`, EMAIL_MAX_SENDS, EMAIL_WINDOW_MS)
+    if (!emailCheck.allowed) return error(429, `Too many requests for this email. Try again in ${emailCheck.retryAfterSec}s.`)
+
     // For signup: ensure email isn't already taken
     if (body.purpose === 'signup') {
-      const existing = await db.user.findUnique({ where: { email: body.email } })
+      const existing = await db.user.findUnique({ where: { emailLower: body.email.toLowerCase() } })
       if (existing) return error(409, 'An account with this email already exists.')
       if (!body.signupData) return error(400, 'signupData required for signup OTP')
     }
 
     // For signin/reset: ensure user exists
     if (body.purpose === 'signin' || body.purpose === 'reset') {
-      const user = await db.user.findUnique({ where: { email: body.email } })
+      const user = await db.user.findUnique({ where: { emailLower: body.email.toLowerCase() } })
       if (!user) return error(404, 'No account found with this email.')
       if (user.status === 'SUSPENDED') return error(403, 'Your account has been suspended.')
     }
@@ -64,12 +80,17 @@ export async function POST(req: Request) {
       data: { used: true },
     })
 
+    // Never store plaintext: the code is HMAC-hashed and the signup payload is
+    // AES-256-GCM encrypted before it touches the DB.
+    const codeHash = hashOtpCode(code)
+    const payload = body.signupData ? encryptPayload(JSON.stringify(body.signupData)) : null
+
     await db.otpCode.create({
       data: {
         email: body.email,
-        code,
+        code: codeHash,
         purpose: body.purpose,
-        payload: body.signupData ? JSON.stringify(body.signupData) : null,
+        payload,
         expiresAt,
       },
     })

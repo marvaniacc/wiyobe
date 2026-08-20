@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 /**
  * Determine which table a setting key belongs to:
  * - SiteSetting: siteName, tagline, logoUrl, SEO defaults, and
- *   headerConfig*/footerConfig* (including locale variants like
+ *   headerConfig* or footerConfig* (including locale variants like
  *   headerConfigGuest_fa)
  * - Setting: everything else (legacy config)
  */

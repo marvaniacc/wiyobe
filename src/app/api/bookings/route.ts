@@ -115,13 +115,6 @@ export async function POST(req: Request) {
       if (svc) amount = svc.price
     }
 
-    // if slot provided, lock it
-    let slot: any = null
-    if (body.slotId) {
-      slot = await db.slot.findUnique({ where: { id: body.slotId } })
-      if (!slot || slot.isBooked) return error(409, 'This slot is no longer available')
-    }
-
     // Get commission rates (platform + affiliate) for this provider type
     const commissionRateRow = await db.commissionRate.findUnique({ where: { providerType: pt } })
     const platformRate = commissionRateRow?.rate || '12'
@@ -246,139 +239,153 @@ export async function POST(req: Request) {
       videoSessionUrl = videoSession.url
     }
 
-    const booking = await db.booking.create({
-      data: {
-        patientId: session.id,
-        providerType: pt,
-        doctorId: pt === 'DOCTOR' ? body.providerId : null,
-        hospitalId: pt === 'HOSPITAL' ? body.providerId : null,
-        hotelId: pt === 'HOTEL' ? body.providerId : null,
-        translatorId: pt === 'TRANSLATOR' ? body.providerId : null,
-        serviceId: body.serviceId || null,
-        slotId: body.slotId || null,
-        visitType: body.visitType,
-        status: 'PENDING',
-        startDate: new Date(body.startDate),
-        endDate: body.endDate ? new Date(body.endDate) : null,
-        amount: toDec(amount),
-        commissionRate: platformRate,
-        commissionAmount: platformCut,           // reduced platform commission (after promo discount)
-        affiliateRate: affiliateRate,
-        affiliateAmount: affiliateUserId ? affiliateCommission : '0',
-        affiliateId: affiliateUserId,
-        providerNetAmount: providerNet,           // UNCHANGED — full net share
-        promoCodeId: promoCodeId,                // null if no code applied
-        discountAmount: discountAmount.toFixed(2), // snapshot of the discount applied
-        videoSessionUrl,
-        notes: body.notes,
-      },
-      include: { patient: { select: { name: true } }, service: true, promoCode: { select: { code: true } } },
-    })
-
-    // Increment promo code usedCount — only on successful booking creation.
-    if (promoCodeId) {
-      await db.promoCode.update({
-        where: { id: promoCodeId },
-        data: { usedCount: { increment: 1 } },
-      })
-    }
-
-    // mark slot booked
-    if (slot) {
-      await db.slot.update({ where: { id: slot.id }, data: { isBooked: true } })
-    }
-
-    // Payment — real Stripe charge if configured, otherwise mock for dev.
-    // The patient is charged the DISCOUNTED amount (amount - discountAmount).
-    const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
-    let stripeChargeId = `ch_mock_${booking.id.slice(-8)}`
-    let paymentStatus = 'SUCCEEDED'
-
-    if (isStripeConfigured()) {
-      const charge = await createCharge(
-        parseFloat(patientCharge),
-        'usd',
-        `MedTravel booking - ${providerName} - ${body.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`,
-        { bookingId: booking.id, patientId: session.id, providerType: pt }
-      )
-      if (charge) {
-        stripeChargeId = charge.id
-        paymentStatus = charge.status === 'succeeded' ? 'SUCCEEDED' : 'PENDING'
+    // Everything from the slot claim to the ledger entries runs in ONE
+    // transaction. The slot is claimed with a conditional UPDATE (atomic),
+    // so concurrent requests cannot both book it — and if anything later in
+    // the transaction fails, the claim is rolled back.
+    const { booking, payment } = await db.$transaction(async (tx) => {
+      // Atomically claim the slot (conditional update — only succeeds once)
+      let slotId: string | null = null
+      if (body.slotId) {
+        const claimed = await tx.slot.updateMany({
+          where: { id: body.slotId, isBooked: false },
+          data: { isBooked: true },
+        })
+        if (claimed.count === 0) throw new Error('SLOT_UNAVAILABLE')
+        slotId = body.slotId
       }
-    }
 
-    const payment = await db.payment.create({
-      data: {
-        bookingId: booking.id,
-        stripeChargeId,
-        amount: patientCharge,  // discounted amount the patient actually paid
-        status: paymentStatus as any,
-      },
-    })
+      const booking = await tx.booking.create({
+        data: {
+          patientId: session.id,
+          providerType: pt,
+          doctorId: pt === 'DOCTOR' ? body.providerId : null,
+          hospitalId: pt === 'HOSPITAL' ? body.providerId : null,
+          hotelId: pt === 'HOTEL' ? body.providerId : null,
+          translatorId: pt === 'TRANSLATOR' ? body.providerId : null,
+          serviceId: body.serviceId || null,
+          slotId,
+          visitType: body.visitType,
+          status: 'PENDING',
+          startDate: new Date(body.startDate),
+          endDate: body.endDate ? new Date(body.endDate) : null,
+          amount: toDec(amount),
+          commissionRate: platformRate,
+          commissionAmount: platformCut,           // reduced platform commission (after promo discount)
+          affiliateRate: affiliateRate,
+          affiliateAmount: affiliateUserId ? affiliateCommission : '0',
+          affiliateId: affiliateUserId,
+          providerNetAmount: providerNet,           // UNCHANGED — full net share
+          promoCodeId: promoCodeId,                // null if no code applied
+          discountAmount: discountAmount.toFixed(2), // snapshot of the discount applied
+          videoSessionUrl,
+          notes: body.notes,
+        },
+        include: { patient: { select: { name: true } }, service: true, promoCode: { select: { code: true } } },
+      })
 
-    // Ledger entries — PATIENT_CHARGE (discounted), COMMISSION (reduced platform cut),
-    // AFFILIATE_COMMISSION (based on reduced platform cut), PROVIDER_CREDIT (full net).
-    // The discount comes out of the platform's commission, not the provider's revenue.
-    const ledgerEntries: any[] = [
-      {
-        type: 'PATIENT_CHARGE',
-        bookingId: booking.id,
-        paymentId: payment.id,
-        amount: patientCharge,
-        description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}${promoCodeId ? ` (promo: ${booking.promoCode?.code || ''})` : ''}`,
-      },
-      {
-        type: 'COMMISSION',
-        bookingId: booking.id,
-        paymentId: payment.id,
-        amount: platformCut,
-        description: `Platform commission (${platformRate}%${discountAmount > 0 ? `, promo discount -$${discountAmount.toFixed(2)}` : ''})`,
-      },
-    ]
+      // Increment promo code usedCount — only on successful booking creation.
+      if (promoCodeId) {
+        await tx.promoCode.update({
+          where: { id: promoCodeId },
+          data: { usedCount: { increment: 1 } },
+        })
+      }
 
-    // Affiliate commission entry (only if affiliate exists)
-    if (affiliateUserId) {
+      // Payment — real Stripe charge if configured, otherwise mock for dev.
+      // The patient is charged the DISCOUNTED amount (amount - discountAmount).
+      const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
+      let stripeChargeId = `ch_mock_${booking.id.slice(-8)}`
+      let paymentStatus = 'SUCCEEDED'
+
+      if (isStripeConfigured()) {
+        const charge = await createCharge(
+          parseFloat(patientCharge),
+          'usd',
+          `MedTravel booking - ${providerName} - ${body.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`,
+          { bookingId: booking.id, patientId: session.id, providerType: pt }
+        )
+        if (charge) {
+          stripeChargeId = charge.id
+          paymentStatus = charge.status === 'succeeded' ? 'SUCCEEDED' : 'PENDING'
+        }
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          bookingId: booking.id,
+          stripeChargeId,
+          amount: patientCharge,  // discounted amount the patient actually paid
+          status: paymentStatus as any,
+        },
+      })
+
+      // Ledger entries — PATIENT_CHARGE (discounted), COMMISSION (reduced platform cut),
+      // AFFILIATE_COMMISSION (based on reduced platform cut), PROVIDER_CREDIT (full net).
+      // The discount comes out of the platform's commission, not the provider's revenue.
+      const ledgerEntries: any[] = [
+        {
+          type: 'PATIENT_CHARGE',
+          bookingId: booking.id,
+          paymentId: payment.id,
+          amount: patientCharge,
+          description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}${promoCodeId ? ` (promo: ${booking.promoCode?.code || ''})` : ''}`,
+        },
+        {
+          type: 'COMMISSION',
+          bookingId: booking.id,
+          paymentId: payment.id,
+          amount: platformCut,
+          description: `Platform commission (${platformRate}%${discountAmount > 0 ? `, promo discount -$${discountAmount.toFixed(2)}` : ''})`,
+        },
+      ]
+
+      // Affiliate commission entry (only if affiliate exists)
+      if (affiliateUserId) {
+        ledgerEntries.push({
+          type: 'AFFILIATE_COMMISSION',
+          bookingId: booking.id,
+          paymentId: payment.id,
+          userId: affiliateUserId,
+          amount: affiliateCommission,
+          description: `Affiliate commission (${affiliateRate}%) for referral`,
+        })
+
+        // Update affiliate click status and earnings
+        if (affiliateClickId) {
+          await tx.affiliateClick.update({
+            where: { id: affiliateClickId },
+            data: { status: 'BOOKED', bookingId: booking.id, commissionAmount: affiliateCommission, convertedAt: new Date() },
+          })
+        }
+        // Update affiliate aggregate stats
+        const affRec = await tx.affiliate.findUnique({ where: { userId: affiliateUserId } })
+        if (affRec) {
+          await tx.affiliate.update({
+            where: { userId: affiliateUserId },
+            data: {
+              totalBookings: { increment: 1 },
+              totalEarnings: (parseFloat(affiliateCommission) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
+              pendingBalance: (parseFloat(affiliateCommission) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
+            },
+          })
+        }
+      }
+
+      // Provider credit (net amount after both commissions)
       ledgerEntries.push({
-        type: 'AFFILIATE_COMMISSION',
+        type: 'PROVIDER_CREDIT',
         bookingId: booking.id,
         paymentId: payment.id,
-        userId: affiliateUserId,
-        amount: affiliateCommission,
-        description: `Affiliate commission (${affiliateRate}%) for referral`,
+        userId: providerUserId,
+        amount: providerNet,
+        description: 'Provider credit (pending until service completion)',
       })
 
-      // Update affiliate click status and earnings
-      if (affiliateClickId) {
-        await db.affiliateClick.update({
-          where: { id: affiliateClickId },
-          data: { status: 'BOOKED', bookingId: booking.id, commissionAmount: affiliateCommission, convertedAt: new Date() },
-        })
-      }
-      // Update affiliate aggregate stats
-      const affRec = await db.affiliate.findUnique({ where: { userId: affiliateUserId } })
-      if (affRec) {
-        await db.affiliate.update({
-          where: { userId: affiliateUserId },
-          data: {
-            totalBookings: { increment: 1 },
-            totalEarnings: (parseFloat(affiliateCommission) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
-            pendingBalance: (parseFloat(affiliateCommission) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
-          },
-        })
-      }
-    }
+      await tx.ledgerEntry.createMany({ data: ledgerEntries })
 
-    // Provider credit (net amount after both commissions)
-    ledgerEntries.push({
-      type: 'PROVIDER_CREDIT',
-      bookingId: booking.id,
-      paymentId: payment.id,
-      userId: providerUserId,
-      amount: providerNet,
-      description: 'Provider credit (pending until service completion)',
+      return { booking, payment }
     })
-
-    await db.ledgerEntry.createMany({ data: ledgerEntries })
 
     // Notifications — notify both patient and provider
     const patientUser = await db.user.findUnique({ where: { id: session.id }, select: { name: true } })

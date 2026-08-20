@@ -32,6 +32,7 @@ async function main() {
     update: {},
     create: {
       email: 'admin@medtravel.com',
+      emailLower: 'admin@medtravel.com',
       passwordHash: hashPassword('admin123'),
       role: 'ADMIN',
       status: 'ACTIVE',
@@ -45,6 +46,7 @@ async function main() {
     update: {},
     create: {
       email: 'patient@medtravel.com',
+      emailLower: 'patient@medtravel.com',
       passwordHash: hashPassword('patient123'),
       role: 'PATIENT',
       status: 'ACTIVE',
@@ -88,7 +90,7 @@ async function main() {
       where: { email: d.email },
       update: {},
       create: {
-        email: d.email, passwordHash: hashPassword('doctor123'), role: 'DOCTOR', status: 'ACTIVE',
+        email: d.email, emailLower: d.email.toLowerCase(), passwordHash: hashPassword('doctor123'), role: 'DOCTOR', status: 'ACTIVE',
         name: d.name, preferredLanguage: 'en', city: d.city, country: d.country,
       },
     })
@@ -148,7 +150,7 @@ async function main() {
       where: { email: h.email },
       update: {},
       create: {
-        email: h.email, passwordHash: hashPassword('hospital123'), role: 'HOSPITAL', status: 'ACTIVE',
+        email: h.email, emailLower: h.email.toLowerCase(), passwordHash: hashPassword('hospital123'), role: 'HOSPITAL', status: 'ACTIVE',
         name: h.name, preferredLanguage: 'en', city: h.city, country: h.country,
       },
     })
@@ -191,7 +193,7 @@ async function main() {
       where: { email: h.email },
       update: {},
       create: {
-        email: h.email, passwordHash: hashPassword('hotel123'), role: 'HOTEL', status: 'ACTIVE',
+        email: h.email, emailLower: h.email.toLowerCase(), passwordHash: hashPassword('hotel123'), role: 'HOTEL', status: 'ACTIVE',
         name: h.name, preferredLanguage: 'en', city: h.city, country: h.country,
       },
     })
@@ -227,7 +229,7 @@ async function main() {
       where: { email: t.email },
       update: {},
       create: {
-        email: t.email, passwordHash: hashPassword('translator123'), role: 'TRANSLATOR', status: 'ACTIVE',
+        email: t.email, emailLower: t.email.toLowerCase(), passwordHash: hashPassword('translator123'), role: 'TRANSLATOR', status: 'ACTIVE',
         name: t.name, preferredLanguage: 'en', city: t.city, country: t.country,
       },
     })
@@ -261,7 +263,7 @@ async function main() {
     where: { email: 'pending.doc@medtravel.com' },
     update: {},
     create: {
-      email: 'pending.doc@medtravel.com', passwordHash: hashPassword('doctor123'), role: 'DOCTOR', status: 'PENDING',
+      email: 'pending.doc@medtravel.com', emailLower: 'pending.doc@medtravel.com', passwordHash: hashPassword('doctor123'), role: 'DOCTOR', status: 'PENDING',
       name: 'Dr. Carlos Mendez', preferredLanguage: 'en', city: 'Madrid', country: 'Spain',
     },
   })

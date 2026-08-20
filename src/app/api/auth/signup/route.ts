@@ -1,10 +1,14 @@
 import { db } from '@/lib/db'
 import { hashPassword, setSessionCookie } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 import { z } from 'zod'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
+
+const IP_MAX_SIGNUPS = 10
+const IP_WINDOW_MS = 60 * 60 * 1000
 
 export async function GET() {
   try {
@@ -66,7 +70,11 @@ async function verifyTurnstileToken(token: string | undefined): Promise<boolean>
 export async function POST(req: Request) {
   try {
     const body = await parseBody(req, signupSchema)
-    const existing = await db.user.findUnique({ where: { email: body.email } })
+
+    const ipCheck = rateLimit(`signup:ip:${clientIp(req)}`, IP_MAX_SIGNUPS, IP_WINDOW_MS)
+    if (!ipCheck.allowed) return error(429, 'Too many signup attempts. Please try again later.')
+
+    const existing = await db.user.findUnique({ where: { emailLower: body.email.toLowerCase() } })
     if (existing) return error(409, 'An account with this email already exists.')
 
     // Verify Cloudflare Turnstile token (anti-bot)
@@ -93,6 +101,7 @@ export async function POST(req: Request) {
     const user = await db.user.create({
       data: {
         email: body.email,
+        emailLower: body.email.toLowerCase(),
         passwordHash: hashPassword(body.password),
         role: body.role,
         status: status as any,
