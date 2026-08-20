@@ -161,7 +161,10 @@ export function AuthForm({
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }} aria-hidden>dashboard</span>
                 {t('auth.goToDashboard', 'Go to Dashboard')}
               </Button>
-              <Button size="lg" variant="outline" className="flex-1 gap-2 text-error hover:bg-error/5" onClick={() => { window.location.href = '/api/auth/signout' }}>
+              <Button size="lg" variant="outline" className="flex-1 gap-2 text-error hover:bg-error/5" onClick={async () => {
+                try { await fetch('/api/auth/signout', { method: 'POST' }) } catch {}
+                window.location.href = '/en'
+              }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }} aria-hidden>logout</span>
                 {t('auth.signOutBtn', 'Sign out')}
               </Button>

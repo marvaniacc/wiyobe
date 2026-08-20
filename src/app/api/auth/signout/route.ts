@@ -1,36 +1,46 @@
 import { clearSessionCookie } from '@/lib/auth'
 import { json, handleError } from '@/lib/api'
-import { NextResponse, type NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/auth/signout
  *
- * Clears the session cookie and redirects to /en (locale landing).
- * Uses the REQUEST's own URL to construct the redirect — NOT
- * NEXT_PUBLIC_APP_URL (which may be unset or set to localhost:3000
- * in dev, causing a redirect to localhost on production).
+ * Clears the session cookie and redirects to /en via a client-side
+ * meta-refresh. We deliberately do NOT use NextResponse.redirect()
+ * because behind a reverse proxy (Caddy), req.nextUrl resolves to
+ * localhost:3000 — causing the browser to redirect to localhost
+ * instead of the actual domain (wishubest.com).
+ *
+ * A meta-refresh with a RELATIVE url (/en) lets the browser resolve
+ * the URL against the actual domain it's visiting.
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await clearSessionCookie()
   } catch {
-    // Continue even if cookie clear fails — still redirect
+    // Continue — redirect even if cookie clear fails
   }
-  // Construct redirect URL from the request's own host (preserves
-  // the domain the user is actually visiting, e.g. wishubest.com)
-  const url = req.nextUrl
-  url.pathname = '/en'
-  url.search = ''
-  return NextResponse.redirect(url, 302)
+
+  // Return a minimal HTML page that immediately redirects to /en.
+  // The browser resolves /en relative to the current domain.
+  return new Response(
+    `<!DOCTYPE html><html><head>` +
+    `<meta http-equiv="refresh" content="0;url=/en">` +
+    `</head><body></body></html>`,
+    {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    },
+  )
 }
 
 /**
  * POST /api/auth/signout
  *
  * Clears the session cookie. Returns JSON { ok: true } for fetch-based
- * signout (used by the dashboard shell's signout button).
+ * signout (used by the dashboard shell's signout button). The caller
+ * does a client-side window.location.href = '/en' after this returns.
  */
 export async function POST() {
   try {
