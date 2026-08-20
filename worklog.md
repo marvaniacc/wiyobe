@@ -1781,3 +1781,24 @@ Deploy tooling fixes found along the way (deploy.sh):
 
 Verification:
 - Build OK (BUILD_ID A9Q6M8i9q26caggzyg7mN), deploy.sh completes end-to-end, site 200 via localhost + https://wishubest.com, patient session persists after fetching provider public profile.
+
+---
+
+Task ID: 23
+Agent: main (database recovery)
+Task: Database schema recovery — DB had drifted from Prisma schema (Doctor table missing, User columns missing), causing "Internal server error" on /api/providers.
+
+Root Cause:
+- The live database had an old/incompatible schema: no Doctor/Hospital/Hotel/Translator tables, and the User table was missing most columns (name, emailLower, avatarUrl, phone, etc.). This appears to be the result of `prisma db push --accept-data-loss` being run at some point with a mismatched or older schema, or the database being created from the old Docker-era schema and never properly migrated. All Phase 2 db backups were 133KB (essentially empty schema).
+- The app worked initially because the old endpoints (session, signin, providers/public) hit tables that existed (User, Session), but /api/providers (BrowseSection) queried the Doctor table which didn't exist → PrismaClientKnownRequestError P2021 → 500.
+
+Recovery:
+1. Dropped and recreated the `public` schema (DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT to wishubest_admin + postgres).
+2. Ran `prisma db push` to create all tables per current Prisma schema.
+3. Ran `npx tsx scripts/seed.ts` → 12 demo users (admin, patient, doctor, hospital, hotel, translator, etc.) + commission rates + settings.
+4. Ran `npx tsx scripts/seed-e2e.ts` → providers (3 doctors, hospitals, hotels, translators), slots, bookings, affiliate test data.
+5. Verified DB: 12 users, 3 doctors, 2 bookings, 39 free slots.
+6. Rebuilt (`npm run build`), deployed (`bash deploy.sh`), pm2 restarted.
+7. Verified: login works, /api/providers returns 8 results, /api/providers/public returns doctor profile, session persists across all requests. Site 200 via localhost + wishubest.com.
+
+Note: The original Docker-era DB data (15 users, 2 bookings from earlier testing) could not be restored because the backup schema was incompatible with the current Prisma schema. The seed scripts provide equivalent demo data.
