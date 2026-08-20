@@ -24,12 +24,18 @@ echo "  Wishubest — Production Deployment (native)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ── Step 0: Check prerequisites ──────────────────────────────────────────────
-for cmd in node npm pm2 git; do
+for cmd in bun git; do
   if ! command -v "$cmd" &> /dev/null; then
     echo "❌ '$cmd' is not installed."
     exit 1
   fi
 done
+# Fall back to npm when bun is missing
+if command -v bun &> /dev/null; then
+  PKG_MGR="bun"
+else
+  PKG_MGR="npm"
+fi
 
 cd "$APP_DIR"
 
@@ -69,8 +75,12 @@ git pull --ff-only origin main || git pull --ff-only origin opencode-work || tru
 
 # ── Step 4: Install dependencies ─────────────────────────────────────────────
 echo ""
-echo "📥 Installing dependencies..."
-npm install --omit=dev 2>&1 | tail -2 || npm install 2>&1 | tail -2
+echo "📥 Installing dependencies ($PKG_MGR)..."
+if [ "$PKG_MGR" = "bun" ]; then
+  bun install --production 2>&1 | tail -3
+else
+  npm install --legacy-peer-deps --omit=dev 2>&1 | tail -2 || npm install --legacy-peer-deps 2>&1 | tail -2
+fi
 
 # ── Step 5: Database schema ──────────────────────────────────────────────────
 echo ""
@@ -100,6 +110,9 @@ echo "🚀 Restarting pm2 ($PM2_APP)..."
 pm2 restart "$PM2_APP" --update-env --max-restarts 10 2>/dev/null \
   || pm2 start ecosystem.config.cjs --only "$PM2_APP" --max-restarts 10 2>/dev/null \
   || pm2 start "node_modules/next/dist/bin/next" --name "$PM2_APP" -- start -p "$PORT" --max-restarts 10
+# Reset the crash counter so the health gate below only counts crashes
+# that happen AFTER this deploy, not the historical restart_time total.
+pm2 reset "$PM2_APP" 2>/dev/null || true
 pm2 save
 
 # ── Step 8: Wait for readiness (health gate) ─────────────────────────────────
@@ -107,7 +120,7 @@ echo ""
 echo "⏳ Waiting for app to be ready..."
 APP_READY=0
 for i in $(seq 1 30); do
-  if curl -sf "http://localhost:$PORT/" > /dev/null 2>&1; then
+  if curl -sfL "http://localhost:$PORT/" > /dev/null 2>&1; then
     APP_READY=1
     echo "✅ App is ready!"
     break

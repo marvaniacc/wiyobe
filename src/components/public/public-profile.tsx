@@ -34,6 +34,10 @@ export function PublicProfilePage() {
   const router = useRouter()
   const view = useApp((s) => s.view)
   const goLanding = useApp((s) => s.goLanding)
+  const goDashboard = useApp((s) => s.goDashboard)
+  const signOut = useApp((s) => s.signOut)
+  const session = useApp((s) => s.session)
+  const lastSection = useApp((s) => s.lastSection)
   const locale = useApp((s) => s.locale)
   const setLocale = useApp((s) => s.setLocale)
   const { t, dir } = useT()
@@ -45,6 +49,12 @@ export function PublicProfilePage() {
   const { data, loading, error } = useApi<{ profile: any }>(url)
 
   const profile = data?.profile
+
+  async function handleSignOut() {
+    try { await fetch('/api/auth/signout', { method: 'POST' }) } catch {}
+    signOut()
+    window.location.href = '/en'
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background" dir={dir}>
@@ -68,8 +78,23 @@ export function PublicProfilePage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" onClick={() => router.push(`/${locale}`)}>{t('common.signin')}</Button>
-          <Button size="sm" variant="outline" onClick={() => router.push(`/${locale}`)}>{t('common.signup')}</Button>
+          {session ? (
+            <>
+              <Button size="sm" variant="outline" onClick={() => goDashboard(lastSection || 'overview')}>
+                <Icon name="dashboard" size={16} />
+                {t('auth.goToDashboard')}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleSignOut}>
+                <Icon name="logout" size={16} />
+                {t('common.signout')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" onClick={() => router.push(`/${locale}/login`)}>{t('common.signin')}</Button>
+              <Button size="sm" variant="outline" onClick={() => router.push(`/${locale}/signup`)}>{t('common.signup')}</Button>
+            </>
+          )}
         </div>
       </header>
 
@@ -246,13 +271,15 @@ export function PublicProfilePage() {
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('common.from')}</p>
                       <p className="text-3xl font-bold text-foreground">{formatCurrency(profile.consultationFee, 'USD', locale)}</p>
                     </div>
-                    <Button size="lg" className="w-full gap-2" onClick={() => router.push(`/${locale}`)}>
+                    <Button size="lg" className="w-full gap-2" onClick={() => session ? goDashboard('browse') : router.push(`/${locale}/login`)}>
                       <Icon name="event_available" size={18} />
                       {t('common.bookNow')}
                     </Button>
-                    <Button size="lg" variant="outline" className="w-full gap-2" onClick={() => router.push(`/${locale}`)}>
-                      {t('common.signin')}
-                    </Button>
+                    {!session && (
+                      <Button size="lg" variant="outline" className="w-full gap-2" onClick={() => router.push(`/${locale}/signup`)}>
+                        {t('common.signup')}
+                      </Button>
+                    )}
                     <p className="text-center text-xs text-muted-foreground">{t('landing.feature.secure.desc')}</p>
                   </CardContent>
                 </Card>

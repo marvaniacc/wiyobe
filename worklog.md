@@ -1760,3 +1760,24 @@ Work Log:
 Stage Summary:
 - Phase 2 hardening complete and verified live. Test artifacts cleaned up.
 - Remaining known gaps (out of scope, for later phases): SMTP/Stripe/Google OAuth/Gemini keys still empty (features run in documented dev modes), in-memory rate limiter resets on process restart (fine for single pm2 fork; Redis needed only if scaling out).
+
+---
+
+Task ID: 22
+Agent: main (bug fix)
+Task: Fix "patient gets logged out" when opening a provider profile from the dashboard.
+
+Root Cause:
+- The SPA public-profile view (`PublicProfilePage`, rendered inside /dashboard via DefaultLanding when view.name === 'public-profile') never read the session from the Zustand store. It always rendered "Sign in / Sign up" buttons in the header and a "Book now" button that pushed to `/{locale}` (public landing). A logged-in patient clicking "View Profile" on a provider card saw sign-in UI and believed they had been logged out. Server-side session was never actually lost (verified: session cookie persists across /en, /api/auth/session, /api/providers/public).
+
+Fix:
+- `public-profile.tsx`: read `session`, `goDashboard`, `signOut`, `lastSection` from the store. Header now shows "Go to Dashboard" (returns to last dashboard section) + "Sign out" when authenticated; sign-in/sign-up (now linking to real `/{locale}/login` and `/{locale}/signup` pages) only when logged out. Book-now button routes authenticated users into the dashboard browse section (`goDashboard('browse')`); guests get login/signup instead.
+- `i18n.ts`: added `auth.goToDashboard` translations for tr/fa/ar (en + ru already present).
+
+Deploy tooling fixes found along the way (deploy.sh):
+- `npm install` failed with next-auth/nodemailer peer-dep conflict → deploy now uses `bun install --production` when bun is available (repo standard is bun.lock), else `npm --legacy-peer-deps`. Installed bun 1.4.0 on the VPS.
+- Health gate used `curl -sf` which treated the root `/` → `/en` redirect (307) as failure → now `curl -sfL`.
+- Health gate compared against cumulative pm2 `restart_time` (309 from history) → script now runs `pm2 reset` after restart so the gate only counts crashes from the current deploy. Verified: deploy now reports "App is ready!" and completes.
+
+Verification:
+- Build OK (BUILD_ID A9Q6M8i9q26caggzyg7mN), deploy.sh completes end-to-end, site 200 via localhost + https://wishubest.com, patient session persists after fetching provider public profile.
