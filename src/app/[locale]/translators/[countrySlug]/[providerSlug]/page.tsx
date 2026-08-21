@@ -146,8 +146,8 @@ export default async function TranslatorDetailPage({
 
   // Verify the translator actually has a presence in the requested country
   const hasCountryMatch =
-    translator.country === countryCode ||
-    translator.locations.some((loc) => loc.country === countryCode)
+    getCountrySlug(translator.country || "") === countrySlug ||
+    translator.locations.some((loc) => getCountrySlug(loc.country || "") === countrySlug)
   if (!hasCountryMatch) notFound()
 
   const countryName = getCountryName(countrySlug) || countrySlug

@@ -138,8 +138,12 @@ export function getCountryCode(slug: string): string | null {
  * Convert an ISO country code to a URL-friendly slug.
  * Returns null if the code is unknown.
  */
-export function getCountrySlug(code: string): string | null {
-  return COUNTRY_CODE_TO_SLUG[code.toUpperCase()] || null
+export function getCountrySlug(codeOrName: string): string | null {
+  const code = codeOrName.toUpperCase()
+  if (COUNTRY_CODE_TO_SLUG[code]) return COUNTRY_CODE_TO_SLUG[code]
+  const country = COUNTRIES.find((c) => c.name.toLowerCase() === codeOrName.toLowerCase())
+  if (country) return countryNameToSlug(country.name)
+  return null
 }
 
 /**

@@ -147,8 +147,8 @@ export default async function DoctorDetailPage({
 
   // Verify the doctor actually has a presence in the requested country
   const hasCountryMatch =
-    doctor.country === countryCode ||
-    doctor.locations.some((loc) => loc.country === countryCode)
+    getCountrySlug(doctor.country || "") === countrySlug ||
+    doctor.locations.some((loc) => getCountrySlug(loc.country || "") === countrySlug)
   if (!hasCountryMatch) notFound()
 
   const countryName = getCountryName(countrySlug) || countrySlug

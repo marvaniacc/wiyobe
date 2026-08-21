@@ -137,7 +137,7 @@ export default async function HospitalDetailPage({
 
   // Verify the hospital actually has a presence in the requested country
   const hasCountryMatch =
-    hospital.country === countryCode ||
+    getCountrySlug(hospital.country || "") === countrySlug ||
     hospital.locations.some((loc) => loc.country === countryCode)
   if (!hasCountryMatch) notFound()
 
