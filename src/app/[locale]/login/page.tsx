@@ -20,8 +20,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
  * Renders the AuthForm with type='login' and the current locale.
  * All labels are translated via the i18n dict.
  */
-export default async function LoginPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function LoginPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ redirect?: string }> }) {
   const { locale } = await params
+  const { redirect } = await searchParams
   const loc = locale as Locale
   const t = (k: string, f: string) => translate(loc, k, f)
 
@@ -32,7 +33,7 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
         <span>Wishubest</span>
       </Link>
 
-      <AuthForm type="login" locale={locale} />
+      <AuthForm type="login" locale={locale} redirectPath={redirect} />
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t('auth.noAccount', "Don't have an account?")}{' '}

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import { BookNowButton } from '@/components/shared/book-now-button'
 import { useT } from '@/hooks/use-t'
 import { useApi } from '@/hooks/use-api'
 import { formatCurrency, relativeTime } from '@/lib/money'
@@ -246,10 +247,7 @@ export function PublicProfilePage() {
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('common.from')}</p>
                       <p className="text-3xl font-bold text-foreground">{formatCurrency(profile.consultationFee, 'USD', locale)}</p>
                     </div>
-                    <Button size="lg" className="w-full gap-2" onClick={() => router.push(`/${locale}`)}>
-                      <Icon name="event_available" size={18} />
-                      {t('common.bookNow')}
-                    </Button>
+                    <BookNowButton locale={locale} providerId={providerId} providerType={providerType} variant="public-profile" />
                     <Button size="lg" variant="outline" className="w-full gap-2" onClick={() => router.push(`/${locale}`)}>
                       {t('common.signin')}
                     </Button>

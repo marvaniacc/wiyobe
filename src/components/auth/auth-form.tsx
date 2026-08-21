@@ -21,6 +21,7 @@ type AuthFormProps = {
   locale?: string
   display?: 'inline' | 'modal'
   buttonText?: string
+  redirectPath?: string
 }
 
 const ROLE_OPTIONS: { value: Role; labelKey: string; icon: string }[] = [
@@ -49,6 +50,7 @@ export function AuthForm({
   locale = 'en',
   display = 'inline',
   buttonText,
+  redirectPath,
 }: AuthFormProps) {
   const router = useRouter()
   const isSignup = type === 'signup'
@@ -114,7 +116,8 @@ export function AuthForm({
       if (!res.ok) throw new Error(data.error || t('auth.authFailed', 'Authentication failed'))
 
       toast.success(isSignup ? t('auth.accountCreated', 'Account created!') : t('auth.welcomeBack', 'Welcome back!'))
-      router.push('/dashboard')
+      // Redirect to the requested page (if any) or dashboard
+      router.push(redirectPath || '/dashboard')
       router.refresh()
     } catch (err: any) {
       toast.error(err.message || t('auth.authFailed', 'Authentication failed'))

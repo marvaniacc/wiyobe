@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
+import { BookNowButton } from '@/components/shared/book-now-button'
 import { notFound } from 'next/navigation'
 import { formatCurrency } from '@/lib/money'
 import {
@@ -373,15 +374,7 @@ export default async function TranslatorDetailPage({
                   </span>
                 </div>
               </div>
-              <Link
-                href="/dashboard"
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }} aria-hidden>
-                  event_available
-                </span>
-                Book now
-              </Link>
+              <BookNowButton locale={locale} providerId={translator.id} providerType="translator" />
             </div>
 
             <div className="rounded-[16px] border border-divider bg-surface p-5">
