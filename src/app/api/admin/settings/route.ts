@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic'
 /**
  * Determine which table a setting key belongs to:
  * - SiteSetting: siteName, tagline, logoUrl, SEO defaults, and
- *   headerConfig*/footerConfig* (including locale variants like
- *   headerConfigGuest_fa)
+ *   headerConfig{asterisk}/footerConfig{asterisk} (including locale
+ *   variants like headerConfigGuest_fa)
  * - Setting: everything else (legacy config)
  */
 function isSiteSettingKey(key: string): boolean {
