@@ -95,11 +95,21 @@ export function DefaultLanding() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [locale, theme])
 
-  // If a session exists and we're on landing, go to dashboard (restore last section if available)
+  // If a session exists and we're on landing, go to dashboard.
+  // Check ?section= query param FIRST — if present (e.g. from Book now button),
+  // go to that section instead of the default/last section.
   useEffect(() => {
     if (session && view.name === 'landing') {
-      const lastSection = useApp.getState().lastSection
-      goDashboard(lastSection || 'overview')
+      const params = new URLSearchParams(window.location.search)
+      const sectionParam = params.get('section')
+      if (sectionParam) {
+        // Clear the query param from URL
+        window.history.replaceState({}, '', window.location.pathname)
+        goDashboard(sectionParam)
+      } else {
+        const lastSection = useApp.getState().lastSection
+        goDashboard(lastSection || 'overview')
+      }
     }
     // If no session, redirect to /en (the public SSR landing page)
     if (!session && !sessionLoading && view.name === 'dashboard') {
