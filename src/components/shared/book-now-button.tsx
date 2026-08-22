@@ -60,8 +60,8 @@ export function BookNowButton({
       // Logged in → go to dashboard booking section with provider prefill
       const params = new URLSearchParams()
       if (providerId) params.set('provider', providerId)
-      if (providerType) params.set('type', providerType)
-      router.push(`/dashboard?section=bookings&${params.toString()}`)
+      if (providerType) params.set('type', providerType.toUpperCase())
+      router.push(`/dashboard?section=browse&${params.toString()}`)
     } else {
       // Not logged in → go to login with redirect back to current page
       const currentPath = window.location.pathname

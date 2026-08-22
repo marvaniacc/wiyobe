@@ -554,6 +554,59 @@ function BrowseSection() {
   const [bookProvider, setBookProvider] = useState<Provider | null>(null)
   const [bookOpen, setBookOpen] = useState(false)
   const [bookKey, setBookKey] = useState(0)
+  const [autoBookTriggered, setAutoBookTriggered] = useState(false)
+
+  // Check for ?provider=X&type=Y query params (from Book now button on
+  // public provider detail pages). Fetch the provider and auto-open the
+  // booking dialog.
+  useEffect(() => {
+    if (autoBookTriggered) return
+    const params = new URLSearchParams(window.location.search)
+    const providerId = params.get('provider')
+    const providerType = params.get('type')
+    if (providerId && providerType) {
+      setAutoBookTriggered(true)
+      // Clear the query params from URL
+      window.history.replaceState({}, '', window.location.pathname)
+      // Fetch this specific provider via API
+      fetch(`/api/providers/detail?id=${providerId}&type=${providerType}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.provider) {
+            // Map to the Provider interface expected by BookingDialog
+            const p = data.provider
+            const mapped: Provider = {
+              id: p.id,
+              providerType: providerType.toUpperCase() as ProviderType,
+              userId: p.userId || '',
+              name: p.name || p.user?.name || 'Provider',
+              avatarUrl: p.user?.avatarUrl || null,
+              specialty: p.specialty || '',
+              subSpecialties: p.subSpecialties || '',
+              bio: p.bio || '',
+              city: p.city || '',
+              country: p.country || '',
+              yearsExperience: p.yearsExperience || 0,
+              languages: p.languages || '',
+              education: p.education || '',
+              certifications: p.certifications || '',
+              verified: p.verified ?? true,
+              rating: p.rating || 0,
+              reviewCount: p.reviewCount || 0,
+              price: p.consultationFee || p.baseFee || p.pricePerNight || p.hourlyRate || '0',
+              onlinePrice: p.onlineFee || null,
+              priceLabel: '',
+              address: p.address || '',
+              extra: {},
+            }
+            setBookProvider(mapped)
+            setBookKey((k) => k + 1)
+            setBookOpen(true)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [autoBookTriggered])
 
   // Debounce search input
   React.useEffect(() => {

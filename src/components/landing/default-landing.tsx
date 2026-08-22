@@ -103,8 +103,12 @@ export function DefaultLanding() {
       const params = new URLSearchParams(window.location.search)
       const sectionParam = params.get('section')
       if (sectionParam) {
-        // Clear the query param from URL
-        window.history.replaceState({}, '', window.location.pathname)
+        // Remove only the 'section' param — preserve provider/type
+        // params so BrowseSection can auto-open the booking dialog.
+        params.delete('section')
+        const remaining = params.toString()
+        const newUrl = remaining ? `${window.location.pathname}?${remaining}` : window.location.pathname
+        window.history.replaceState({}, '', newUrl)
         goDashboard(sectionParam)
       } else {
         const lastSection = useApp.getState().lastSection
