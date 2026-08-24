@@ -37,8 +37,53 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (itinerary.status !== 'DRAFT') return error(409, `Itinerary is ${itinerary.status}. Only DRAFT itineraries can be booked.`)
     if (itinerary.items.length === 0) return error(400, 'Itinerary has no items')
 
-    const totalAmountCents = itinerary.totalEstimatedCost
-    const totalAmountDollars = (totalAmountCents / 100).toFixed(2)
+    // === Server-side price re-derivation ===
+    // The patient-set estimate (totalEstimatedCost / item.estimatedCost) is
+    // NEVER charged. Every item is re-priced from current DB state; services
+    // must belong to their provider and be active.
+    interface PricedItem { itemId: string; amountDollars: string; providerUserId: string | null }
+    const pricedItems: PricedItem[] = []
+    let totalPrice = 0
+    for (const item of itinerary.items) {
+      let providerUserId: string | null = null
+      let basePrice = '0'
+      if (item.providerType === 'DOCTOR') {
+        const p = await db.doctor.findUnique({ where: { id: item.providerId } })
+        if (!p || !p.verified) return error(409, 'A doctor in this itinerary is no longer available')
+        providerUserId = p.userId; basePrice = p.consultationFee
+      } else if (item.providerType === 'HOSPITAL') {
+        const p = await db.hospital.findUnique({ where: { id: item.providerId } })
+        if (!p || !p.verified) return error(409, 'A hospital in this itinerary is no longer available')
+        providerUserId = p.userId; basePrice = p.baseFee
+      } else if (item.providerType === 'HOTEL') {
+        const p = await db.hotel.findUnique({ where: { id: item.providerId } })
+        if (!p || !p.verified) return error(409, 'A hotel in this itinerary is no longer available')
+        providerUserId = p.userId; basePrice = p.pricePerNight
+      } else if (item.providerType === 'TRANSLATOR') {
+        const p = await db.translator.findUnique({ where: { id: item.providerId } })
+        if (!p || !p.verified) return error(409, 'A translator in this itinerary is no longer available')
+        providerUserId = p.userId; basePrice = p.hourlyRate
+      } else {
+        return error(400, 'Unknown provider type in itinerary')
+      }
+      let price = parseFloat(basePrice || '0')
+      if (item.serviceId) {
+        const svcOwnership =
+          item.providerType === 'DOCTOR' ? { doctorId: item.providerId }
+          : item.providerType === 'HOSPITAL' ? { hospitalId: item.providerId }
+          : item.providerType === 'HOTEL' ? { hotelId: item.providerId }
+          : { translatorId: item.providerId }
+        const svc = await db.service.findFirst({
+          where: { id: item.serviceId, providerType: item.providerType, isActive: true, ...svcOwnership },
+        })
+        if (svc) price = parseFloat(svc.price)
+      }
+      totalPrice += price
+      pricedItems.push({ itemId: item.id, amountDollars: price.toFixed(2), providerUserId })
+    }
+
+    const totalAmountCents = Math.round(totalPrice * 100)
+    const totalAmountDollars = totalPrice.toFixed(2)
 
     // === Step 1: Process payment (mock or Stripe) ===
     const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
@@ -100,16 +145,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // Process each itinerary item as a separate booking
         for (let i = 0; i < itinerary.items.length; i++) {
           const item = itinerary.items[i]
-          const itemAmountDollars = (item.estimatedCost / 100).toFixed(2)
-
-          // Resolve provider user ID
-          const providerUserId = await resolveProviderUser({
-            providerType: item.providerType,
-            doctorId: item.providerType === 'DOCTOR' ? item.providerId : null,
-            hospitalId: item.providerType === 'HOSPITAL' ? item.providerId : null,
-            hotelId: item.providerType === 'HOTEL' ? item.providerId : null,
-            translatorId: item.providerType === 'TRANSLATOR' ? item.providerId : null,
-          })
+          // Server-derived price + provider (see re-derivation above)
+          const priced = pricedItems[i]!
+          const itemAmountDollars = priced.amountDollars
+          const providerUserId = priced.providerUserId
 
           if (!providerUserId) {
             throw new Error(`Provider not found for ${item.providerType} ${item.providerId}`)

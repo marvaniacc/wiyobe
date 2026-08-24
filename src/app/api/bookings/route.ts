@@ -109,17 +109,33 @@ export async function POST(req: Request) {
     }
     if (!providerUserId) return error(400, 'Could not resolve provider')
 
-    // override amount with service price if provided
+    // Override amount with the service price — but the service MUST belong to
+    // the booked provider and be active. Otherwise a patient could book any
+    // provider while paying another provider's (cheap) price.
     if (body.serviceId) {
-      const svc = await db.service.findUnique({ where: { id: body.serviceId } })
-      if (svc) amount = svc.price
+      const svcOwnership =
+        pt === 'DOCTOR' ? { doctorId: body.providerId }
+        : pt === 'HOSPITAL' ? { hospitalId: body.providerId }
+        : pt === 'HOTEL' ? { hotelId: body.providerId }
+        : { translatorId: body.providerId }
+      const svc = await db.service.findFirst({
+        where: { id: body.serviceId, providerType: pt, isActive: true, ...svcOwnership },
+      })
+      if (!svc) return error(400, 'Selected service is not available for this provider')
+      amount = svc.price
     }
 
-    // if slot provided, lock it
+    // If slot provided, lock it — the slot MUST belong to the same provider.
     let slot: any = null
     if (body.slotId) {
-      slot = await db.slot.findUnique({ where: { id: body.slotId } })
-      if (!slot || slot.isBooked) return error(409, 'This slot is no longer available')
+      const slotOwnership =
+        pt === 'DOCTOR' ? { doctorId: body.providerId }
+        : pt === 'HOSPITAL' ? { hospitalId: body.providerId }
+        : pt === 'TRANSLATOR' ? { translatorId: body.providerId }
+        : null // hotels have no slots
+      if (!slotOwnership) return error(400, 'Slots are not supported for this provider type')
+      slot = await db.slot.findFirst({ where: { id: body.slotId, isBooked: false, ...slotOwnership } })
+      if (!slot) return error(409, 'This slot is no longer available')
     }
 
     // Get commission rates (platform + affiliate) for this provider type

@@ -9,7 +9,11 @@ import type { ProviderType } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'kyc')
+// KYC identity documents are SENSITIVE — they must never be web-served
+// statically. Files live OUTSIDE public/ and are streamed through the
+// authenticated route at /api/kyc/file/[name] (owner or admin only).
+const UPLOAD_DIR = path.join(process.cwd(), 'private-uploads', 'kyc')
+const PUBLIC_URL_PREFIX = '/api/kyc/file/'
 const MAX_FILE_SIZE_IMAGE = 5 * 1024 * 1024 // 5 MB for images/PDFs
 const MAX_FILE_SIZE_VIDEO = 15 * 1024 * 1024 // 15 MB for videos
 
@@ -19,9 +23,10 @@ const ALLOWED_MIME_TYPES = new Set([
   'video/webm', 'video/mp4', 'video/quicktime', 'video/x-msvideo',
 ])
 
-function getExtension(fileName: string, mimeType: string): string {
-  const fromName = path.extname(fileName)
-  if (fromName) return fromName
+// The on-disk extension is derived ONLY from the validated MIME type — never
+// from the user-supplied filename, which could smuggle `.html`/`.svg` onto
+// the app origin.
+function getExtension(mimeType: string): string {
   const map: Record<string, string> = {
     'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
     'image/webp': '.webp', 'image/bmp': '.bmp', 'application/pdf': '.pdf',
@@ -170,8 +175,8 @@ export async function POST(req: Request) {
       await mkdir(UPLOAD_DIR, { recursive: true })
     }
 
-    // Generate unique filename
-    const ext = getExtension(file.name, file.type)
+    // Generate unique filename (extension from MIME map only)
+    const ext = getExtension(file.type)
     const uniqueName = `${crypto.randomUUID()}${ext}`
     const fullPath = path.join(UPLOAD_DIR, uniqueName)
 
@@ -185,7 +190,7 @@ export async function POST(req: Request) {
       return error(500, 'Failed to save file to disk.')
     }
 
-    const filePath = `/uploads/kyc/${uniqueName}`
+    const filePath = `${PUBLIC_URL_PREFIX}${uniqueName}`
 
     // If there's an existing document for this requirement, delete it
     // (only one document per requirement — re-upload replaces the old one)
@@ -273,8 +278,18 @@ export async function DELETE(req: Request) {
 
     await db.kycDocument.delete({ where: { id } })
 
-    // Try to remove the file from disk (gracefully handle ENOENT)
-    if (doc.dataUrl?.startsWith('/uploads/')) {
+    // Try to remove the file from disk (gracefully handle ENOENT).
+    // Handles both the current private-store path and legacy public paths.
+    if (doc.dataUrl?.startsWith(PUBLIC_URL_PREFIX)) {
+      const name = path.basename(doc.dataUrl.slice(PUBLIC_URL_PREFIX.length))
+      const fullPath = path.join(UPLOAD_DIR, name)
+      try {
+        const { unlink } = await import('fs/promises')
+        await unlink(fullPath)
+      } catch (fsErr: any) {
+        if (fsErr.code !== 'ENOENT') console.error('[kyc delete] Failed to delete file:', fsErr)
+      }
+    } else if (doc.dataUrl?.startsWith('/uploads/')) {
       const fullPath = path.join(process.cwd(), 'public', doc.dataUrl)
       try {
         const { unlink } = await import('fs/promises')

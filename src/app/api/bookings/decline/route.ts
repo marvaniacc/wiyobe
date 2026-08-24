@@ -41,29 +41,44 @@ export async function POST(req: Request) {
       return error(409, `Booking is already ${booking.status}. Only PENDING bookings can be declined.`)
     }
 
-    const refundAmount = booking.amount // Full refund on decline
+    // Refund basis is the amount ACTUALLY PAID (payment.amount), never the
+    // list price in booking.amount.
+    const payment = booking.payment
+    const paidAmount = payment && ['SUCCEEDED', 'PARTIALLY_REFUNDED'].includes(payment.status)
+      ? Math.max(0, parseFloat(payment.amount) - parseFloat(payment.refundAmount || '0'))
+      : 0
+    const refundAmount = paidAmount.toFixed(2) // Full refund on decline
 
-    // Update payment to REFUNDED
-    await db.payment.update({
-      where: { bookingId: booking.id },
-      data: {
-        status: 'REFUNDED',
-        refundAmount: toDec(refundAmount),
-      },
-    })
+    // Gateway refund FIRST — DB records the refund only after Stripe confirms.
+    let stripeRefunded = false
+    if (parseFloat(refundAmount) > 0 && payment?.stripeChargeId) {
+      if (payment.stripeChargeId.startsWith('ch_mock_')) {
+        stripeRefunded = true // mock charges "refund" trivially
+      } else {
+        const { refundPayment } = await import('@/lib/stripe')
+        const refund = await refundPayment(payment.stripeChargeId, parseFloat(refundAmount))
+        if (refund) {
+          stripeRefunded = true
+          console.log(`Refund processed: ${refund.id} for $${refund.amount}`)
+        } else {
+          console.error(`[decline] Stripe refund FAILED for booking ${booking.id} (${payment.stripeChargeId})`)
+        }
+      }
+    }
+
+    if (payment && stripeRefunded && parseFloat(refundAmount) > 0) {
+      await db.payment.update({
+        where: { bookingId: booking.id },
+        data: {
+          status: 'REFUNDED',
+          refundAmount: toDec(refundAmount),
+        },
+      })
+    }
 
     // Release the slot
     if (booking.slotId) {
       await db.slot.update({ where: { id: booking.slotId }, data: { isBooked: false } })
-    }
-
-    // Process refund through Stripe if configured
-    if (booking.payment?.stripeChargeId && !booking.payment.stripeChargeId.startsWith('ch_mock_')) {
-      const { refundPayment } = await import('@/lib/stripe')
-      const refund = await refundPayment(booking.payment.stripeChargeId, parseFloat(refundAmount))
-      if (refund) {
-        console.log(`Refund processed: ${refund.id} for $${refund.amount}`)
-      }
     }
 
     const updated = await db.booking.update({

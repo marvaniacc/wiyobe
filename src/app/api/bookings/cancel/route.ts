@@ -41,40 +41,59 @@ export async function POST(req: Request) {
     if (booking.status === 'CANCELLED' || booking.status === 'REFUNDED') {
       return error(409, 'Booking already cancelled')
     }
+    // Only CONFIRMED bookings are cancellable. Cancelling COMPLETED/NO_SHOW
+    // bookings would refund delivered services; PENDING ones have no charge to reverse.
+    if (booking.status !== 'CONFIRMED') {
+      return error(409, `Booking is ${booking.status}. Only CONFIRMED bookings can be cancelled.`)
+    }
 
     // Cancellation fee logic: if within free window, full refund; else partial with fee retained
     const policy = await getCancellationPolicy(booking.providerType)
     const hoursUntil = (booking.startDate.getTime() - Date.now()) / 3600000
     const withinFreeWindow = hoursUntil >= policy.freeCancellationHours
     const feePercent = withinFreeWindow ? 0 : parseFloat(policy.cancellationFeePercent)
-    const paidAmount = parseFloat(booking.amount)
+    // Refund basis is the amount ACTUALLY PAID (payment.amount), never the
+    // list price in booking.amount — otherwise promo discounts over-refund.
+    const payment = booking.payment
+    const paidAmount = payment && ['SUCCEEDED', 'PARTIALLY_REFUNDED'].includes(payment.status)
+      ? Math.max(0, parseFloat(payment.amount) - parseFloat(payment.refundAmount || '0'))
+      : 0
     const refundAmount = (paidAmount * (1 - feePercent / 100)).toFixed(2)
-    const feeRetained = subDec(booking.amount, refundAmount)
+    const feeRetained = subDec(paidAmount.toFixed(2), refundAmount)
 
-    // Process refund through Stripe (mock — real impl: stripe.refunds.create)
-    await db.payment.update({
-      where: { bookingId: booking.id },
-      data: {
-        status: feeRetained === '0.00' ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
-        refundAmount: toDec(refundAmount),
-      },
-    })
+    // Process the gateway refund FIRST — the DB may only record a refund
+    // after Stripe confirms it, otherwise a failed refund leaves phantom state.
+    let stripeRefunded = false
+    if (parseFloat(refundAmount) > 0 && payment?.stripeChargeId) {
+      if (payment.stripeChargeId.startsWith('ch_mock_')) {
+        stripeRefunded = true // mock charges "refund" trivially
+      } else {
+        const { refundPayment } = await import('@/lib/stripe')
+        const refund = await refundPayment(payment.stripeChargeId, parseFloat(refundAmount))
+        if (refund) {
+          stripeRefunded = true
+          console.log(`Refund processed: ${refund.id} for $${refund.amount}`)
+        } else {
+          // Do not mark the payment refunded. Booking proceeds to CANCELLED;
+          // the refund must be retried manually by an administrator.
+          console.error(`[cancel] Stripe refund FAILED for booking ${booking.id} (${payment.stripeChargeId})`)
+        }
+      }
+    }
+
+    if (payment && stripeRefunded && parseFloat(refundAmount) > 0) {
+      await db.payment.update({
+        where: { bookingId: booking.id },
+        data: {
+          status: feeRetained === '0.00' ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+          refundAmount: toDec(refundAmount),
+        },
+      })
+    }
 
     // Release slot
     if (booking.slotId) {
       await db.slot.update({ where: { id: booking.slotId }, data: { isBooked: false } })
-    }
-
-    // Process refund through Stripe if configured
-    if (booking.payment?.stripeChargeId && !booking.payment.stripeChargeId.startsWith('ch_mock_')) {
-      const { refundPayment } = await import('@/lib/stripe')
-      const refund = await refundPayment(
-        booking.payment.stripeChargeId,
-        parseFloat(refundAmount)
-      )
-      if (refund) {
-        console.log(`Refund processed: ${refund.id} for $${refund.amount}`)
-      }
     }
 
     const updated = await db.booking.update({
@@ -107,16 +126,9 @@ export async function POST(req: Request) {
       if (aff) {
         const commissionAmount = parseFloat(booking.affiliateAmount)
 
-        // Determine whether to reverse from pendingBalance or availableBalance
-        // If booking was COMPLETED, the commission was already moved to availableBalance
-        // Otherwise it's still in pendingBalance
-        if (booking.status === 'COMPLETED') {
-          const newAvailable = Math.max(0, parseFloat(aff.availableBalance) - commissionAmount).toFixed(2)
-          await db.affiliate.update({
-            where: { userId: booking.affiliateId },
-            data: { availableBalance: newAvailable },
-          })
-        } else {
+        // Only CONFIRMED bookings reach this point (guard above), so the
+        // commission is still held in pendingBalance — never yet released.
+        {
           const newPending = Math.max(0, parseFloat(aff.pendingBalance) - commissionAmount).toFixed(2)
           await db.affiliate.update({
             where: { userId: booking.affiliateId },
