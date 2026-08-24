@@ -2,14 +2,25 @@ import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
-const SECRET = process.env.AUTH_SECRET
-if (!SECRET) {
-  throw new Error('AUTH_SECRET environment variable is required. Set it in your .env file.')
-}
-// Re-bind to a narrowed type so downstream usages are guaranteed non-null.
-const AUTH_SECRET: string = SECRET
+// ============================================================================
+// Auth — simple, database-backed opaque session tokens.
+//
+// Design:
+//   • Login issues a 256-bit random token stored in an httpOnly cookie.
+//   • Only a SHA-256 hash of the token is persisted (DB leak ≠ session theft).
+//   • Every request resolves cookie → Session row → User row. One source of
+//     truth: deleting the row revokes the session everywhere, instantly.
+//   • Expired rows are deleted lazily on access and opportunistically on login.
+//
+// Public API (unchanged — 80+ routes depend on it):
+//   getSession(), requireUser(), requireRole(...roles), setSessionCookie(),
+//   clearSessionCookie(), invalidateSessions(userId),
+//   hashPassword(), verifyPassword(), type SessionUser
+// ============================================================================
+
 const COOKIE_NAME = 'mt_session'
-const SESSION_TTL_MS = 60 * 60 * 24 * 7 // 7 days
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
+const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex')
@@ -24,55 +35,50 @@ export function verifyPassword(password: string, stored: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(test, 'hex'))
 }
 
-function signToken(payload: object): string {
-  const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url')
-  return `${body}.${sig}`
+function sha256(input: string): string {
+  return crypto.createHash('sha256').update(input).digest('hex')
 }
 
-function safeEqual(a: string, b: string): boolean {
-  const ba = Buffer.from(a)
-  const bb = Buffer.from(b)
-  if (ba.length !== bb.length) return false
-  return crypto.timingSafeEqual(ba, bb)
+function hashToken(rawToken: string): string {
+  return sha256(rawToken)
 }
 
-function verifyToken<T = any>(token: string): T | null {
-  const [body, sig] = token.split('.')
-  if (!body || !sig) return null
-  // Length-safe comparison — a mismatched-length signature must be treated as
-  // an invalid token, not crash with ERR_CRYPTO_TIMING_SAFE_EQUAL_LENGTHS.
-  if (!safeEqual(sig, crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url'))) return null
-  try {
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as T & { iat?: number; exp?: number }
-    // Enforce expiry server-side (cookie maxAge is not enforcement).
-    if (typeof payload.exp === 'number') {
-      if (payload.exp < Date.now()) return null
-    } else if (typeof payload.iat === 'number') {
-      // Legacy tokens without exp: fall back to iat + TTL.
-      if (payload.iat + SESSION_TTL_MS < Date.now()) return null
-    }
-    return payload as T
-  } catch {
-    return null
-  }
-}
-
-export async function setSessionCookie(userId: string, role: string) {
-  const now = Date.now()
-  const token = signToken({ uid: userId, role, iat: now, exp: now + SESSION_TTL_MS })
+export async function setSessionCookie(userId: string, _role?: string) {
+  const rawToken = crypto.randomBytes(32).toString('base64url')
+  await db.session.create({
+    data: {
+      userId,
+      tokenHash: hashToken(rawToken),
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    },
+  })
   const c = await cookies()
-  c.set(COOKIE_NAME, token, {
+  c.set(COOKIE_NAME, rawToken, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: SESSION_TTL_MS / 1000,
+    maxAge: SESSION_TTL_SECONDS,
   })
+  // Opportunistic cleanup of dead sessions (expired or stale beyond TTL).
+  db.session
+    .deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { createdAt: { lt: new Date(Date.now() - SESSION_TTL_MS * 2) } },
+        ],
+      },
+    })
+    .catch(() => {})
 }
 
 export async function clearSessionCookie() {
   const c = await cookies()
+  const rawToken = c.get(COOKIE_NAME)?.value
+  if (rawToken) {
+    await db.session.deleteMany({ where: { tokenHash: hashToken(rawToken) } }).catch(() => {})
+  }
   c.delete(COOKIE_NAME)
 }
 
@@ -93,12 +99,25 @@ export type SessionUser = {
 }
 
 export async function getSession(): Promise<SessionUser | null> {
-  const token = await getSessionToken()
-  if (!token) return null
-  const payload = verifyToken<{ uid: string; role: string; iat?: number }>(token)
-  if (!payload) return null
+  const rawToken = await getSessionToken()
+  if (!rawToken) return null
+
+  let session
+  try {
+    session = await db.session.findUnique({ where: { tokenHash: hashToken(rawToken) } })
+  } catch {
+    return null // DB unavailable — fail closed
+  }
+  if (!session) return null
+
+  // Expired session → revoke it and treat as logged out.
+  if (session.expiresAt.getTime() < Date.now()) {
+    await db.session.delete({ where: { id: session.id } }).catch(() => {})
+    return null
+  }
+
   const user = await db.user.findUnique({
-    where: { id: payload.uid },
+    where: { id: session.userId },
     select: {
       id: true,
       email: true,
@@ -108,25 +127,17 @@ export async function getSession(): Promise<SessionUser | null> {
       preferredLanguage: true,
       avatarUrl: true,
       kycStatus: true,
-      sessionsInvalidAfter: true,
     },
   })
   if (!user || user.status === 'SUSPENDED') return null
-  // Revocation: reject tokens issued before the invalidation timestamp.
-  if (payload.iat && user.sessionsInvalidAfter && payload.iat < user.sessionsInvalidAfter.getTime()) return null
-  const { sessionsInvalidAfter: _ignored, ...session } = user
-  return session as SessionUser
+  return user as SessionUser
 }
 
 /**
- * Invalidate all existing session tokens for a user (e.g. after a password
- * reset or suspension). New logins mint tokens with a fresh iat and remain valid.
+ * Revoke every session belonging to a user (password reset, suspension, etc).
  */
 export async function invalidateSessions(userId: string) {
-  await db.user.update({
-    where: { id: userId },
-    data: { sessionsInvalidAfter: new Date() },
-  })
+  await db.session.deleteMany({ where: { userId } }).catch(() => {})
 }
 
 export async function requireUser(): Promise<SessionUser> {

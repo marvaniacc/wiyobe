@@ -15,8 +15,8 @@ export async function GET() {
     })
     // Strip credential material from every row before sending.
     const safeUsers = users.map((u) => {
-      const { passwordHash: _ph, googleId: _gi, sessionsInvalidAfter: _si, ...rest } = u
-      void _ph; void _gi; void _si
+      const { passwordHash: _ph, googleId: _gi, ...rest } = u
+      void _ph; void _gi
       return rest
     })
     return json({ users: safeUsers })
@@ -48,10 +48,6 @@ export async function POST(req: Request) {
     // Suspension/rejection must also revoke the user's existing sessions.
     if (body.action === 'suspend' || body.action === 'reject') {
       await invalidateSessions(user.id)
-    }
-    // Re-approval clears the revocation marker so future suspensions start clean.
-    if (body.action === 'activate' || body.action === 'approve') {
-      await db.user.update({ where: { id: user.id }, data: { sessionsInvalidAfter: null } })
     }
 
     if (verified) {

@@ -15,8 +15,8 @@ export async function GET() {
     })
     if (!user) return error(404, 'User not found')
     // Never expose credential material to the client.
-    const { passwordHash: _ph, googleId: _gi, sessionsInvalidAfter: _si, ...safeUser } = user
-    void _ph; void _gi; void _si
+    const { passwordHash: _ph, googleId: _gi, ...safeUser } = user
+    void _ph; void _gi
     return json({ user: safeUser })
   } catch (e) { return handleError(e) }
 }

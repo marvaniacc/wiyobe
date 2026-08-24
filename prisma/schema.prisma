@@ -1,9 +1,9 @@
 // Global Medical Tourism Marketplace — full data model
 generator client {
-  provider        = "prisma-client-js"
+  provider      = "prisma-client-js"
   // Vercel runs on Amazon Linux 2 (rhel-openssl-3.0.x); local dev is debian-based.
   // Listing both ensures the Prisma engine binary works in both environments.
-  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -75,74 +75,73 @@ enum PayoutStatus {
 }
 
 model User {
-  id                String       @id @default(cuid())
-  email             String       @unique
-  passwordHash      String?      // optional — Google-only users have no password
-  googleId          String?      @unique
-  authProvider      String       @default("password") // "password" | "google" | "otp"
+  id                String     @id @default(cuid())
+  email             String     @unique
+  passwordHash      String? // optional — Google-only users have no password
+  googleId          String?    @unique
+  authProvider      String     @default("password") // "password" | "google" | "otp"
   emailVerified     DateTime?
   role              Role
-  status            UserStatus   @default(ACTIVE)
+  status            UserStatus @default(ACTIVE)
   name              String?
   phone             String?
   avatarUrl         String?
-  preferredLanguage String       @default("en")
+  preferredLanguage String     @default("en")
   country           String?
   city              String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  // Sessions issued (token iat) before this timestamp are rejected — set on
-  // password reset / suspension to revoke all existing sessions.
-  sessionsInvalidAfter DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  patient           Patient?
-  doctor            Doctor?
-  hospital          Hospital?
-  hotel             Hotel?
-  translator        Translator?
-  bookings          Booking[]    @relation("patientBookings")
-  ledgerEntries     LedgerEntry[]
-  reviewsAuthored   Review[]     @relation("reviewAuthor")
-  reviewsReceived   Review[]     @relation("reviewSubject")
-  payouts           Payout[]
-  notifications     Notification[]
-  favorites         Favorite[]   @relation("favorites")
-  medicalDocuments  MedicalDocument[] @relation("medicalDocuments")
+  sessions Session[]
+
+  patient               Patient?
+  doctor                Doctor?
+  hospital              Hospital?
+  hotel                 Hotel?
+  translator            Translator?
+  bookings              Booking[]             @relation("patientBookings")
+  ledgerEntries         LedgerEntry[]
+  reviewsAuthored       Review[]              @relation("reviewAuthor")
+  reviewsReceived       Review[]              @relation("reviewSubject")
+  payouts               Payout[]
+  notifications         Notification[]
+  favorites             Favorite[]            @relation("favorites")
+  medicalDocuments      MedicalDocument[]     @relation("medicalDocuments")
   // Medical documents that other patients (or this user's patients) have
   // explicitly shared with this user (when they are a doctor).
-  sharedMedicalRecords MedicalRecordAccess[] @relation("doctorRecordAccess")
-  disputesRaised    Dispute[]    @relation("disputesRaised")
-  disputesAgainst   Dispute[]    @relation("disputesAgainst")
-  disputesResolved  Dispute[]    @relation("disputesResolved")
-  affiliate         Affiliate?
-  affiliateReferrals AffiliateClick[] @relation("affiliateReferrals")
+  sharedMedicalRecords  MedicalRecordAccess[] @relation("doctorRecordAccess")
+  disputesRaised        Dispute[]             @relation("disputesRaised")
+  disputesAgainst       Dispute[]             @relation("disputesAgainst")
+  disputesResolved      Dispute[]             @relation("disputesResolved")
+  affiliate             Affiliate?
+  affiliateReferrals    AffiliateClick[]      @relation("affiliateReferrals")
   referredByAffiliateId String?
-  referredByAffiliate  Affiliate? @relation("ReferredProviders", fields: [referredByAffiliateId], references: [id])
-  referredAt           DateTime?
+  referredByAffiliate   Affiliate?            @relation("ReferredProviders", fields: [referredByAffiliateId], references: [id])
+  referredAt            DateTime?
   // Cryptographically secure token used to authenticate read-only iCal feed
   // access (/api/calendar/[token]) for providers (DOCTOR, HOSPITAL, HOTEL,
   // TRANSLATOR) without requiring a login session. NULL for non-providers.
-  calendarToken        String?      @unique
+  calendarToken         String?               @unique
   // KYC status: PENDING (not started), IN_REVIEW (submitted, awaiting admin),
   // APPROVED (all required docs approved), REJECTED (at least one rejected).
-  kycStatus            String       @default("PENDING")
-  kycDocuments      KycDocument[] @relation("kycDocuments")
-  kycReviewed       KycDocument[] @relation("kycReviewed")
-  ticketsRaised     Ticket[]    @relation("ticketsRaised")
-  ticketMessages    TicketMessage[] @relation("ticketMessages")
-  chatMessages      ChatMessage[] @relation("chatSender")
-  itineraries       Itinerary[]  @relation("PatientItineraries")
+  kycStatus             String                @default("PENDING")
+  kycDocuments          KycDocument[]         @relation("kycDocuments")
+  kycReviewed           KycDocument[]         @relation("kycReviewed")
+  ticketsRaised         Ticket[]              @relation("ticketsRaised")
+  ticketMessages        TicketMessage[]       @relation("ticketMessages")
+  chatMessages          ChatMessage[]         @relation("chatSender")
+  itineraries           Itinerary[]           @relation("PatientItineraries")
   // In-app CMS blog posts authored by this user (admin).
-  blogPosts         BlogPost[]
-  mediaAssets       MediaAsset[]
+  blogPosts             BlogPost[]
+  mediaAssets           MediaAsset[]
 }
 
 model OtpCode {
   id        String   @id @default(cuid())
   email     String
-  code      String   // 6-digit code
-  purpose   String   // "signup" | "signin" | "reset"
-  payload   String?  // JSON of stashed signup data for signup OTP
+  code      String // 6-digit code
+  purpose   String // "signup" | "signin" | "reset"
+  payload   String? // JSON of stashed signup data for signup OTP
   expiresAt DateTime
   used      Boolean  @default(false)
   attempts  Int      @default(0)
@@ -150,101 +149,101 @@ model OtpCode {
 }
 
 model Notification {
-  id         String   @id @default(cuid())
-  userId     String   // recipient
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type       String   // legacy type field: "booking_created" | "booking_cancelled" | etc.
-  category   String   @default("SYSTEM")  // BOOKING | KYC | CHAT | SYSTEM | ANNOUNCEMENT | PAYOUT | REVIEW
-  title      String
-  body       String
-  isRead     Boolean  @default(false)
-  read       Boolean  @default(false)  // legacy field (kept for backward compat — mirrors isRead)
-  link       String?  // dashboard section to navigate to
-  metadata   Json?    // structured extra data, e.g. { reason: "Image blurred" }
-  meta       String?  // legacy JSON string field (kept for backward compat)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String // recipient
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // legacy type field: "booking_created" | "booking_cancelled" | etc.
+  category  String   @default("SYSTEM") // BOOKING | KYC | CHAT | SYSTEM | ANNOUNCEMENT | PAYOUT | REVIEW
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  read      Boolean  @default(false) // legacy field (kept for backward compat — mirrors isRead)
+  link      String? // dashboard section to navigate to
+  metadata  Json? // structured extra data, e.g. { reason: "Image blurred" }
+  meta      String? // legacy JSON string field (kept for backward compat)
+  createdAt DateTime @default(now())
 
   @@index([userId, isRead])
   @@index([category])
 }
 
 model Favorite {
-  id        String   @id @default(cuid())
-  patientId String   // patient user id
-  patient   User     @relation("favorites", fields: [patientId], references: [id], onDelete: Cascade)
-  providerId String  // provider's id (doctor/hospital/hotel/translator record id)
-  providerType String
+  id             String   @id @default(cuid())
+  patientId      String // patient user id
+  patient        User     @relation("favorites", fields: [patientId], references: [id], onDelete: Cascade)
+  providerId     String // provider's id (doctor/hospital/hotel/translator record id)
+  providerType   String
   providerUserId String // provider's user id
-  createdAt DateTime @default(now())
+  createdAt      DateTime @default(now())
 
   @@unique([patientId, providerId])
 }
 
 model Patient {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dateOfBirth   String?
-  gender        String?
-  bloodGroup    String?
-  medicalHistory String?
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth      String?
+  gender           String?
+  bloodGroup       String?
+  medicalHistory   String?
   emergencyContact String?
-  passportNumber String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  passportNumber   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model Doctor {
-  id               String    @id @default(cuid())
-  userId           String    @unique
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  specialty        String
-  subSpecialties   String    // comma-separated
-  bio              String
-  city             String
-  country          String
-  slug             String?   @unique           // URL-friendly slug (e.g., "luis-sharon")
-  yearsExperience  Int       @default(0)
-  consultationFee  String    @default("0")
-  onlineFee        String    @default("0")
-  languages        String    // comma-separated language codes
-  education        String
-  certifications   String
-  verified         Boolean   @default(false)
-  rating           Float     @default(0)
-  reviewCount      Int       @default(0)
-  services         Service[]
-  slots            Slot[]
-  bookings         Booking[]
-  locations        ProviderLocation[] @relation("DoctorLocations")
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-}
-
-model Hospital {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name            String
-  description     String
-  address         String
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty       String
+  subSpecialties  String // comma-separated
+  bio             String
   city            String
   country         String
-  slug            String?   @unique
-  departments     String    // comma-separated
-  accreditations  String    // comma-separated
-  beds            Int       @default(0)
-  baseFee         String    @default("0")
-  languages       String
-  verified        Boolean   @default(false)
-  rating          Float     @default(0)
-  reviewCount     Int       @default(0)
+  slug            String?            @unique // URL-friendly slug (e.g., "luis-sharon")
+  yearsExperience Int                @default(0)
+  consultationFee String             @default("0")
+  onlineFee       String             @default("0")
+  languages       String // comma-separated language codes
+  education       String
+  certifications  String
+  verified        Boolean            @default(false)
+  rating          Float              @default(0)
+  reviewCount     Int                @default(0)
   services        Service[]
   slots           Slot[]
   bookings        Booking[]
-  locations       ProviderLocation[] @relation("HospitalLocations")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  locations       ProviderLocation[] @relation("DoctorLocations")
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+model Hospital {
+  id             String             @id @default(cuid())
+  userId         String             @unique
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  description    String
+  address        String
+  city           String
+  country        String
+  slug           String?            @unique
+  departments    String // comma-separated
+  accreditations String // comma-separated
+  beds           Int                @default(0)
+  baseFee        String             @default("0")
+  languages      String
+  verified       Boolean            @default(false)
+  rating         Float              @default(0)
+  reviewCount    Int                @default(0)
+  services       Service[]
+  slots          Slot[]
+  bookings       Booking[]
+  locations      ProviderLocation[] @relation("HospitalLocations")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 }
 
 model Hotel {
@@ -256,10 +255,10 @@ model Hotel {
   address       String
   city          String
   country       String
-  slug          String?   @unique           // URL-friendly slug (e.g., "hilton-berlin")
+  slug          String?   @unique // URL-friendly slug (e.g., "hilton-berlin")
   starRating    Int       @default(3)
-  amenities     String    // comma-separated
-  roomTypes     String    // comma-separated
+  amenities     String // comma-separated
+  roomTypes     String // comma-separated
   pricePerNight String    @default("0")
   languages     String
   verified      Boolean   @default(false)
@@ -274,28 +273,28 @@ model Hotel {
 }
 
 model Translator {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  languages         String    // comma-separated translation language pairs (e.g., "en->fa,fa->en")
-  spokenLanguages   String    @default("")  // comma-separated spoken languages (e.g., "Arabic,Persian,English,German")
-  specialization    String    // medical, legal, general
-  bio               String
-  city              String
-  country           String
-  slug              String?   @unique         // URL-friendly slug (e.g., "luis-translator")
-  hourlyRate        String    @default("0")
-  dailyRate         String    @default("0")
-  yearsExperience   Int       @default(0)
-  verified          Boolean   @default(false)
-  rating            Float     @default(0)
-  reviewCount       Int       @default(0)
-  services          Service[]
-  slots             Slot[]
-  bookings          Booking[]
-  locations         ProviderLocation[] @relation("TranslatorLocations")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languages       String // comma-separated translation language pairs (e.g., "en->fa,fa->en")
+  spokenLanguages String             @default("") // comma-separated spoken languages (e.g., "Arabic,Persian,English,German")
+  specialization  String // medical, legal, general
+  bio             String
+  city            String
+  country         String
+  slug            String?            @unique // URL-friendly slug (e.g., "luis-translator")
+  hourlyRate      String             @default("0")
+  dailyRate       String             @default("0")
+  yearsExperience Int                @default(0)
+  verified        Boolean            @default(false)
+  rating          Float              @default(0)
+  reviewCount     Int                @default(0)
+  services        Service[]
+  slots           Slot[]
+  bookings        Booking[]
+  locations       ProviderLocation[] @relation("TranslatorLocations")
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 }
 
 model Service {
@@ -321,19 +320,19 @@ model Service {
 }
 
 model Slot {
-  id           String     @id @default(cuid())
+  id           String      @id @default(cuid())
   doctorId     String?
   hospitalId   String?
   translatorId String?
-  doctor       Doctor?    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  hospital     Hospital?  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  doctor       Doctor?     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital     Hospital?   @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
   translator   Translator? @relation(fields: [translatorId], references: [id], onDelete: Cascade)
   startTime    DateTime
   endTime      DateTime
-  visitType    VisitType  @default(IN_PERSON)
-  isBooked     Boolean    @default(false)
+  visitType    VisitType   @default(IN_PERSON)
+  isBooked     Boolean     @default(false)
   booking      Booking?
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime    @default(now())
 }
 
 model Booking {
@@ -359,12 +358,12 @@ model Booking {
   endDate            DateTime?
   amount             String        @default("0")
   currency           String        @default("USD")
-  commissionRate     String        @default("0")       // platform commission %
-  commissionAmount   String        @default("0")       // platform commission $
-  affiliateRate      String        @default("0")       // affiliate commission %
-  affiliateAmount    String        @default("0")       // affiliate commission $
-  affiliateId        String?       // affiliate user id who earns (null = no affiliate, platform keeps both)
-  providerNetAmount  String        @default("0")       // provider receives = amount - platform - affiliate
+  commissionRate     String        @default("0") // platform commission %
+  commissionAmount   String        @default("0") // platform commission $
+  affiliateRate      String        @default("0") // affiliate commission %
+  affiliateAmount    String        @default("0") // affiliate commission $
+  affiliateId        String? // affiliate user id who earns (null = no affiliate, platform keeps both)
+  providerNetAmount  String        @default("0") // provider receives = amount - platform - affiliate
   videoSessionUrl    String?
   notes              String?
   cancellationReason String?
@@ -375,47 +374,47 @@ model Booking {
   // PLATFORM's commission — the provider always receives their full net share.
   promoCodeId        String?
   promoCode          PromoCode?    @relation(fields: [promoCodeId], references: [id])
-  discountAmount     String        @default("0")       // snapshot of the discount applied (capped at platformCut)
+  discountAmount     String        @default("0") // snapshot of the discount applied (capped at platformCut)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  payment            Payment?
-  ledgerEntries      LedgerEntry[]
-  review             Review?
-  disputes           Dispute[]
-  chatMessages       ChatMessage[]
-  itineraryId        String?
-  itinerary          Itinerary?  @relation(fields: [itineraryId], references: [id])
+  payment       Payment?
+  ledgerEntries LedgerEntry[]
+  review        Review?
+  disputes      Dispute[]
+  chatMessages  ChatMessage[]
+  itineraryId   String?
+  itinerary     Itinerary?    @relation(fields: [itineraryId], references: [id])
 }
 
 /// Promo codes for patient conversion boosts. The discount is always
 /// deducted from the platform's commission, never from provider revenue.
 model PromoCode {
   id            String    @id @default(cuid())
-  code          String    @unique              // e.g. "WINTER10" — stored uppercase
-  discountType  String                          // "PERCENTAGE" | "FIXED"
-  discountValue Int                             // Percentage: 1-100. Fixed: amount in cents.
-  maxUses       Int?                            // null = unlimited
+  code          String    @unique // e.g. "WINTER10" — stored uppercase
+  discountType  String // "PERCENTAGE" | "FIXED"
+  discountValue Int // Percentage: 1-100. Fixed: amount in cents.
+  maxUses       Int? // null = unlimited
   usedCount     Int       @default(0)
   expiryDate    DateTime?
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  bookings      Booking[]
+  bookings Booking[]
 }
 
 model Payment {
-  id            String        @id @default(cuid())
-  bookingId     String        @unique
-  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  bookingId      String        @unique
+  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   stripeChargeId String?
-  amount        String        @default("0")
-  currency      String        @default("USD")
-  status        PaymentStatus @default(PENDING)
-  refundAmount  String        @default("0")
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  amount         String        @default("0")
+  currency       String        @default("USD")
+  status         PaymentStatus @default(PENDING)
+  refundAmount   String        @default("0")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   ledgerEntries LedgerEntry[]
 }
@@ -429,7 +428,7 @@ model LedgerEntry {
   payment     Payment?   @relation(fields: [paymentId], references: [id])
   payoutId    String?
   payout      Payout?    @relation(fields: [payoutId], references: [id])
-  userId      String?    // provider user id (for provider balances)
+  userId      String? // provider user id (for provider balances)
   user        User?      @relation(fields: [userId], references: [id])
   amount      String     @default("0") // signed: + credit, - debit
   description String
@@ -438,53 +437,53 @@ model LedgerEntry {
 }
 
 model Payout {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   providerUserId String
-  providerUser   User         @relation(fields: [providerUserId], references: [id])
+  providerUser   User          @relation(fields: [providerUserId], references: [id])
   providerType   ProviderType
-  amount         String       @default("0")
-  currency       String       @default("USD")
-  status         PayoutStatus @default(PENDING)
-  method         String       @default("bank_transfer")
+  amount         String        @default("0")
+  currency       String        @default("USD")
+  status         PayoutStatus  @default(PENDING)
+  method         String        @default("bank_transfer")
   reference      String?
   periodStart    DateTime
   periodEnd      DateTime
   note           String?
   ledgerEntries  LedgerEntry[]
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime      @default(now())
   completedAt    DateTime?
 }
 
 model Review {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   authorId      String
-  author        User     @relation("reviewAuthor", fields: [authorId], references: [id])
+  author        User      @relation("reviewAuthor", fields: [authorId], references: [id])
   subjectUserId String
-  subjectUser   User     @relation("reviewSubject", fields: [subjectUserId], references: [id])
-  bookingId     String   @unique
-  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  subjectUser   User      @relation("reviewSubject", fields: [subjectUserId], references: [id])
+  bookingId     String    @unique
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   rating        Int
   comment       String
-  language      String   @default("en")
+  language      String    @default("en")
   reply         String?
   repliedAt     DateTime?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 }
 
 model CommissionRate {
-  id           String       @id @default(cuid())
-  providerType ProviderType @unique
-  rate         String       @default("12") // platform commission percentage
-  affiliateRate String      @default("25") // percentage of the PLATFORM'S COMMISSION that the affiliate receives
-  updatedAt    DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  providerType  ProviderType @unique
+  rate          String       @default("12") // platform commission percentage
+  affiliateRate String       @default("25") // percentage of the PLATFORM'S COMMISSION that the affiliate receives
+  updatedAt     DateTime     @updatedAt
 }
 
 model CancellationPolicy {
-  id                      String       @id @default(cuid())
-  providerType            ProviderType @unique
-  freeCancellationHours   Int          @default(24)
-  cancellationFeePercent  String       @default("20")
-  updatedAt               DateTime     @updatedAt
+  id                     String       @id @default(cuid())
+  providerType           ProviderType @unique
+  freeCancellationHours  Int          @default(24)
+  cancellationFeePercent String       @default("20")
+  updatedAt              DateTime     @updatedAt
 }
 
 model Setting {
@@ -494,16 +493,16 @@ model Setting {
 }
 
 model MedicalDocument {
-  id         String   @id @default(cuid())
-  patientId  String   // patient user id
-  patient    User     @relation("medicalDocuments", fields: [patientId], references: [id], onDelete: Cascade)
-  fileName   String
-  fileType   String   // MIME type
-  fileSize   Int
-  category   String   // "prescription" | "test_result" | "insurance" | "passport" | "other"
-  dataUrl    String   // base64 data URL (MVP) — would be S3 URL in production
-  notes      String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  patientId String // patient user id
+  patient   User     @relation("medicalDocuments", fields: [patientId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileType  String // MIME type
+  fileSize  Int
+  category  String // "prescription" | "test_result" | "insurance" | "passport" | "other"
+  dataUrl   String // base64 data URL (MVP) — would be S3 URL in production
+  notes     String?
+  createdAt DateTime @default(now())
 
   // Doctors the patient has explicitly granted access to this document.
   // A join table is used instead of a String[] scalar list because SQLite
@@ -511,20 +510,20 @@ model MedicalDocument {
   // authorization queries (a doctor can fetch only documents where a row
   // with their userId exists here).
   accessGrants MedicalRecordAccess[]
-  deletedAt  DateTime?  // soft delete — null = active, non-null = in recycle bin
+  deletedAt    DateTime? // soft delete — null = active, non-null = in recycle bin
 }
 
 /// Junction table — grants a single doctor access to a single medical document.
 model MedicalRecordAccess {
-  id          String   @id @default(cuid())
-  documentId  String
-  document    MedicalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  doctorId    String   // the User id of the doctor granted access
-  doctor      User     @relation("doctorRecordAccess", fields: [doctorId], references: [id], onDelete: Cascade)
-  grantedAt   DateTime @default(now())
+  id         String          @id @default(cuid())
+  documentId String
+  document   MedicalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  doctorId   String // the User id of the doctor granted access
+  doctor     User            @relation("doctorRecordAccess", fields: [doctorId], references: [id], onDelete: Cascade)
+  grantedAt  DateTime        @default(now())
 
   @@unique([documentId, doctorId]) // a doctor can't be granted access twice to the same doc
-  @@index([doctorId])              // fast lookup of "all docs shared with me"
+  @@index([doctorId]) // fast lookup of "all docs shared with me"
 }
 
 enum DisputeStatus {
@@ -543,23 +542,23 @@ enum DisputeType {
 }
 
 model Dispute {
-  id           String        @id @default(cuid())
-  bookingId    String
-  booking      Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  raisedById   String
-  raisedBy     User          @relation("disputesRaised", fields: [raisedById], references: [id])
+  id            String        @id @default(cuid())
+  bookingId     String
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  raisedById    String
+  raisedBy      User          @relation("disputesRaised", fields: [raisedById], references: [id])
   againstUserId String
-  againstUser  User          @relation("disputesAgainst", fields: [againstUserId], references: [id])
-  type         DisputeType   @default(OTHER)
-  status       DisputeStatus @default(OPEN)
-  title        String
-  description  String
+  againstUser   User          @relation("disputesAgainst", fields: [againstUserId], references: [id])
+  type          DisputeType   @default(OTHER)
+  status        DisputeStatus @default(OPEN)
+  title         String
+  description   String
   adminResponse String?
-  resolvedById String?
-  resolvedBy   User?         @relation("disputesResolved", fields: [resolvedById], references: [id])
-  resolvedAt   DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  resolvedById  String?
+  resolvedBy    User?         @relation("disputesResolved", fields: [resolvedById], references: [id])
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 // ============================================================================
@@ -577,57 +576,57 @@ enum AffiliateClickStatus {
 }
 
 model Affiliate {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  referralCode    String   @unique
-  website         String?
-  socialMedia     String?
-  description     String?
-  verified        Boolean  @default(false)
-  totalClicks     Int      @default(0)
-  totalSignups    Int      @default(0)
-  totalBookings   Int      @default(0)
-  totalEarnings   String   @default("0")
-  availableBalance String  @default("0")
-  pendingBalance  String   @default("0")
-  paidOut         String   @default("0")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referralCode     String   @unique
+  website          String?
+  socialMedia      String?
+  description      String?
+  verified         Boolean  @default(false)
+  totalClicks      Int      @default(0)
+  totalSignups     Int      @default(0)
+  totalBookings    Int      @default(0)
+  totalEarnings    String   @default("0")
+  availableBalance String   @default("0")
+  pendingBalance   String   @default("0")
+  paidOut          String   @default("0")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   clicks            AffiliateClick[]
   payouts           AffiliatePayout[]
-  referredProviders User[]  @relation("ReferredProviders")
+  referredProviders User[]            @relation("ReferredProviders")
 }
 
 model AffiliateClick {
-  id            String   @id @default(cuid())
-  affiliateId   String
-  affiliate     Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  visitorIp     String?
-  userAgent     String?
-  referredUserId String?  // user who signed up from this click
-  referredUser  User?     @relation("affiliateReferrals", fields: [referredUserId], references: [id])
-  bookingId     String?   // booking that resulted from this referral
-  status        AffiliateClickStatus @default(CLICKED)
+  id               String               @id @default(cuid())
+  affiliateId      String
+  affiliate        Affiliate            @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  visitorIp        String?
+  userAgent        String?
+  referredUserId   String? // user who signed up from this click
+  referredUser     User?                @relation("affiliateReferrals", fields: [referredUserId], references: [id])
+  bookingId        String? // booking that resulted from this referral
+  status           AffiliateClickStatus @default(CLICKED)
   commissionAmount String? // commission earned when booking completes
-  clickedAt     DateTime @default(now())
-  convertedAt   DateTime?
+  clickedAt        DateTime             @default(now())
+  convertedAt      DateTime?
 }
 
 model AffiliatePayout {
-  id           String   @id @default(cuid())
-  affiliateId  String
-  affiliate    Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  amount       String   @default("0")
-  currency     String   @default("USD")
-  status       PayoutStatus @default(PENDING)
-  method       String   @default("bank_transfer")
-  reference    String?
-  periodStart  DateTime
-  periodEnd    DateTime
-  createdAt    DateTime @default(now())
-  completedAt  DateTime?
+  id          String       @id @default(cuid())
+  affiliateId String
+  affiliate   Affiliate    @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  amount      String       @default("0")
+  currency    String       @default("USD")
+  status      PayoutStatus @default(PENDING)
+  method      String       @default("bank_transfer")
+  reference   String?
+  periodStart DateTime
+  periodEnd   DateTime
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
 }
 
 // AffiliateSetting model removed — tier system eliminated in affiliate redesign.
@@ -656,50 +655,50 @@ enum KycRequirementType {
 /// Admin-defined KYC requirement — defines what documents each provider type
 /// must submit. Created/managed by admins, used by providers during KYC upload.
 model KycRequirement {
-  id           String       @id @default(cuid())
-  providerType String                        // DOCTOR | HOSPITAL | HOTEL | TRANSLATOR
-  documentName String                        // e.g. "Medical License"
-  description  String?                       // instructions for the provider
-  type         KycRequirementType @default(IMAGE)  // IMAGE | DOCUMENT | VIDEO (DB-enforced enum)
-  isRequired   Boolean      @default(true)
-  order        Int          @default(0)      // staging/display order
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id           String             @id @default(cuid())
+  providerType String // DOCTOR | HOSPITAL | HOTEL | TRANSLATOR
+  documentName String // e.g. "Medical License"
+  description  String? // instructions for the provider
+  type         KycRequirementType @default(IMAGE) // IMAGE | DOCUMENT | VIDEO (DB-enforced enum)
+  isRequired   Boolean            @default(true)
+  order        Int                @default(0) // staging/display order
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  documents    KycDocument[]
+  documents KycDocument[]
 
   @@index([providerType])
 }
 
 model KycDocument {
-  id              String    @id @default(cuid())
+  id              String          @id @default(cuid())
   userId          String
-  user            User      @relation("kycDocuments", fields: [userId], references: [id], onDelete: Cascade)
+  user            User            @relation("kycDocuments", fields: [userId], references: [id], onDelete: Cascade)
   // Link to the requirement this document fulfills (optional for backward
   // compat with pre-existing documents that weren't tied to a requirement).
   requirementId   String?
   requirement     KycRequirement? @relation(fields: [requirementId], references: [id])
   // Copied from the requirement at upload time for historical record (in case
   // the requirement is later edited or deleted).
-  documentName    String    @default("")
+  documentName    String          @default("")
   // Legacy docType field — kept for backward compat with existing records.
-  docType         String    @default("other")
+  docType         String          @default("other")
   fileName        String
   fileType        String
   fileSize        Int
-  dataUrl         String    // file path (/uploads/kyc/uuid.ext)
+  dataUrl         String // file path (/uploads/kyc/uuid.ext)
   notes           String?
-  status          KycStatus @default(NOT_SUBMITTED)
+  status          KycStatus       @default(NOT_SUBMITTED)
   // New string-based status for the upgraded workflow: PENDING | APPROVED | REJECTED
-  reviewStatus    String    @default("PENDING")
+  reviewStatus    String          @default("PENDING")
   rejectionReason String?
   adminNote       String?
   reviewedById    String?
-  reviewedBy      User?     @relation("kycReviewed", fields: [reviewedById], references: [id])
+  reviewedBy      User?           @relation("kycReviewed", fields: [reviewedById], references: [id])
   reviewedAt      DateTime?
-  uploadedAt      DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  uploadedAt      DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([userId])
   @@index([requirementId])
@@ -724,28 +723,28 @@ enum TicketPriority {
 }
 
 model Ticket {
-  id          String         @id @default(cuid())
+  id          String          @id @default(cuid())
   userId      String
-  user        User           @relation("ticketsRaised", fields: [userId], references: [id], onDelete: Cascade)
+  user        User            @relation("ticketsRaised", fields: [userId], references: [id], onDelete: Cascade)
   subject     String
   description String
-  category    String         // "booking" | "payment" | "account" | "technical" | "other"
-  priority    TicketPriority @default(MEDIUM)
-  status      TicketStatus   @default(OPEN)
+  category    String // "booking" | "payment" | "account" | "technical" | "other"
+  priority    TicketPriority  @default(MEDIUM)
+  status      TicketStatus    @default(OPEN)
   messages    TicketMessage[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model TicketMessage {
-  id        String   @id @default(cuid())
-  ticketId  String
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  senderId  String
-  sender    User     @relation("ticketMessages", fields: [senderId], references: [id])
-  message   String
-  isFromAdmin Boolean @default(false)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  ticketId    String
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User     @relation("ticketMessages", fields: [senderId], references: [id])
+  message     String
+  isFromAdmin Boolean  @default(false)
+  createdAt   DateTime @default(now())
 }
 
 // ============================================================================
@@ -753,14 +752,14 @@ model TicketMessage {
 // ============================================================================
 
 model ChatMessage {
-  id           String   @id @default(cuid())
-  bookingId    String
-  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  senderId     String
-  sender       User     @relation("chatSender", fields: [senderId], references: [id])
-  message      String?
-  read         Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation("chatSender", fields: [senderId], references: [id])
+  message   String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   translations MessageTranslation[]
   attachments  ChatAttachment[]
@@ -770,13 +769,13 @@ model ChatMessage {
 }
 
 model MessageTranslation {
-  id              String   @id @default(cuid())
-  messageId       String
-  message         ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  targetLanguage  String   // e.g. "en", "tr", "fa", "ar"
-  translatedText  String
-  provider        String   @default("zai")
-  createdAt       DateTime @default(now())
+  id             String      @id @default(cuid())
+  messageId      String
+  message        ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  targetLanguage String // e.g. "en", "tr", "fa", "ar"
+  translatedText String
+  provider       String      @default("zai")
+  createdAt      DateTime    @default(now())
 
   @@unique([messageId, targetLanguage])
   @@index([messageId])
@@ -786,14 +785,14 @@ model MessageTranslation {
 // Stored as base64 data URLs (same pattern as MedicalDocument / KycDocument).
 // Served through /api/chat/attachment?id=... which authorizes per-booking access.
 model ChatAttachment {
-  id          String   @id @default(cuid())
-  messageId   String
-  message     ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  fileName    String
-  fileType    String   // MIME type, e.g. "image/png", "application/pdf"
-  fileSize    Int      // bytes
-  dataUrl     String   // base64 data URL
-  createdAt   DateTime @default(now())
+  id        String      @id @default(cuid())
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileType  String // MIME type, e.g. "image/png", "application/pdf"
+  fileSize  Int // bytes
+  dataUrl   String // base64 data URL
+  createdAt DateTime    @default(now())
 
   @@index([messageId])
 }
@@ -819,22 +818,22 @@ model Itinerary {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  items     ItineraryItem[]
-  bookings  Booking[]
+  items    ItineraryItem[]
+  bookings Booking[]
 
   @@index([patientId])
 }
 
 model ItineraryItem {
-  id           String       @id @default(cuid())
-  itineraryId  String
-  itinerary    Itinerary    @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
-  providerType ProviderType
-  providerId   String
-  serviceId    String?
-  estimatedCost Int         // stored in cents
-  notes        String?
-  createdAt    DateTime     @default(now())
+  id            String       @id @default(cuid())
+  itineraryId   String
+  itinerary     Itinerary    @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  providerType  ProviderType
+  providerId    String
+  serviceId     String?
+  estimatedCost Int // stored in cents
+  notes         String?
+  createdAt     DateTime     @default(now())
 
   @@index([itineraryId])
 }
@@ -842,25 +841,25 @@ model ItineraryItem {
 /// In-app CMS blog posts. Content is stored as TipTap JSON (not HTML) to
 /// prevent XSS when rendered publicly. Phase 12.2 will render this JSON.
 model BlogPost {
-  id              String   @id @default(cuid())
-  title           String
-  slug            String   @unique                        // kebab-case URL slug
-  excerpt         String                                   // short summary for blog cards
-  content         Json                                      // TipTap JSON structure
-  coverImage      String?                                  // optional cover image URL
-  authorId        String
-  author          User     @relation(fields: [authorId], references: [id])
-  status          String   @default("DRAFT")               // "DRAFT" | "PUBLISHED"
+  id             String        @id @default(cuid())
+  title          String
+  slug           String        @unique // kebab-case URL slug
+  excerpt        String // short summary for blog cards
+  content        Json // TipTap JSON structure
+  coverImage     String? // optional cover image URL
+  authorId       String
+  author         User          @relation(fields: [authorId], references: [id])
+  status         String        @default("DRAFT") // "DRAFT" | "PUBLISHED"
   // SEO fields
-  seoTitle        String?                                  // overrides title in <title> and OG
-  seoDescription  String?                                  // overrides excerpt in meta description
-  focusKeyword    String?                                  // primary keyword for SEO optimization
-  canonicalUrl    String?                                  // canonical URL override
-  noIndex         Boolean  @default(false)                 // exclude from search engines
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?                                 // soft delete
-  tags            BlogPostTag[]
+  seoTitle       String? // overrides title in <title> and OG
+  seoDescription String? // overrides excerpt in meta description
+  focusKeyword   String? // primary keyword for SEO optimization
+  canonicalUrl   String? // canonical URL override
+  noIndex        Boolean       @default(false) // exclude from search engines
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime? // soft delete
+  tags           BlogPostTag[]
 
   @@index([status])
   @@index([authorId])
@@ -877,22 +876,22 @@ model BlogPost {
 /// slug="home" with language="fa". This enables locale-specific landing
 /// pages.
 model CustomPage {
-  id              String   @id @default(cuid())
-  title           String
-  slug            String                          // kebab-case URL slug (NOT unique alone — see @@unique below)
-  htmlContent     String                          // raw HTML/CSS code (legacy / fallback)
-  content         Json?                           // BlockNote JSON content (primary; rendered via BlockNoteSSRRenderer)
-  language        String   @default("en")         // ISO 639-1 locale code (en/tr/fa/ar/ru) — non-nullable for compound unique
-  seoTitle        String?
-  seoDescription  String?
+  id             String    @id @default(cuid())
+  title          String
+  slug           String // kebab-case URL slug (NOT unique alone — see @@unique below)
+  htmlContent    String // raw HTML/CSS code (legacy / fallback)
+  content        Json? // BlockNote JSON content (primary; rendered via BlockNoteSSRRenderer)
+  language       String    @default("en") // ISO 639-1 locale code (en/tr/fa/ar/ru) — non-nullable for compound unique
+  seoTitle       String?
+  seoDescription String?
   // SEO fields
-  focusKeyword    String?                         // primary keyword for SEO optimization
-  canonicalUrl    String?                         // canonical URL override
-  noIndex         Boolean  @default(false)        // exclude from search engines
-  isPublished     Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?                        // soft delete
+  focusKeyword   String? // primary keyword for SEO optimization
+  canonicalUrl   String? // canonical URL override
+  noIndex        Boolean   @default(false) // exclude from search engines
+  isPublished    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime? // soft delete
 
   @@unique([slug, language])
   @@index([isPublished])
@@ -903,15 +902,15 @@ model CustomPage {
 /// Internal media library — files uploaded to public/uploads/ and tracked
 /// in the DB. Used by blog cover images, custom pages, TipTap, etc.
 model MediaAsset {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   uploaderId String
-  uploader   User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
-  fileName   String                        // original file name from upload
-  filePath   String                        // relative path: /uploads/uuid.ext
+  uploader   User      @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  fileName   String // original file name from upload
+  filePath   String // relative path: /uploads/uuid.ext
   mimeType   String
-  fileSize   Int                           // bytes
-  createdAt  DateTime @default(now())
-  deletedAt  DateTime?                     // soft delete
+  fileSize   Int // bytes
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime? // soft delete
 
   @@index([uploaderId])
   @@index([deletedAt])
@@ -928,8 +927,8 @@ model MediaAsset {
 /// Hotels are excluded — each hotel is an independent bookable entity with its
 /// own reviews/rating, so they don't need multi-location support.
 model ProviderLocation {
-  id           String   @id @default(cuid())
-  providerType String   // "DOCTOR" | "HOSPITAL" | "TRANSLATOR"
+  id           String      @id @default(cuid())
+  providerType String // "DOCTOR" | "HOSPITAL" | "TRANSLATOR"
   doctorId     String?
   hospitalId   String?
   translatorId String?
@@ -937,14 +936,14 @@ model ProviderLocation {
   hospital     Hospital?   @relation("HospitalLocations", fields: [hospitalId], references: [id], onDelete: Cascade)
   translator   Translator? @relation("TranslatorLocations", fields: [translatorId], references: [id], onDelete: Cascade)
   city         String
-  country      String                          // ISO 3166-1 alpha-2 (e.g., "CA", "AE", "DE")
-  countrySlug  String   @default("")           // URL-friendly country name (e.g., "canada", "uae")
+  country      String // ISO 3166-1 alpha-2 (e.g., "CA", "AE", "DE")
+  countrySlug  String      @default("") // URL-friendly country name (e.g., "canada", "uae")
   address      String?
   phone        String?
-  isPrimary    Boolean  @default(false)        // marks the main/headquarters location
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isPrimary    Boolean     @default(false) // marks the main/headquarters location
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@index([doctorId])
   @@index([hospitalId])
@@ -964,10 +963,10 @@ model SiteSetting {
 // ============================================================================
 
 model Tag {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  createdAt DateTime @default(now())
+  id        String        @id @default(cuid())
+  name      String        @unique
+  slug      String        @unique
+  createdAt DateTime      @default(now())
   posts     BlogPostTag[]
 }
 
@@ -1009,4 +1008,15 @@ model City {
 
   @@unique([countryId, slug])
   @@index([countryId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique // sha256 of the raw cookie token — raw token is never stored
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
