@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/shared/icon'
+import { useApp } from '@/stores/app-store'
 import { translate, type Locale } from '@/lib/i18n'
 
 type BookNowButtonProps = {
@@ -42,7 +43,19 @@ export function BookNowButton({
     if (providerId) params.set('provider', providerId)
     if (providerType) params.set('type', providerType.toUpperCase())
     const qs = params.toString()
-    router.push(`/dashboard?section=browse${qs ? `&${qs}` : ''}`)
+    const target = `/dashboard?section=browse${qs ? `&${qs}` : ''}`
+
+    if (window.location.pathname === '/dashboard') {
+      // Already inside the SPA (e.g. the ?profile= public-profile view):
+      // router.push to the same route would NOT remount the dashboard or
+      // re-run the ?section handler, leaving the button feeling dead.
+      // Transition the view directly and keep the URL (with prefill params)
+      // in sync for BrowseSection's auto-book effect and the back button.
+      window.history.pushState({ appView: 'dashboard', section: 'browse' }, '', target)
+      useApp.getState().goDashboard('browse')
+      return
+    }
+    router.push(target)
   }
 
   if (variant === 'public-profile') {

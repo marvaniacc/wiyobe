@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 const TYPE_ICON: Record<string, string> = {
   DOCTOR: 'medical_services',
@@ -35,6 +36,7 @@ export function PublicProfilePage() {
   const router = useRouter()
   const view = useApp((s) => s.view)
   const goLanding = useApp((s) => s.goLanding)
+  const session = useApp((s) => s.session)
   const locale = useApp((s) => s.locale)
   const setLocale = useApp((s) => s.setLocale)
   const { t, dir } = useT()
@@ -69,8 +71,39 @@ export function PublicProfilePage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" onClick={() => router.push(`/${locale}`)}>{t('common.signin')}</Button>
-          <Button size="sm" variant="outline" onClick={() => router.push(`/${locale}`)}>{t('common.signup')}</Button>
+          {session ? (
+            /* Authenticated: avatar dropdown (was hardcoded guest CTAs —
+               made logged-in patients believe they had been signed out). */
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-2">
+                  <Avatar className="size-6">
+                    <AvatarImage src={session.avatarUrl || undefined} alt={session.name || 'User'} />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-[10px]">
+                      {session.name?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden max-w-[100px] truncate sm:inline">{session.name || session.email}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                  <Icon name="dashboard" size={18} /> Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/dashboard?section=profile')}>
+                  <Icon name="account_circle" size={18} /> Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-error" onClick={() => { window.location.href = '/api/auth/signout' }}>
+                  <Icon name="logout" size={18} /> Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <Button size="sm" onClick={() => router.push(`/${locale}/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)}>{t('common.signin')}</Button>
+              <Button size="sm" variant="outline" onClick={() => router.push(`/${locale}/signup`)}>{t('common.signup')}</Button>
+            </>
+          )}
         </div>
       </header>
 

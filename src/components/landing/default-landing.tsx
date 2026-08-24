@@ -121,11 +121,13 @@ export function DefaultLanding() {
     // NOTE: DefaultLanding only mounts on /dashboard, and view stays
     // 'landing' for unauthenticated visitors — so don't gate on view.name,
     // otherwise they spin forever.
+    // view.name is a dependency: transitions INTO the dashboard view (e.g.
+    // Book now from the public-profile view) must re-evaluate this guard.
     if (!session && !sessionLoading && view.name !== 'public-profile') {
       const here = window.location.pathname + window.location.search
       router.push(`/${locale || 'en'}/login?redirect=${encodeURIComponent(here)}`)
     }
-  }, [session, sessionLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, sessionLoading, view.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Browser back button support
   useEffect(() => {
