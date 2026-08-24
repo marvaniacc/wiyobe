@@ -128,6 +128,7 @@ export function DefaultLanding() {
       router.push(`/${locale || 'en'}/login?redirect=${encodeURIComponent(here)}`)
     }
   }, [session, sessionLoading, view.name]) // eslint-disable-line react-hooks/exhaustive-deps
+<<<<<<< HEAD
 
   // Surface notices passed via ?notice= (e.g. Google welcome-back)
   useEffect(() => {
@@ -140,6 +141,8 @@ export function DefaultLanding() {
       window.history.replaceState({}, '', remaining ? `${window.location.pathname}?${remaining}` : window.location.pathname)
     }
   }, [])
+=======
+>>>>>>> 5d7248c (fix(ux): SPA public-profile view (?profile=) — session-aware header + working Book now)
 
   // Browser back button support
   useEffect(() => {
