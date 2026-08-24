@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { hashPassword } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
 import crypto from 'crypto'
@@ -69,8 +70,24 @@ export async function POST(req: Request) {
         email: body.email,
         code,
         purpose: body.purpose,
-        payload: body.signupData ? JSON.stringify(body.signupData) : null,
+        // SECURITY: the stashed signup payload must NEVER contain the
+        // plaintext password — store its scrypt hash and use it directly
+        // as passwordHash when the user is created after verification.
+        payload: body.signupData
+          ? JSON.stringify({ ...body.signupData, password: hashPassword(body.signupData.password) })
+          : null,
         expiresAt,
+      },
+    })
+
+    // Opportunistic cleanup: purge consumed and expired codes (they may hold
+    // sensitive stashed payloads) so nothing lingers in the table.
+    await db.otpCode.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { used: true, createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        ],
       },
     })
 

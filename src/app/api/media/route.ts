@@ -11,13 +11,14 @@ export const dynamic = 'force-dynamic'
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads')
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
-/** Allowed MIME types — images, PDFs, and common document formats. */
+/** Allowed MIME types — images, PDFs, and common document formats.
+ *  NOTE: image/svg+xml is intentionally excluded — SVG can execute scripts
+ *  when opened directly and would give stored XSS on the app origin. */
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
   'image/bmp',
   'application/pdf',
   'application/msword',
@@ -30,23 +31,23 @@ const ALLOWED_MIME_TYPES = new Set([
   'text/csv',
 ])
 
-/** Extract file extension from a filename or MIME type. */
-function getExtension(fileName: string, mimeType: string): string {
-  const fromName = path.extname(fileName)
-  if (fromName) return fromName
-  // Fallback: derive from MIME type
+/**
+ * Extract file extension from the VALIDATED MIME type only. The extension is
+ * never taken from the user-supplied filename — an attacker could otherwise
+ * store executable content (e.g. ".html") that Next serves on the app origin.
+ */
+function getExtension(mimeType: string): string {
   const map: Record<string, string> = {
     'image/jpeg': '.jpg',
     'image/png': '.png',
     'image/gif': '.gif',
     'image/webp': '.webp',
-    'image/svg+xml': '.svg',
     'image/bmp': '.bmp',
     'application/pdf': '.pdf',
     'text/plain': '.txt',
     'text/csv': '.csv',
   }
-  return map[mimeType] || ''
+  return map[mimeType] || '.bin'
 }
 
 /**
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
     }
 
     // Generate a unique filename: UUID + original extension
-    const ext = getExtension(file.name, file.type)
+    const ext = getExtension(file.type)
     const uniqueName = `${crypto.randomUUID()}${ext}`
     const fullPath = path.join(UPLOAD_DIR, uniqueName)
 

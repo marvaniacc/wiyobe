@@ -39,22 +39,29 @@ export async function GET(req: Request) {
     const match = attachment.dataUrl.match(/^data:([^;]+);base64,([\s\S]*)$/)
     if (!match) return error(500, 'Invalid attachment encoding')
 
-    const mimeType = match[1]
     const base64 = match[2]
     const bytes = Buffer.from(base64, 'base64')
 
+    // Serve the VALIDATED fileType metadata — never the client-controlled
+    // MIME embedded in the dataUrl, which could smuggle text/html or SVG
+    // and execute on the app origin when previewed inline.
+    const mimeType = attachment.fileType || 'application/octet-stream'
+
     const forceDownload = searchParams.get('download') === '1'
-    const disposition = forceDownload ? 'attachment' : 'inline'
+    // Anything that is not a safely-renderable image/PDF is forced to download.
+    const safeInline = !forceDownload && /^(image\/(jpeg|png|gif|webp|bmp)|application\/pdf)$/.test(mimeType)
+    const disposition = safeInline ? 'inline' : 'attachment'
     // Sanitize filename for the header (strip quotes / newlines)
     const safeName = (attachment.fileName || 'attachment').replace(/["\r\n]/g, '')
 
     return new Response(bytes, {
       status: 200,
       headers: {
-        'Content-Type': mimeType || attachment.fileType || 'application/octet-stream',
+        'Content-Type': mimeType,
         'Content-Length': String(bytes.length),
         'Content-Disposition': `${disposition}; filename="${safeName}"`,
         'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
       },
     })
   } catch (e) { return handleError(e) }

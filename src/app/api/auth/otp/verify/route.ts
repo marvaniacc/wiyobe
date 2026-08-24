@@ -50,8 +50,9 @@ export async function POST(req: Request) {
       return error(400, `Invalid code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`)
     }
 
-    // Mark code as used
-    await db.otpCode.update({ where: { id: otp.id }, data: { used: true } })
+    // Mark code as used and immediately destroy any stashed signup payload
+    // (it contains credential material that must not linger).
+    await db.otpCode.update({ where: { id: otp.id }, data: { used: true, payload: null } })
 
     // === SIGNUP: create the user ===
     if (body.purpose === 'signup') {
@@ -76,7 +77,8 @@ export async function POST(req: Request) {
       const user = await db.user.create({
         data: {
           email: body.email,
-          passwordHash: hashPassword(data.password),
+          // The stashed payload already holds the scrypt HASH (never plaintext).
+          passwordHash: data.password,
           role: data.role,
           status: status as any,
           name: data.name,
