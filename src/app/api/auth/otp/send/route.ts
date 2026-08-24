@@ -120,7 +120,12 @@ export async function POST(req: Request) {
     } else {
       const { sendEmail, otpEmailTemplate } = await import('@/lib/email')
       const template = otpEmailTemplate(code, body.purpose)
-      await sendEmail({ to: body.email, subject: template.subject, html: template.html })
+      const delivered = await sendEmail({ to: body.email, subject: template.subject, html: template.html })
+      // Do not claim success when delivery failed — the user would wait for a
+      // code that never arrives.
+      if (!delivered) {
+        return error(502, 'Failed to send the email. Please try again in a few minutes.')
+      }
     }
 
     // devCode is returned ONLY outside production (and only when SMTP is unset)

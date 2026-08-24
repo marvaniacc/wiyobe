@@ -39,11 +39,15 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
   }
 
   try {
-    const from = process.env.EMAIL_FROM || 'noreply@medtravel.com'
+    const fromRaw = process.env.EMAIL_FROM || 'noreply@medtravel.com'
     const appName = process.env.NEXT_PUBLIC_APP_NAME || 'MedTravel'
+    // EMAIL_FROM may be a bare address or a full "Name <addr>" — accept both.
+    // (Wrapping a full value again produces `"Name" <Name <addr>>` which
+    // providers like Resend reject with 550 Invalid from field.)
+    const from = fromRaw.includes('<') ? fromRaw : `"${appName}" <${fromRaw}>`
 
     await t.sendMail({
-      from: `"${appName}" <${from}>`,
+      from,
       to,
       subject,
       html,
