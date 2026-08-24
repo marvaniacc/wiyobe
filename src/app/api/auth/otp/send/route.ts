@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 import { z } from 'zod'
 import crypto from 'crypto'
 
@@ -31,6 +32,16 @@ export async function POST(req: Request) {
   try {
     const body = await parseBody(req, schema)
 
+    // Anti-abuse: per-IP and per-account budgets (email bombing / spam guard).
+    const ip = clientIp(req)
+    const emailKey = body.email.toLowerCase()
+    const perIp = rateLimit(`otpsend:ip:${ip}`, 10, 15 * 60 * 1000)
+    const perEmail = rateLimit(`otpsend:acct:${emailKey}`, 5, 15 * 60 * 1000)
+    if (!perIp.ok || !perEmail.ok) {
+      const wait = Math.max(perIp.retryAfterSec, perEmail.retryAfterSec)
+      return error(429, `Too many code requests. Please try again in ${Math.ceil(wait / 60)} minute${Math.ceil(wait / 60) === 1 ? '' : 's'}.`)
+    }
+
     // For signup: ensure email isn't already taken
     if (body.purpose === 'signup') {
       const existing = await db.user.findUnique({ where: { email: body.email } })
@@ -41,7 +52,12 @@ export async function POST(req: Request) {
     // For signin/reset: ensure user exists
     if (body.purpose === 'signin' || body.purpose === 'reset') {
       const user = await db.user.findUnique({ where: { email: body.email } })
-      if (!user) return error(404, 'No account found with this email.')
+      // Anti-enumeration: respond exactly like a successful send for unknown
+      // accounts (no code is created, nothing is emailed).
+      if (!user) {
+        const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000)
+        return json({ sent: true, expiresAt: expiresAt.toISOString() })
+      }
       if (user.status === 'SUSPENDED') return error(403, 'Your account has been suspended.')
     }
 

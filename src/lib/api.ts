@@ -17,8 +17,9 @@ export function handleError(e: unknown) {
     if (e.message === 'UNAUTHORIZED') return error(401, 'Unauthorized')
     if (e.message === 'FORBIDDEN') return error(403, 'Forbidden')
     if (e.message === 'NOT_FOUND') return error(404, 'Not found')
+    // Never leak internal exception text (Prisma/schema hints) to clients.
     console.error('[api error]', e)
-    return error(500, e.message)
+    return error(500, 'Internal server error')
   }
   console.error('[api error]', e)
   return error(500, 'Internal server error')

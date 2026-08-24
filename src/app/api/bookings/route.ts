@@ -304,7 +304,9 @@ export async function POST(req: Request) {
       await db.slot.update({ where: { id: slot.id }, data: { isBooked: true } })
     }
 
-    // Payment — real Stripe charge if configured, otherwise mock for dev.
+    // Payment — real Stripe charge if configured. In production a missing
+    // Stripe configuration must FAIL CLOSED: mock charges would make every
+    // booking free while still crediting provider/affiliate balances.
     // The patient is charged the DISCOUNTED amount (amount - discountAmount).
     const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
     let stripeChargeId = `ch_mock_${booking.id.slice(-8)}`
@@ -320,7 +322,11 @@ export async function POST(req: Request) {
       if (charge) {
         stripeChargeId = charge.id
         paymentStatus = charge.status === 'succeeded' ? 'SUCCEEDED' : 'PENDING'
+      } else {
+        paymentStatus = 'FAILED'
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      return error(503, 'Payments are temporarily unavailable. Please contact support.')
     }
 
     const payment = await db.payment.create({
@@ -332,69 +338,71 @@ export async function POST(req: Request) {
       },
     })
 
-    // Ledger entries — PATIENT_CHARGE (discounted), COMMISSION (reduced platform cut),
-    // AFFILIATE_COMMISSION (based on reduced platform cut), PROVIDER_CREDIT (full net).
-    // The discount comes out of the platform's commission, not the provider's revenue.
-    const ledgerEntries: any[] = [
-      {
-        type: 'PATIENT_CHARGE',
-        bookingId: booking.id,
-        paymentId: payment.id,
-        amount: patientCharge,
-        description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}${promoCodeId ? ` (promo: ${booking.promoCode?.code || ''})` : ''}`,
-      },
-      {
-        type: 'COMMISSION',
-        bookingId: booking.id,
-        paymentId: payment.id,
-        amount: platformCut,
-        description: `Platform commission (${platformRate}%${discountAmount > 0 ? `, promo discount -$${discountAmount.toFixed(2)}` : ''})`,
-      },
-    ]
+    // Ledger entries — only when money actually arrived. Crediting
+    // PROVIDER_CREDIT / COMMISSION / AFFILIATE_COMMISSION for failed or
+    // pending payments created payable balances out of thin air.
+    if (paymentStatus === 'SUCCEEDED') {
+      const ledgerEntries: any[] = [
+        {
+          type: 'PATIENT_CHARGE',
+          bookingId: booking.id,
+          paymentId: payment.id,
+          amount: patientCharge,
+          description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}${promoCodeId ? ` (promo: ${booking.promoCode?.code || ''})` : ''}`,
+        },
+        {
+          type: 'COMMISSION',
+          bookingId: booking.id,
+          paymentId: payment.id,
+          amount: platformCut,
+          description: `Platform commission (${platformRate}%${discountAmount > 0 ? `, promo discount -$${discountAmount.toFixed(2)}` : ''})`,
+        },
+      ]
 
-    // Affiliate commission entry (only if affiliate exists)
-    if (affiliateUserId) {
+      // Affiliate commission entry (only if affiliate exists)
+      if (affiliateUserId) {
+        ledgerEntries.push({
+          type: 'AFFILIATE_COMMISSION',
+          bookingId: booking.id,
+          paymentId: payment.id,
+          userId: affiliateUserId,
+          amount: affiliateCommission,
+          description: `Affiliate commission (${affiliateRate}%) for referral`,
+        })
+
+        // Update affiliate click status and earnings
+        if (affiliateClickId) {
+          await db.affiliateClick.update({
+            where: { id: affiliateClickId },
+            data: { status: 'BOOKED', bookingId: booking.id, commissionAmount: affiliateCommission, convertedAt: new Date() },
+          })
+        }
+        // Update affiliate aggregate stats
+        const affRec = await db.affiliate.findUnique({ where: { userId: affiliateUserId } })
+        if (affRec) {
+          await db.affiliate.update({
+            where: { userId: affiliateUserId },
+            data: {
+              totalBookings: { increment: 1 },
+              totalEarnings: (parseFloat(affiliateCommission) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
+              pendingBalance: (parseFloat(affiliateCommission) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
+            },
+          })
+        }
+      }
+
+      // Provider credit (net amount after both commissions)
       ledgerEntries.push({
-        type: 'AFFILIATE_COMMISSION',
+        type: 'PROVIDER_CREDIT',
         bookingId: booking.id,
         paymentId: payment.id,
-        userId: affiliateUserId,
-        amount: affiliateCommission,
-        description: `Affiliate commission (${affiliateRate}%) for referral`,
+        userId: providerUserId,
+        amount: providerNet,
+        description: 'Provider credit (pending until service completion)',
       })
 
-      // Update affiliate click status and earnings
-      if (affiliateClickId) {
-        await db.affiliateClick.update({
-          where: { id: affiliateClickId },
-          data: { status: 'BOOKED', bookingId: booking.id, commissionAmount: affiliateCommission, convertedAt: new Date() },
-        })
-      }
-      // Update affiliate aggregate stats
-      const affRec = await db.affiliate.findUnique({ where: { userId: affiliateUserId } })
-      if (affRec) {
-        await db.affiliate.update({
-          where: { userId: affiliateUserId },
-          data: {
-            totalBookings: { increment: 1 },
-            totalEarnings: (parseFloat(affiliateCommission) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
-            pendingBalance: (parseFloat(affiliateCommission) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
-          },
-        })
-      }
+      await db.ledgerEntry.createMany({ data: ledgerEntries })
     }
-
-    // Provider credit (net amount after both commissions)
-    ledgerEntries.push({
-      type: 'PROVIDER_CREDIT',
-      bookingId: booking.id,
-      paymentId: payment.id,
-      userId: providerUserId,
-      amount: providerNet,
-      description: 'Provider credit (pending until service completion)',
-    })
-
-    await db.ledgerEntry.createMany({ data: ledgerEntries })
 
     // Notifications — notify both patient and provider
     const patientUser = await db.user.findUnique({ where: { id: session.id }, select: { name: true } })

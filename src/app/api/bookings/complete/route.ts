@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     const booking = await db.booking.findUnique({
       where: { id: bookingId },
       include: {
+        payment: true,
         doctor: { include: { user: { select: { name: true } } } },
         hospital: { select: { name: true } },
         hotel: { select: { name: true } },
@@ -33,10 +34,16 @@ export async function POST(req: Request) {
     if (!isProvider && !isAdmin && !isPatient) return error(403, 'Forbidden')
     if (booking.status !== 'CONFIRMED') return error(409, 'Only confirmed bookings can be completed')
 
-    const updated = await db.booking.update({
-      where: { id: bookingId },
+    // Never release credits for a booking whose payment did not succeed.
+    if (booking.payment && !['SUCCEEDED', 'PARTIALLY_REFUNDED'].includes(booking.payment.status)) {
+      return error(409, 'Payment for this booking is not completed. Cannot release credits.')
+    }
+
+    const bumped = await db.booking.updateMany({
+      where: { id: bookingId, status: 'CONFIRMED' },
       data: { status: 'COMPLETED', endDate: new Date() },
     })
+    if (bumped.count === 0) return error(409, 'Booking was already processed by someone else')
 
     // === Release provider's pending balance → available ===
     if (providerUserId) {
@@ -114,6 +121,6 @@ export async function POST(req: Request) {
       await sendEmail({ to: patientUser.email, subject: tpl.subject, html: tpl.html })
     }
 
-    return json({ booking: updated })
+    return json({ booking: { ...booking, status: 'COMPLETED' } })
   } catch (e) { return handleError(e) }
 }

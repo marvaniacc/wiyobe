@@ -39,10 +39,12 @@ export async function POST(req: Request) {
       return error(409, `Booking is already ${booking.status}. Only PENDING bookings can be accepted.`)
     }
 
-    const updated = await db.booking.update({
-      where: { id: booking.id },
+    const bumped = await db.booking.updateMany({
+      where: { id: booking.id, status: 'PENDING' },
       data: { status: 'CONFIRMED' },
     })
+    if (bumped.count === 0) return error(409, 'Booking was already processed by someone else')
+
 
     // Notify the patient
     const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
@@ -63,6 +65,6 @@ export async function POST(req: Request) {
       await sendEmail({ to: patientUser.email, subject: tpl.subject, html: tpl.html })
     }
 
-    return json({ booking: updated })
+    return json({ booking: { ...booking, status: 'CONFIRMED' } })
   } catch (e) { return handleError(e) }
 }

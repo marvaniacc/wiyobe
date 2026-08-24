@@ -47,7 +47,10 @@ export async function GET() {
 }
 
 const updateSchema = z.object({
-  settings: z.record(z.string(), z.string()),
+  settings: z.record(
+    z.string().regex(/^[a-zA-Z0-9_]{1,64}$/),
+    z.string().max(10_000)
+  ),
 })
 
 /**

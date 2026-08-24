@@ -81,8 +81,8 @@ export async function POST(req: Request) {
       await db.slot.update({ where: { id: booking.slotId }, data: { isBooked: false } })
     }
 
-    const updated = await db.booking.update({
-      where: { id: booking.id },
+    const bumped = await db.booking.updateMany({
+      where: { id: booking.id, status: 'PENDING' },
       data: {
         status: 'CANCELLED',
         cancellationReason: body.reason || 'Declined by provider',
@@ -91,6 +91,8 @@ export async function POST(req: Request) {
         refundAmount: toDec(refundAmount),
       },
     })
+    if (bumped.count === 0) return error(409, 'Booking was already processed by someone else')
+
 
     // Refund ledger entries (same logic as cancel route)
     if (booking.payment && providerUserId) {
@@ -159,6 +161,6 @@ export async function POST(req: Request) {
       await sendEmail({ to: patientUser.email, subject: tpl.subject, html: tpl.html })
     }
 
-    return json({ booking: updated, refundAmount })
+    return json({ booking: { ...booking, status: 'CANCELLED' }, refundAmount })
   } catch (e) { return handleError(e) }
 }

@@ -39,13 +39,15 @@ export async function POST(req: Request) {
       return error(409, `Booking is ${booking.status}. Only CONFIRMED bookings can be marked as no-show.`)
     }
 
-    const updated = await db.booking.update({
-      where: { id: booking.id },
+    const bumped = await db.booking.updateMany({
+      where: { id: booking.id, status: 'CONFIRMED' },
       data: {
         status: 'NO_SHOW',
         endDate: new Date(),
       },
     })
+    if (bumped.count === 0) return error(409, 'Booking was already processed by someone else')
+
 
     // Financial logic: the provider should not receive credit for a no-show.
     // Create a REFUND_PROVIDER_DEBIT ledger entry to reverse the PROVIDER_CREDIT
@@ -75,6 +77,6 @@ export async function POST(req: Request) {
       meta: { bookingId: booking.id },
     })
 
-    return json({ booking: updated })
+    return json({ booking: { ...booking, status: 'NO_SHOW' } })
   } catch (e) { return handleError(e) }
 }

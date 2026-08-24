@@ -37,15 +37,22 @@ export async function POST(req: Request) {
       return error(410, 'This code has expired. Please request a new one.')
     }
 
-    // Check attempts
-    if (otp.attempts >= MAX_ATTEMPTS) {
+    // Check attempts ATOMICALLY — a read-then-increment race previously let
+    // concurrent guesses exceed MAX_ATTEMPTS.
+    const bumped = await db.otpCode.updateMany({
+      where: { id: otp.id, used: false, attempts: { lt: MAX_ATTEMPTS } },
+      data: { attempts: { increment: 1 } },
+    })
+    if (bumped.count === 0) {
       await db.otpCode.update({ where: { id: otp.id }, data: { used: true } })
       return error(429, 'Too many attempts. Please request a new code.')
     }
 
-    // Verify code
-    if (otp.code !== body.code) {
-      await db.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } })
+    // Verify code (constant-time comparison; lengths are fixed 6 digits)
+    const codeMatches =
+      otp.code.length === body.code.length &&
+      crypto.timingSafeEqual(Buffer.from(otp.code), Buffer.from(body.code))
+    if (!codeMatches) {
       const remaining = MAX_ATTEMPTS - (otp.attempts + 1)
       return error(400, `Invalid code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`)
     }

@@ -67,9 +67,10 @@ export async function POST(req: Request) {
       if (!googleInfo.email_verified) {
         return error(401, 'Your Google email address is not verified. Verify it with Google first, then try again.')
       }
-    } else if (body.demoEmail && process.env.NODE_ENV !== 'production') {
-      // Demo mode — ONLY available in non-production environments for development/testing.
-      // In production, demoEmail is ignored entirely to prevent authentication bypass.
+    } else if (body.demoEmail && process.env.AUTH_DEMO_MODE === '1' && process.env.NODE_ENV !== 'production') {
+      // Demo mode — requires BOTH an explicit opt-in flag (AUTH_DEMO_MODE=1)
+      // and a non-production NODE_ENV. Never available by default: this path
+      // logs the caller in as any email without credentials.
       isDemo = true
       googleInfo = {
         sub: `demo_${Buffer.from(body.demoEmail).toString('hex')}`,
@@ -79,10 +80,10 @@ export async function POST(req: Request) {
         picture: null,
         locale: 'en',
       }
-    } else if (body.demoEmail && process.env.NODE_ENV === 'production') {
-      // Reject demoEmail in production — this is a security measure to prevent
-      // authentication bypass by impersonating any email address.
-      return error(403, 'Demo authentication is not available in production.')
+    } else if (body.demoEmail) {
+      // Reject demoEmail everywhere else — prevents authentication bypass by
+      // impersonating any email address.
+      return error(403, 'Demo authentication is not available.')
     } else {
       return error(400, 'Either idToken or demoEmail is required.')
     }

@@ -11,6 +11,8 @@ function slugify(s: string) {
 
 export async function GET(req: Request) {
   try {
+    const session = await getSession()
+    if (!session || session.role !== 'ADMIN') return error(403, 'Admin only')
     const url = new URL(req.url)
     const countryId = url.searchParams.get('countryId')
     const cities = await db.city.findMany({ where: countryId ? { countryId } : {}, orderBy: { name: 'asc' } })

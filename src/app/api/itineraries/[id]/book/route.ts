@@ -100,7 +100,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (charge) {
         stripeChargeId = charge.id
         paymentStatus = charge.status === 'succeeded' ? 'SUCCEEDED' : 'PENDING'
+      } else {
+        paymentStatus = 'FAILED'
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      return error(503, 'Payments are temporarily unavailable. Please contact support.')
     }
 
     // === Step 2: Determine affiliate attribution (applied to first booking) ===
@@ -210,8 +214,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           },
         })
 
-        // Phase B: build ledger entries for each booking against the single payment
-        for (const c of created) {
+        // Phase B: build ledger entries for each booking against the single payment.
+        // Only credit anyone when the money actually arrived.
+        if (paymentStatus === 'SUCCEEDED') {
+          for (const c of created) {
           ledgerEntries.push(
             {
               bookingId: c.id,
@@ -264,8 +270,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           }
         }
 
-        // Create all ledger entries
-        await tx.ledgerEntry.createMany({ data: ledgerEntries })
+          // Create all ledger entries
+          if (ledgerEntries.length > 0) {
+            await tx.ledgerEntry.createMany({ data: ledgerEntries })
+          }
+        }
 
         // Update itinerary status to BOOKED
         await tx.itinerary.update({

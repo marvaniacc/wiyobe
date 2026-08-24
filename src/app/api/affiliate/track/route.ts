@@ -22,21 +22,33 @@ export async function POST(req: Request) {
     const visitorIp = headers.get('x-forwarded-for')?.split(',')[0]?.trim() || headers.get('x-real-ip') || null
     const userAgent = headers.get('user-agent') || null
 
-    // Create click record
-    await db.affiliateClick.create({
-      data: {
-        affiliateId: affiliate.id,
-        visitorIp,
-        userAgent,
-        status: 'CLICKED',
-      },
-    })
+    // Click-fraud guard: count at most one click per (affiliate, IP) per 24h.
+    // Repeat hits still set the attribution cookie but don't inflate stats.
+    const recent = visitorIp
+      ? await db.affiliateClick.findFirst({
+          where: {
+            affiliateId: affiliate.id,
+            visitorIp,
+            clickedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          },
+          select: { id: true },
+        })
+      : null
 
-    // Increment total clicks
-    await db.affiliate.update({
-      where: { id: affiliate.id },
-      data: { totalClicks: { increment: 1 } },
-    })
+    if (!recent) {
+      await db.affiliateClick.create({
+        data: {
+          affiliateId: affiliate.id,
+          visitorIp,
+          userAgent,
+          status: 'CLICKED',
+        },
+      })
+      await db.affiliate.update({
+        where: { id: affiliate.id },
+        data: { totalClicks: { increment: 1 } },
+      })
+    }
 
     // Set HTTP-only cookie with 30-day expiry for attribution
     const c = await cookies()
