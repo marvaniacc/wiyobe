@@ -80,12 +80,14 @@ export function AuthForm({
       .finally(() => setSessionChecked(true))
   }, [])
 
-  // If logged in and type is 'login', auto-redirect to dashboard
+  // If logged in and type is 'login', auto-redirect to the requested page
+  // (honor ?redirect= — previously this dumped users on /dashboard and lost
+  // their place, e.g. after clicking "Book now" on a provider profile).
   useEffect(() => {
     if (existingSession && type === 'login') {
-      router.push('/dashboard')
+      router.push(redirectPath || '/dashboard')
     }
-  }, [existingSession, type, router])
+  }, [existingSession, type, redirectPath, router])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

@@ -60,6 +60,13 @@ export async function POST(req: Request) {
       if (!googleInfo || !googleInfo.email) {
         return error(401, 'Google authentication failed. Invalid or expired token.')
       }
+      // SECURITY: never log in or LINK accounts on unverified emails.
+      // Google issues tokens with email_verified=false for unverified
+      // Workspace domains — allowing them would enable account takeover of
+      // the matching local account by email claim.
+      if (!googleInfo.email_verified) {
+        return error(401, 'Your Google email address is not verified. Verify it with Google first, then try again.')
+      }
     } else if (body.demoEmail && process.env.NODE_ENV !== 'production') {
       // Demo mode — ONLY available in non-production environments for development/testing.
       // In production, demoEmail is ignored entirely to prevent authentication bypass.

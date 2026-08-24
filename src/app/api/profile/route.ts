@@ -13,7 +13,11 @@ export async function GET() {
       where: { id: session.id },
       include: { patient: true, doctor: true, hospital: true, hotel: true, translator: true },
     })
-    return json({ user })
+    if (!user) return error(404, 'User not found')
+    // Never expose credential material to the client.
+    const { passwordHash: _ph, googleId: _gi, sessionsInvalidAfter: _si, ...safeUser } = user
+    void _ph; void _gi; void _si
+    return json({ user: safeUser })
   } catch (e) { return handleError(e) }
 }
 

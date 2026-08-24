@@ -115,9 +115,15 @@ export function DefaultLanding() {
         goDashboard(lastSection || 'overview')
       }
     }
-    // If no session, redirect to /en (the public SSR landing page)
-    if (!session && !sessionLoading && view.name === 'dashboard') {
-      router.push('/en')
+    // If no session, redirect to login — preserving the destination so the
+    // user returns here after signing in (instead of a bare /en bounce that
+    // made an authenticated-looking flow feel like being signed out).
+    // NOTE: DefaultLanding only mounts on /dashboard, and view stays
+    // 'landing' for unauthenticated visitors — so don't gate on view.name,
+    // otherwise they spin forever.
+    if (!session && !sessionLoading && view.name !== 'public-profile') {
+      const here = window.location.pathname + window.location.search
+      router.push(`/${locale || 'en'}/login?redirect=${encodeURIComponent(here)}`)
     }
   }, [session, sessionLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
