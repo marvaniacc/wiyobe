@@ -131,18 +131,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     try {
       const result = await db.$transaction(async (tx) => {
-        // Create a single payment record for the entire itinerary
-        const payment = await tx.payment.create({
-          data: {
-            bookingId: `itin_${itinerary.id}`, // placeholder — will be updated per-booking
-            stripeChargeId,
-            amount: toDec(totalAmountDollars),
-            currency: 'USD',
-            status: paymentStatus as any,
-          },
-        })
+        // Phase A: create all bookings FIRST. The Payment row has a real FK to
+        // Booking.id, so it cannot be inserted with a placeholder id.
+        interface CreatedBooking { id: string; isFirst: boolean; itemAmountDollars: string; platformCut: string; providerNet: string; providerUserId: string; bookingAffiliateUserId: string | null; bookingAffiliateAmount: string; affRate: string }
+        const created: CreatedBooking[] = []
 
-        // Process each itinerary item as a separate booking
         for (let i = 0; i < itinerary.items.length; i++) {
           const item = itinerary.items[i]
           // Server-derived price + provider (see re-derivation above)
@@ -167,8 +160,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
           if (i === 0 && affiliateUserId) {
             bookingAffiliateUserId = affiliateUserId
-            const platformCut = (parseFloat(itemAmountDollars) * parseFloat(platformRate) / 100).toFixed(2)
-            bookingAffiliateAmount = (parseFloat(platformCut) * parseFloat(affRate) / 100).toFixed(2)
+            const platformCutTmp = (parseFloat(itemAmountDollars) * parseFloat(platformRate) / 100).toFixed(2)
+            bookingAffiliateAmount = (parseFloat(platformCutTmp) * parseFloat(affRate) / 100).toFixed(2)
             affiliateRate = affRate
             affiliateAmount = bookingAffiliateAmount
           }
@@ -203,62 +196,68 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           })
 
           createdBookingIds.push(booking.id)
+          created.push({ id: booking.id, isFirst: i === 0, itemAmountDollars, platformCut, providerNet, providerUserId, bookingAffiliateUserId, bookingAffiliateAmount, affRate })
+        }
 
-          // Update the payment to link to the first booking
-          if (i === 0) {
-            await tx.payment.update({
-              where: { id: payment.id },
-              data: { bookingId: booking.id },
-            })
-          }
+        // Single payment record for the entire itinerary — linked to the FIRST booking.
+        const payment = await tx.payment.create({
+          data: {
+            bookingId: created[0].id,
+            stripeChargeId,
+            amount: toDec(totalAmountDollars),
+            currency: 'USD',
+            status: paymentStatus as any,
+          },
+        })
 
-          // Build ledger entries for this booking
+        // Phase B: build ledger entries for each booking against the single payment
+        for (const c of created) {
           ledgerEntries.push(
             {
-              bookingId: booking.id,
+              bookingId: c.id,
               paymentId: payment.id,
               userId: session.id,
               type: 'PATIENT_CHARGE',
-              amount: toDec(itemAmountDollars),
-              description: `Payment for ${item.providerType} service (itinerary)`,
+              amount: toDec(c.itemAmountDollars),
+              description: `Payment for service (itinerary)`,
             },
             {
-              bookingId: booking.id,
+              bookingId: c.id,
               paymentId: payment.id,
               type: 'COMMISSION',
-              amount: platformCut,
-              description: `Platform commission (${platformRate}%)`,
+              amount: c.platformCut,
+              description: `Platform commission`,
             },
             {
-              bookingId: booking.id,
+              bookingId: c.id,
               paymentId: payment.id,
-              userId: providerUserId,
+              userId: c.providerUserId,
               type: 'PROVIDER_CREDIT',
-              amount: providerNet,
+              amount: c.providerNet,
               description: 'Provider credit (pending until service completion)',
             }
           )
 
           // Affiliate commission ledger entry (only for first booking)
-          if (i === 0 && bookingAffiliateUserId && parseFloat(bookingAffiliateAmount) > 0) {
+          if (c.isFirst && c.bookingAffiliateUserId && parseFloat(c.bookingAffiliateAmount) > 0) {
             ledgerEntries.push({
-              bookingId: booking.id,
+              bookingId: c.id,
               paymentId: payment.id,
-              userId: bookingAffiliateUserId,
+              userId: c.bookingAffiliateUserId,
               type: 'AFFILIATE_COMMISSION',
-              amount: bookingAffiliateAmount,
-              description: `Affiliate commission (${affRate}% of platform)`,
+              amount: c.bookingAffiliateAmount,
+              description: `Affiliate commission (${c.affRate}% of platform)`,
             })
 
             // Update affiliate stats
-            const affRec = await tx.affiliate.findUnique({ where: { userId: bookingAffiliateUserId } })
+            const affRec = await tx.affiliate.findUnique({ where: { userId: c.bookingAffiliateUserId } })
             if (affRec) {
               await tx.affiliate.update({
-                where: { userId: bookingAffiliateUserId },
+                where: { userId: c.bookingAffiliateUserId },
                 data: {
                   totalBookings: { increment: 1 },
-                  totalEarnings: (parseFloat(bookingAffiliateAmount) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
-                  pendingBalance: (parseFloat(bookingAffiliateAmount) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
+                  totalEarnings: (parseFloat(c.bookingAffiliateAmount) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
+                  pendingBalance: (parseFloat(c.bookingAffiliateAmount) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
                 },
               })
             }
