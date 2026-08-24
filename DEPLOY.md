@@ -80,6 +80,6 @@ Or connect your GitHub repo at https://vercel.com/new and auto-deploy on push.
 
 ## Default Admin Account
 After seeding:
-- Email: `admin@medtravel.com`
+- Email: `admin@wishubest.com`
 - Password: `admin123`
 - **Change this immediately after first login in production!**

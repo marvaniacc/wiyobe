@@ -21,10 +21,10 @@ async function main() {
   console.log('━━━ 1. System Setup ━━━')
 
   const admin = await db.user.upsert({
-    where: { email: 'admin@medtravel.com' },
+    where: { email: 'admin@wishubest.com' },
     update: {},
     create: {
-      email: 'admin@medtravel.com',
+      email: 'admin@wishubest.com',
       passwordHash: hashPassword('admin123'),
       role: 'ADMIN',
       status: 'ACTIVE',
@@ -58,10 +58,10 @@ async function main() {
   console.log('\n━━━ 2. Affiliate Setup ━━━')
 
   const affUser = await db.user.upsert({
-    where: { email: 'affiliate@medtravel.com' },
+    where: { email: 'affiliate@wishubest.com' },
     update: {},
     create: {
-      email: 'affiliate@medtravel.com',
+      email: 'affiliate@wishubest.com',
       passwordHash: hashPassword('affiliate123'),
       role: 'AFFILIATE',
       status: 'ACTIVE',
@@ -93,10 +93,10 @@ async function main() {
   console.log('\n━━━ 3. Provider Registration (Referred) ━━━')
 
   const doctorUser = await db.user.upsert({
-    where: { email: 'doctor@medtravel.com' },
+    where: { email: 'doctor@wishubest.com' },
     update: { referredByAffiliateId: affiliate.id },
     create: {
-      email: 'doctor@medtravel.com',
+      email: 'doctor@wishubest.com',
       passwordHash: hashPassword('doctor123'),
       role: 'DOCTOR',
       status: 'ACTIVE',
@@ -183,10 +183,10 @@ async function main() {
   console.log('  Expected: platform=$30, affiliate=$7.50 (25% of $30), provider=$70')
 
   const patientUser = await db.user.upsert({
-    where: { email: 'patient@medtravel.com' },
+    where: { email: 'patient@wishubest.com' },
     update: {},
     create: {
-      email: 'patient@medtravel.com',
+      email: 'patient@wishubest.com',
       passwordHash: hashPassword('patient123'),
       role: 'PATIENT',
       status: 'ACTIVE',
@@ -451,10 +451,10 @@ async function main() {
 
   // Print login credentials
   console.log('━━━ Test Credentials ━━━')
-  console.log('  Admin:      admin@medtravel.com / admin123')
-  console.log('  Patient:    patient@medtravel.com / patient123')
-  console.log('  Doctor:     doctor@medtravel.com / doctor123')
-  console.log('  Affiliate:  affiliate@medtravel.com / affiliate123')
+  console.log('  Admin:      admin@wishubest.com / admin123')
+  console.log('  Patient:    patient@wishubest.com / patient123')
+  console.log('  Doctor:     doctor@wishubest.com / doctor123')
+  console.log('  Affiliate:  affiliate@wishubest.com / affiliate123')
 }
 
 main()

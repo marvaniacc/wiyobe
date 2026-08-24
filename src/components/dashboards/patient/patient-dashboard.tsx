@@ -2682,7 +2682,7 @@ function handleAddToCalendar(booking: any) {
     location,
     startTime,
     endTime,
-    organizer: { name: 'MedTravel', email: 'noreply@medtravel.com' },
+    organizer: { name: 'MedTravel', email: 'noreply@wishubest.com' },
   })
   toast.success('Calendar event downloaded')
 }

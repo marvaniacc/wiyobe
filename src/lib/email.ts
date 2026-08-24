@@ -39,7 +39,7 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
   }
 
   try {
-    const fromRaw = process.env.EMAIL_FROM || 'noreply@medtravel.com'
+    const fromRaw = process.env.EMAIL_FROM || 'noreply@wishubest.com'
     const appName = process.env.NEXT_PUBLIC_APP_NAME || 'MedTravel'
     // EMAIL_FROM may be a bare address or a full "Name <addr>" — accept both.
     // (Wrapping a full value again produces `"Name" <Name <addr>>` which

@@ -34,7 +34,7 @@ export function generateICal(event: ICalEvent): string {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${event.uid}@medtravel.com`,
+    `UID:${event.uid}@wishubest.com`,
     `DTSTAMP:${now}`,
     `DTSTART:${formatICalDate(event.startTime)}`,
     `DTEND:${formatICalDate(event.endTime)}`,
@@ -47,13 +47,13 @@ export function generateICal(event: ICalEvent): string {
   }
 
   if (event.organizer) {
-    const email = event.organizer.email || 'noreply@medtravel.com'
+    const email = event.organizer.email || 'noreply@wishubest.com'
     lines.push(`ORGANIZER;CN=${escapeICalText(event.organizer.name)}:mailto:${email}`)
   }
 
   if (event.attendees) {
     for (const att of event.attendees) {
-      const email = att.email || 'noreply@medtravel.com'
+      const email = att.email || 'noreply@wishubest.com'
       lines.push(`ATTENDEE;CN=${escapeICalText(att.name)};ROLE=REQ-PARTICIPANT:mailto:${email}`)
     }
   }

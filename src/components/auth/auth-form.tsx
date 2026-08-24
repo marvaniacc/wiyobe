@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import Script from 'next/script'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,6 +12,16 @@ import { Icon } from '@/components/shared/icon'
 import { toast } from 'sonner'
 import { translate, type Locale } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (el: HTMLElement, opts: Record<string, unknown>) => string
+      reset: (widgetId?: string) => void
+      remove: (widgetId: string) => void
+    }
+  }
+}
 
 type AuthType = 'login' | 'signup'
 type Role = 'patient' | 'doctor' | 'hospital' | 'hotel' | 'translator' | 'affiliate'
@@ -67,6 +78,33 @@ export function AuthForm({
   const [selectedRole, setSelectedRole] = useState<Role>(role)
   const [submitting, setSubmitting] = useState(false)
 
+  // Cloudflare Turnstile (signup only — the server rejects signups without a
+  // valid token when CF_TURNSTILE_SECRET_KEY is configured)
+  const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY
+  const turnstileRef = useRef<HTMLDivElement>(null)
+  const turnstileWidgetId = useRef<string | null>(null)
+  const [cfToken, setCfToken] = useState('')
+
+  const renderTurnstile = useCallback(() => {
+    if (!isSignup || !TURNSTILE_SITE_KEY || !window.turnstile || !turnstileRef.current || turnstileWidgetId.current) return
+    turnstileWidgetId.current = window.turnstile.render(turnstileRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (token: string) => setCfToken(token),
+      'expired-callback': () => setCfToken(''),
+      theme: 'auto',
+    })
+  }, [isSignup, TURNSTILE_SITE_KEY])
+
+  const resetTurnstile = useCallback(() => {
+    setCfToken('')
+    if (turnstileWidgetId.current && window.turnstile) window.turnstile.reset(turnstileWidgetId.current)
+  }, [])
+
+  useEffect(() => {
+    // Script may already be loaded (bfcache navigation) — try rendering.
+    renderTurnstile()
+  }, [renderTurnstile])
+
   const t = (key: string, fallback: string) => translate(loc, key, fallback)
 
   // Session check on mount
@@ -105,6 +143,7 @@ export function AuthForm({
       payload.name = name.trim()
       payload.role = selectedRole.toUpperCase()
       payload.preferredLanguage = loc
+      payload.cfToken = cfToken || undefined
     }
 
     try {
@@ -123,6 +162,7 @@ export function AuthForm({
       router.refresh()
     } catch (err: any) {
       toast.error(err.message || t('auth.authFailed', 'Authentication failed'))
+      resetTurnstile() // tokens are single-use — get a fresh challenge
     } finally {
       setSubmitting(false)
     }
@@ -242,8 +282,22 @@ export function AuthForm({
               </div>
             )}
 
+            {/* Turnstile challenge — signup only */}
+            {isSignup && TURNSTILE_SITE_KEY && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">{t('auth.securityCheck', 'Security check')}</Label>
+                <div className="overflow-hidden rounded-[10px]">
+                  <div ref={turnstileRef} />
+                </div>
+              </div>
+            )}
+
             {/* Submit */}
-            <Button type="submit" disabled={submitting || !email.trim() || !password.trim() || (isSignup && !name.trim())} className="mt-2 h-11 w-full gap-2">
+            <Button
+              type="submit"
+              disabled={submitting || !email.trim() || !password.trim() || (isSignup && !name.trim()) || (isSignup && !!TURNSTILE_SITE_KEY && !cfToken)}
+              className="mt-2 h-11 w-full gap-2"
+            >
               {submitting ? (
                 <span className="size-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
               ) : (
@@ -254,6 +308,13 @@ export function AuthForm({
           </form>
         </CardContent>
       </Card>
+      {isSignup && TURNSTILE_SITE_KEY && (
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="lazyOnload"
+          onReady={renderTurnstile}
+        />
+      )}
     </div>
   )
 }
