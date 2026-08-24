@@ -9,6 +9,7 @@ if (!SECRET) {
 // Re-bind to a narrowed type so downstream usages are guaranteed non-null.
 const AUTH_SECRET: string = SECRET
 const COOKIE_NAME = 'mt_session'
+const SESSION_TTL_MS = 60 * 60 * 24 * 7 // 7 days
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex')
@@ -29,26 +30,44 @@ function signToken(payload: object): string {
   return `${body}.${sig}`
 }
 
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a)
+  const bb = Buffer.from(b)
+  if (ba.length !== bb.length) return false
+  return crypto.timingSafeEqual(ba, bb)
+}
+
 function verifyToken<T = any>(token: string): T | null {
   const [body, sig] = token.split('.')
   if (!body || !sig) return null
-  const expected = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url')
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
+  // Length-safe comparison — a mismatched-length signature must be treated as
+  // an invalid token, not crash with ERR_CRYPTO_TIMING_SAFE_EQUAL_LENGTHS.
+  if (!safeEqual(sig, crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url'))) return null
   try {
-    return JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as T
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as T & { iat?: number; exp?: number }
+    // Enforce expiry server-side (cookie maxAge is not enforcement).
+    if (typeof payload.exp === 'number') {
+      if (payload.exp < Date.now()) return null
+    } else if (typeof payload.iat === 'number') {
+      // Legacy tokens without exp: fall back to iat + TTL.
+      if (payload.iat + SESSION_TTL_MS < Date.now()) return null
+    }
+    return payload as T
   } catch {
     return null
   }
 }
 
 export async function setSessionCookie(userId: string, role: string) {
-  const token = signToken({ uid: userId, role, iat: Date.now() })
+  const now = Date.now()
+  const token = signToken({ uid: userId, role, iat: now, exp: now + SESSION_TTL_MS })
   const c = await cookies()
   c.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: SESSION_TTL_MS / 1000,
   })
 }
 
@@ -76,7 +95,7 @@ export type SessionUser = {
 export async function getSession(): Promise<SessionUser | null> {
   const token = await getSessionToken()
   if (!token) return null
-  const payload = verifyToken<{ uid: string; role: string }>(token)
+  const payload = verifyToken<{ uid: string; role: string; iat?: number }>(token)
   if (!payload) return null
   const user = await db.user.findUnique({
     where: { id: payload.uid },
@@ -89,10 +108,25 @@ export async function getSession(): Promise<SessionUser | null> {
       preferredLanguage: true,
       avatarUrl: true,
       kycStatus: true,
+      sessionsInvalidAfter: true,
     },
   })
   if (!user || user.status === 'SUSPENDED') return null
-  return user as SessionUser
+  // Revocation: reject tokens issued before the invalidation timestamp.
+  if (payload.iat && user.sessionsInvalidAfter && payload.iat < user.sessionsInvalidAfter.getTime()) return null
+  const { sessionsInvalidAfter: _ignored, ...session } = user
+  return session as SessionUser
+}
+
+/**
+ * Invalidate all existing session tokens for a user (e.g. after a password
+ * reset or suspension). New logins mint tokens with a fresh iat and remain valid.
+ */
+export async function invalidateSessions(userId: string) {
+  await db.user.update({
+    where: { id: userId },
+    data: { sessionsInvalidAfter: new Date() },
+  })
 }
 
 export async function requireUser(): Promise<SessionUser> {

@@ -91,6 +91,9 @@ model User {
   city              String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+  // Sessions issued (token iat) before this timestamp are rejected — set on
+  // password reset / suspension to revoke all existing sessions.
+  sessionsInvalidAfter DateTime?
 
   patient           Patient?
   doctor            Doctor?

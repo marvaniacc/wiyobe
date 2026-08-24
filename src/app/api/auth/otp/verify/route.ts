@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { hashPassword, setSessionCookie } from '@/lib/auth'
+import { hashPassword, setSessionCookie, invalidateSessions } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
 import crypto from 'crypto'
@@ -225,6 +225,8 @@ export async function POST(req: Request) {
         where: { id: user.id },
         data: { passwordHash: hashPassword(body.newPassword), emailVerified: new Date() },
       })
+      // Revoke any existing sessions — old tokens must not survive a reset.
+      await invalidateSessions(user.id)
       return json({ reset: true, verified: true })
     }
 

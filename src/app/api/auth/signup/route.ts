@@ -43,10 +43,11 @@ const signupSchema = z.object({
  */
 async function verifyTurnstileToken(token: string | undefined): Promise<boolean> {
   const secret = process.env.CF_TURNSTILE_SECRET_KEY
-  if (!secret || !token) {
-    // No secret key configured or no token — allow in dev mode
-    return true
-  }
+  // Dev mode: no secret configured — allow without verification
+  if (!secret) return true
+  // Production hard requirement: a missing/empty token must fail closed,
+  // otherwise bots bypass the challenge by simply omitting cfToken.
+  if (!token) return false
   try {
     const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',

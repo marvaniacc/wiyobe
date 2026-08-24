@@ -74,9 +74,15 @@ export async function POST(req: Request) {
       },
     })
 
-    // Send email — uses SMTP if configured, otherwise logs to console (dev mode)
-    const isDev = !process.env.SMTP_HOST
-    if (isDev) {
+    // Send email — uses SMTP if configured. In production a missing SMTP
+    // configuration must FAIL CLOSED: returning the code in the response
+    // (or logging it) would allow unauthenticated account takeover.
+    const isProd = process.env.NODE_ENV === 'production'
+    if (!process.env.SMTP_HOST) {
+      if (isProd) {
+        console.error(`[auth/otp] SMTP_HOST is not configured — refusing to issue OTP for ${body.email}`)
+        return error(503, 'Email delivery is temporarily unavailable. Please contact support.')
+      }
       console.log(`\n🔐 OTP for ${body.email} (${body.purpose}): ${code}\n   Expires at ${expiresAt.toISOString()}\n`)
     } else {
       const { sendEmail, otpEmailTemplate } = await import('@/lib/email')
@@ -84,11 +90,11 @@ export async function POST(req: Request) {
       await sendEmail({ to: body.email, subject: template.subject, html: template.html })
     }
 
-    // Only return devCode in development mode (no SMTP configured)
+    // devCode is returned ONLY outside production (and only when SMTP is unset)
     return json({
       sent: true,
       expiresAt: expiresAt.toISOString(),
-      ...(isDev ? { devCode: code } : {}),
+      ...(!isProd && !process.env.SMTP_HOST ? { devCode: code } : {}),
     })
   } catch (e) { return handleError(e) }
 }

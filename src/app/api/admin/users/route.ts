@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { getSession } from '@/lib/auth'
+import { getSession, invalidateSessions } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
 
@@ -39,6 +39,10 @@ export async function POST(req: Request) {
     else if (body.action === 'reject') { status = 'SUSPENDED' }
 
     await db.user.update({ where: { id: user.id }, data: { status: status as any } })
+    // Suspension/rejection must also revoke the user's existing sessions.
+    if (body.action === 'suspend' || body.action === 'reject') {
+      await invalidateSessions(user.id)
+    }
 
     if (verified) {
       if (user.doctor) await db.doctor.update({ where: { id: user.doctor.id }, data: { verified: true } })
