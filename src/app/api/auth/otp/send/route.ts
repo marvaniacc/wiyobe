@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
-import { verifyTurnstileToken } from '@/lib/turnstile'
+import { verifyTurnstileToken, markTurnstilePassed, hasTurnstilePassed } from '@/lib/turnstile'
 import { z } from 'zod'
 import crypto from 'crypto'
 
@@ -51,8 +51,16 @@ export async function POST(req: Request) {
       const existing = await db.user.findUnique({ where: { email: body.email } })
       if (existing) return error(409, 'An account with this email already exists.')
       if (!body.signupData) return error(400, 'signupData required for signup OTP')
-      const turnstileOk = await verifyTurnstileToken(body.cfToken)
-      if (!turnstileOk) return error(403, 'Security verification failed. Please try again.')
+      // A Turnstile token is single-use: require it only on the FIRST send.
+      // Resends within the TTL reuse the earlier pass (otherwise every resend
+      // would fail with 'Security verification failed').
+      if (hasTurnstilePassed(body.email)) {
+        markTurnstilePassed(body.email) // sliding window
+      } else {
+        const turnstileOk = await verifyTurnstileToken(body.cfToken)
+        if (!turnstileOk) return error(403, 'Security verification failed. Please try again.')
+        markTurnstilePassed(body.email)
+      }
     }
 
     // For signin/reset: ensure user exists

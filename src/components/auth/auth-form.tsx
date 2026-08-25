@@ -192,6 +192,7 @@ export function AuthForm({
       if (!res.ok) throw new Error(data.error || t('auth.authFailed', 'Authentication failed'))
       setStep('code')
       setResendIn(45)
+      setCfToken('') // token was consumed server-side; resends rely on the server's grace marker
       toast.success(t('auth.codeSent', 'Verification code sent — check your inbox'))
     } catch (err: any) {
       toast.error(err.message || t('auth.authFailed', 'Authentication failed'))

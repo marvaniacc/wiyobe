@@ -40,7 +40,7 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
 
   try {
     const fromRaw = process.env.EMAIL_FROM || 'noreply@wishubest.com'
-    const appName = process.env.NEXT_PUBLIC_APP_NAME || 'MedTravel'
+    const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Wishubest'
     // EMAIL_FROM may be a bare address or a full "Name <addr>" — accept both.
     // (Wrapping a full value again produces `"Name" <Name <addr>>` which
     // providers like Resend reject with 550 Invalid from field.)
@@ -67,11 +67,11 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
 export function otpEmailTemplate(code: string, purpose: string): { subject: string; html: string } {
   const purposeText = purpose === 'signup' ? 'account verification' : purpose === 'reset' ? 'password reset' : 'login verification'
   return {
-    subject: `Your MedTravel verification code: ${code}`,
+    subject: `Your Wishubest verification code: ${code}`,
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
           <p style="color: #5F6368; font-size: 14px; margin-top: 4px;">Global Medical Tourism Marketplace</p>
         </div>
         <div style="background: #F8F9FA; border-radius: 16px; padding: 24px; border: 1px solid #DADCE0;">
@@ -87,7 +87,7 @@ export function otpEmailTemplate(code: string, purpose: string): { subject: stri
           </p>
         </div>
         <p style="color: #9AA0A6; font-size: 12px; text-align: center; margin-top: 24px;">
-          © ${new Date().getFullYear()} MedTravel. All rights reserved.
+          © ${new Date().getFullYear()} Wishubest. All rights reserved.
         </p>
       </div>
     `,
@@ -100,7 +100,7 @@ export function bookingConfirmationEmail(patientName: string, providerName: stri
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: #F8F9FA; border-radius: 16px; padding: 24px; border: 1px solid #DADCE0;">
           <h2 style="color: #202124; font-size: 18px; margin: 0 0 12px;">✅ Booking Confirmed!</h2>
@@ -112,7 +112,7 @@ export function bookingConfirmationEmail(patientName: string, providerName: stri
             <tr><td style="color: #5F6368; padding: 8px 0;">Type</td><td style="color: #202124; font-weight: 500;">${visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}</td></tr>
             <tr><td style="color: #5F6368; padding: 8px 0;">Amount</td><td style="color: #202124; font-weight: 500;">$${amount}</td></tr>
           </table>
-          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">You can view your booking details and manage your appointment in your MedTravel dashboard.</p>
+          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">You can view your booking details and manage your appointment in your Wishubest dashboard.</p>
         </div>
       </div>
     `,
@@ -125,13 +125,13 @@ export function bookingAcceptedEmail(patientName: string, providerName: string):
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: #F0FDF4; border-radius: 16px; padding: 24px; border: 1px solid #188038;">
           <h2 style="color: #188038; font-size: 18px; margin: 0 0 12px;">✅ Booking Accepted</h2>
           <p style="color: #5F6368; font-size: 14px;">Hi ${patientName},</p>
           <p style="color: #5F6368; font-size: 14px;">Your booking with <strong>${providerName}</strong> has been accepted and is now confirmed.</p>
-          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">You can view your booking details in your MedTravel dashboard.</p>
+          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">You can view your booking details in your Wishubest dashboard.</p>
         </div>
       </div>
     `,
@@ -144,14 +144,14 @@ export function bookingDeclinedEmail(patientName: string, providerName: string, 
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: #FEF7F0; border-radius: 16px; padding: 24px; border: 1px solid #D93025;">
           <h2 style="color: #D93025; font-size: 18px; margin: 0 0 12px;">❌ Booking Declined</h2>
           <p style="color: #5F6368; font-size: 14px;">Hi ${patientName},</p>
           <p style="color: #5F6368; font-size: 14px;">Unfortunately, <strong>${providerName}</strong> has declined your booking.</p>
           ${parseFloat(refundAmount) > 0 ? `<p style="color: #188038; font-size: 14px; margin-top: 12px;">A full refund of <strong>$${refundAmount}</strong> will be processed to your original payment method within 5-10 business days.</p>` : ''}
-          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">Please browse other providers on MedTravel to find an available appointment.</p>
+          <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">Please browse other providers on Wishubest to find an available appointment.</p>
         </div>
       </div>
     `,
@@ -164,7 +164,7 @@ export function bookingCancelledEmail(patientName: string, providerName: string,
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: #FEF7F0; border-radius: 16px; padding: 24px; border: 1px solid #D93025;">
           <h2 style="color: #D93025; font-size: 18px; margin: 0 0 12px;">❌ Booking Cancelled</h2>
@@ -183,7 +183,7 @@ export function bookingCompletedEmail(patientName: string, providerName: string)
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: #F8F9FA; border-radius: 16px; padding: 24px; border: 1px solid #DADCE0;">
           <h2 style="color: #188038; font-size: 18px; margin: 0 0 12px;">✅ Visit Completed</h2>
@@ -203,7 +203,7 @@ export function ticketReplyEmail(userName: string, ticketSubject: string, messag
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: #F8F9FA; border-radius: 16px; padding: 24px; border: 1px solid #DADCE0;">
           <h2 style="color: #202124; font-size: 18px; margin: 0 0 12px;">💬 New reply on your ticket</h2>
@@ -224,7 +224,7 @@ export function kycStatusEmail(doctorName: string, docType: string, approved: bo
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: ${approved ? '#F0FDF4' : '#FEF7F0'}; border-radius: 16px; padding: 24px; border: 1px solid ${approved ? '#188038' : '#D93025'};">
           <h2 style="color: ${approved ? '#188038' : '#D93025'}; font-size: 18px; margin: 0 0 12px;">${approved ? '✅ Document Approved' : '❌ Document Rejected'}</h2>
@@ -244,7 +244,7 @@ export function tierPromotionEmail(affiliateName: string, oldTier: string, newTi
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">MedTravel</h1>
+          <h1 style="color: #1A73E8; font-size: 24px; margin: 0;">Wishubest</h1>
         </div>
         <div style="background: #F0FDF4; border-radius: 16px; padding: 24px; border: 1px solid #188038;">
           <h2 style="color: #188038; font-size: 18px; margin: 0 0 12px;">🎉 Congratulations, ${affiliateName}!</h2>
