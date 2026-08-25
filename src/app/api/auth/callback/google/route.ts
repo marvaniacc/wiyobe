@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { resolveGoogleUser } from '@/lib/google-auth'
+import { resolveGoogleUser, storePendingGoogleSignup } from '@/lib/google-auth'
+import { db } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,30 +98,36 @@ export async function GET(req: Request) {
     return fail('Your Google email address is not verified. Verify it with Google first, then try again.')
   }
 
-  const result = await resolveGoogleUser(
-    {
-      sub: claims.sub,
-      email: claims.email,
-      email_verified: claims.email_verified,
-      name: claims.name,
-      picture: claims.picture || null,
-      locale: claims.locale,
-    },
-    role,
-    mode === 'signup'
-  )
+  const googleInfo = {
+    sub: claims.sub,
+    email: claims.email,
+    email_verified: claims.email_verified,
+    name: claims.name,
+    picture: claims.picture || null,
+    locale: claims.locale,
+  }
+
+  // Does a matching account already exist? (by googleId or verified email)
+  const existing = (await db.user.findFirst({
+    where: { OR: [{ googleId: googleInfo.sub }, { email: googleInfo.email }] },
+    select: { id: true },
+  }))
+
+  let result
+  if (existing) {
+    result = await resolveGoogleUser(googleInfo, role, false)
+  } else {
+    // NEW Google identity — the user picks their role AFTER the redirect
+    // (role selection page); claims are held server-side behind a token.
+    const token = storePendingGoogleSignup(googleInfo, redirect)
+    const locale = redirect.split('/')[1]
+    const loc = ['en', 'tr', 'fa', 'ar', 'ru'].includes(locale as any) ? locale : 'en'
+    const res = NextResponse.redirect(new URL(`/${loc}/complete-signup?token=${token}`, origin))
+    res.cookies.delete('g_state')
+    return res
+  }
 
   if (!result.ok) {
-    // Sign-in intent with no existing account → send to signup so the role
-    // is chosen explicitly (never silently create a PATIENT account).
-    if (result.message.startsWith('NO_ACCOUNT:')) {
-      const email = result.message.slice('NO_ACCOUNT:'.length)
-      const locale = redirect.split('/')[1]
-      const loc = ['en', 'tr', 'fa', 'ar', 'ru'].includes(locale as any) ? locale : 'en'
-      return NextResponse.redirect(
-        new URL(`/${loc}/signup?notice=${encodeURIComponent(`No account exists for ${email} yet. Choose your role to sign up.`)}`, origin)
-      )
-    }
     return NextResponse.redirect(new URL(`/en/login?error=${encodeURIComponent(result.message)}`, origin))
   }
 

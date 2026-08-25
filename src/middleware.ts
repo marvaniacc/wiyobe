@@ -66,7 +66,7 @@ export function middleware(req: NextRequest) {
     requestHeaders.set('x-locale', firstSegment)
     // Auth pages render chromeless (no public header/footer) — they bring
     // their own centered layout and must fit the viewport without scrolling.
-    if (/^\/(login|signup|forgot-password)(\/|$)/.test(pathname.slice(firstSegment.length + 1))) {
+    if (/^\/(login|signup|forgot-password|complete-signup)(\/|$)/.test(pathname.slice(firstSegment.length + 1))) {
       requestHeaders.set('x-auth-page', '1')
     }
     return NextResponse.next({ request: { headers: requestHeaders } })

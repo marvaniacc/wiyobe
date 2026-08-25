@@ -161,7 +161,9 @@ export function AuthForm({
   }, [isForgot])
 
   function handleGoogleSignIn(mode: 'login' | 'signup') {
-    const params = new URLSearchParams({ role: selectedRole.toUpperCase(), mode })
+    // Role is chosen AFTER the Google redirect (complete-signup page) —
+    // the email path keeps its own role dropdown.
+    const params = new URLSearchParams({ mode })
     if (redirectPath) params.set('redirect', redirectPath)
     window.location.href = `/api/auth/google/start?${params.toString()}`
   }

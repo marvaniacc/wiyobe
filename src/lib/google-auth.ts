@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { db } from '@/lib/db'
 import { setSessionCookie } from '@/lib/auth'
 import { json, error } from '@/lib/api'
@@ -104,6 +105,11 @@ export async function resolveGoogleUser(googleInfo: GoogleUserInfo, role: string
     await db.translator.create({
       data: { userId: user.id, languages: user.preferredLanguage, specialization: 'general', bio: '', city: '', country: '', hourlyRate: '0', dailyRate: '0', yearsExperience: 0, verified: false },
     })
+  } else if (role === 'AFFILIATE') {
+    const referralCode = (user.name || email).replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() + crypto.randomBytes(4).toString('hex').toUpperCase()
+    await db.affiliate.create({
+      data: { userId: user.id, referralCode },
+    })
   }
 
   if (status === 'ACTIVE') {
@@ -111,6 +117,35 @@ export async function resolveGoogleUser(googleInfo: GoogleUserInfo, role: string
   }
 
   return { ok: true, user, isNewUser: true, needsApproval: false }
+}
+
+// ── Pending Google signups ──────────────────────────────────────────────
+// After OAuth, a NEW Google identity waits for the user to pick a role.
+// The verified claims are held server-side (never exposed to the client)
+// behind a 256-bit token with a short TTL.
+const gPending = globalThis as unknown as {
+  __googlePending?: Map<string, { claims: GoogleUserInfo; redirect: string; createdAt: number }>
+}
+const pending: Map<string, { claims: GoogleUserInfo; redirect: string; createdAt: number }> =
+  gPending.__googlePending ?? (gPending.__googlePending = new Map())
+const PENDING_TTL_MS = 15 * 60 * 1000
+
+export function storePendingGoogleSignup(claims: GoogleUserInfo, redirect: string): string {
+  const token = crypto.randomBytes(32).toString('base64url')
+  pending.set(token, { claims, redirect, createdAt: Date.now() })
+  if (pending.size > 2000) {
+    const now = Date.now()
+    for (const [k, v] of pending) if (now - v.createdAt > PENDING_TTL_MS) pending.delete(k)
+  }
+  return token
+}
+
+export function takePendingGoogleSignup(token: string): { claims: GoogleUserInfo; redirect: string } | null {
+  const entry = pending.get(token)
+  if (!entry) return null
+  pending.delete(token)
+  if (Date.now() - entry.createdAt > PENDING_TTL_MS) return null
+  return { claims: entry.claims, redirect: entry.redirect }
 }
 
 /** Public config for the login UI. */
