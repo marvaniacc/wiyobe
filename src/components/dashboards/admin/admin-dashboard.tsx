@@ -17,6 +17,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -5382,6 +5383,73 @@ function AdminSettingsSection() {
                   />
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Payments — commercial activation */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="payments" size={18} className="text-primary" />
+                Online Payments (Stripe)
+              </CardTitle>
+              <CardDescription>
+                Commercial activation: paste the merchant secret key from your Stripe Dashboard, then flip the switch to take the platform live. Until both are set, checkout is disabled and no charges can occur.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="stripeMerchantCode">Merchant code (Stripe secret key)</Label>
+                <Input
+                  id="stripeMerchantCode"
+                  type="password"
+                  placeholder="sk_live_… or sk_test_…  (stored in server env, never exposed to clients)"
+                  value={values.stripeMerchantCodeInput ?? ''}
+                  onChange={(e) => setValues((v) => ({ ...v, stripeMerchantCodeInput: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Deployment note: set STRIPE_SECRET_KEY in the server environment (.env / hosting secrets). This field is an operational convenience for recording who activated payments and when — keys are read from the environment at runtime.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-[12px] border border-divider p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Payments enabled</p>
+                  <p className="text-xs text-muted-foreground">
+                    {values.paymentsEnabled === 'true'
+                      ? 'LIVE — patients can pay at checkout'
+                      : 'OFFLINE — checkout disabled platform-wide'}
+                  </p>
+                </div>
+                <Switch
+                  checked={values.paymentsEnabled === 'true'}
+                  onCheckedChange={async (checked) => {
+                    const newVal = checked ? 'true' : 'false'
+                    setValues((v) => ({ ...v, paymentsEnabled: newVal }))
+                    try {
+                      await apiPatch('/api/admin/settings', {
+                        paymentsEnabled: newVal,
+                        ...(checked && values.stripeMerchantCodeInput
+                          ? { paymentsActivatedAt: new Date().toISOString(), paymentsActivatedBy: 'admin' }
+                          : {}),
+                      })
+                      toast.success(`Payments ${checked ? 'enabled — you are LIVE' : 'disabled'}`)
+                    } catch (e: any) {
+                      toast.error(e.message || 'Failed to update')
+                      setValues((v) => ({ ...v, paymentsEnabled: checked ? 'false' : 'true' }))
+                    }
+                  }}
+                />
+              </div>
+
+              {values.paymentsEnabled !== 'true' && (
+                <Alert className="border-warning/30 bg-warning/5">
+                  <Icon name="info" size={16} />
+                  <AlertDescription className="text-xs">
+                    Webhook setup after activation: add endpoint <code>/api/stripe/webhook</code> in the Stripe Dashboard for events checkout.session.completed, checkout.session.expired, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed and charge.refunded; then set STRIPE_WEBHOOK_SECRET in the server environment.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 

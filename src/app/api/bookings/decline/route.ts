@@ -52,9 +52,9 @@ export async function POST(req: Request) {
     // Gateway refund FIRST — DB records the refund only after Stripe confirms.
     let stripeRefunded = false
     if (parseFloat(refundAmount) > 0 && payment?.stripeChargeId) {
-      if (payment.stripeChargeId.startsWith('ch_mock_')) {
-        stripeRefunded = true // mock charges "refund" trivially
-      } else {
+      // stripeChargeId holds a real PaymentIntent id (pi_...) post-checkout —
+      // refunds go through the gateway unconditionally.
+      {
         const { refundPayment } = await import('@/lib/stripe')
         const refund = await refundPayment(payment.stripeChargeId, parseFloat(refundAmount))
         if (refund) {

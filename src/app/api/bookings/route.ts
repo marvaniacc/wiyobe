@@ -4,6 +4,7 @@ import { json, error, handleError, parseBody } from '@/lib/api'
 import { resolveProviderUser } from '@/lib/ledger'
 import { notify } from '@/lib/notify'
 import { toDec, mulDec, subDec } from '@/lib/money'
+import { arePaymentsEnabled } from '@/lib/stripe'
 import { z } from 'zod'
 import type { ProviderType } from '@prisma/client'
 
@@ -63,8 +64,8 @@ const createSchema = z.object({
   serviceId: z.string().optional(),
   slotId: z.string().optional(),
   visitType: z.enum(['IN_PERSON', 'ONLINE']),
-  startDate: z.string(),
-  endDate: z.string().optional(),
+  startDate: z.string().refine((v) => !isNaN(Date.parse(v)), { message: 'startDate must be a valid ISO datetime' }),
+  endDate: z.string().refine((v) => !isNaN(Date.parse(v)), { message: 'endDate must be a valid ISO datetime' }).optional(),
   notes: z.string().optional(),
   promoCode: z.string().optional(), // optional promo code to apply at checkout
 })
@@ -125,7 +126,9 @@ export async function POST(req: Request) {
       amount = svc.price
     }
 
-    // If slot provided, lock it — the slot MUST belong to the same provider.
+    // If slot provided, CLAIM it atomically — updateMany with isBooked:false
+    // precondition guarantees only one concurrent request can win; the loser
+    // gets 0 updated rows and a 409 instead of a double-booking.
     let slot: any = null
     if (body.slotId) {
       const slotOwnership =
@@ -134,8 +137,20 @@ export async function POST(req: Request) {
         : pt === 'TRANSLATOR' ? { translatorId: body.providerId }
         : null // hotels have no slots
       if (!slotOwnership) return error(400, 'Slots are not supported for this provider type')
-      slot = await db.slot.findFirst({ where: { id: body.slotId, isBooked: false, ...slotOwnership } })
-      if (!slot) return error(409, 'This slot is no longer available')
+      const claimed = await db.slot.updateMany({
+        where: { id: body.slotId, isBooked: false, ...slotOwnership },
+        data: { isBooked: true },
+      })
+      if (claimed.count === 0) return error(409, 'This slot is no longer available')
+      slot = { id: body.slotId }
+    }
+
+    // Compensation helper — if any later step of the multi-write booking flow
+    // fails, we must not leave a claimed slot (or reserved promo use) orphaned.
+    const releaseSlotIfClaimed = async () => {
+      if (slot) {
+        await db.slot.updateMany({ where: { id: slot.id, isBooked: true }, data: { isBooked: false } }).catch(() => {})
+      }
     }
 
     // Get commission rates (platform + affiliate) for this provider type
@@ -240,6 +255,21 @@ export async function POST(req: Request) {
           }
           // Cap at platform commission — provider revenue is NEVER reduced.
           discountAmount = Math.min(rawDiscount, basePlatformCut)
+          // Reserve one use ATOMICALLY — the updateMany precondition
+          // (usedCount < maxUses, still active) makes concurrent bookings
+          // unable to exceed maxUses; a losing reservation returns 0 rows.
+          const reserved = await db.promoCode.updateMany({
+            where: {
+              id: promoCodeRecord.id,
+              isActive: true,
+              ...(promoCodeRecord.maxUses !== null ? { usedCount: { lt: promoCodeRecord.maxUses } } : {}),
+            },
+            data: { usedCount: { increment: 1 } },
+          })
+          if (reserved.count === 0) {
+            await releaseSlotIfClaimed() // promo exhausted → release slot claim
+            return error(409, 'This promo code has just reached its usage limit')
+          }
           promoCodeId = promoCodeRecord.id
         }
       }
@@ -289,154 +319,61 @@ export async function POST(req: Request) {
         notes: body.notes,
       },
       include: { patient: { select: { name: true } }, service: true, promoCode: { select: { code: true } } },
+    }).catch(async (bkErr) => {
+      // Compensation: slot/promo were reserved but the booking row failed.
+      await releaseSlotIfClaimed()
+      if (promoCodeId) {
+        await db.promoCode.updateMany({ where: { id: promoCodeId }, data: { usedCount: { decrement: 1 } } }).catch(() => {})
+      }
+      throw bkErr
     })
 
-    // Increment promo code usedCount — only on successful booking creation.
-    if (promoCodeId) {
-      await db.promoCode.update({
-        where: { id: promoCodeId },
-        data: { usedCount: { increment: 1 } },
-      })
+    // Increment promo code usedCount — already reserved atomically above
+    // (guarded updateMany); nothing further to do here.
+
+    // NO CHARGE HAPPENS HERE. Payment is collected on the dedicated checkout
+    // page via Stripe Checkout (/api/checkout/session → hosted payment →
+    // /api/checkout/confirm + webhook finalize). The booking stays PENDING
+    // (unpaid) until then. If payments are disabled platform-wide, the
+    // booking is created with status PENDING_PAYMENT so providers/patients
+    // can see it awaits offline arrangement or later activation.
+    const paymentsLive = await arePaymentsEnabled()
+    if (!paymentsLive) {
+      await db.booking.update({ where: { id: booking.id }, data: { notes: prependNote(booking.notes, '[AWAITING PAYMENT — online checkout currently disabled]') } }).catch(() => {})
     }
 
-    // mark slot booked
-    if (slot) {
-      await db.slot.update({ where: { id: slot.id }, data: { isBooked: true } })
-    }
+    // Release the slot hold only when we could NOT persist a payable booking
+    // (compensation already handled above; nothing further needed here).
 
-    // Payment — real Stripe charge if configured. In production a missing
-    // Stripe configuration must FAIL CLOSED: mock charges would make every
-    // booking free while still crediting provider/affiliate balances.
-    // The patient is charged the DISCOUNTED amount (amount - discountAmount).
-    const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
-    let stripeChargeId = `ch_mock_${booking.id.slice(-8)}`
-    let paymentStatus = 'SUCCEEDED'
+// A Payment row is NOT created here — it is created by /api/checkout/session
+    // when the patient proceeds to checkout, and marked SUCCEEDED only by
+    // /api/checkout/confirm or the Stripe webhook after verified payment.
 
-    if (isStripeConfigured()) {
-      const charge = await createCharge(
-        parseFloat(patientCharge),
-        'usd',
-        `Wishubest booking - ${providerName} - ${body.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`,
-        { bookingId: booking.id, patientId: session.id, providerType: pt }
-      )
-      if (charge) {
-        stripeChargeId = charge.id
-        paymentStatus = charge.status === 'succeeded' ? 'SUCCEEDED' : 'PENDING'
-      } else {
-        paymentStatus = 'FAILED'
-      }
-    } else if (process.env.NODE_ENV === 'production') {
-      return error(503, 'Payments are temporarily unavailable. Please contact support.')
-    }
-
-    const payment = await db.payment.create({
-      data: {
-        bookingId: booking.id,
-        stripeChargeId,
-        amount: patientCharge,  // discounted amount the patient actually paid
-        status: paymentStatus as any,
-      },
-    })
-
-    // Ledger entries — only when money actually arrived. Crediting
-    // PROVIDER_CREDIT / COMMISSION / AFFILIATE_COMMISSION for failed or
-    // pending payments created payable balances out of thin air.
-    if (paymentStatus === 'SUCCEEDED') {
-      const ledgerEntries: any[] = [
-        {
-          type: 'PATIENT_CHARGE',
-          bookingId: booking.id,
-          paymentId: payment.id,
-          amount: patientCharge,
-          description: `Payment for ${providerName} — ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'}${promoCodeId ? ` (promo: ${booking.promoCode?.code || ''})` : ''}`,
-        },
-        {
-          type: 'COMMISSION',
-          bookingId: booking.id,
-          paymentId: payment.id,
-          amount: platformCut,
-          description: `Platform commission (${platformRate}%${discountAmount > 0 ? `, promo discount -$${discountAmount.toFixed(2)}` : ''})`,
-        },
-      ]
-
-      // Affiliate commission entry (only if affiliate exists)
-      if (affiliateUserId) {
-        ledgerEntries.push({
-          type: 'AFFILIATE_COMMISSION',
-          bookingId: booking.id,
-          paymentId: payment.id,
-          userId: affiliateUserId,
-          amount: affiliateCommission,
-          description: `Affiliate commission (${affiliateRate}%) for referral`,
-        })
-
-        // Update affiliate click status and earnings
-        if (affiliateClickId) {
-          await db.affiliateClick.update({
-            where: { id: affiliateClickId },
-            data: { status: 'BOOKED', bookingId: booking.id, commissionAmount: affiliateCommission, convertedAt: new Date() },
-          })
-        }
-        // Update affiliate aggregate stats
-        const affRec = await db.affiliate.findUnique({ where: { userId: affiliateUserId } })
-        if (affRec) {
-          await db.affiliate.update({
-            where: { userId: affiliateUserId },
-            data: {
-              totalBookings: { increment: 1 },
-              totalEarnings: (parseFloat(affiliateCommission) + parseFloat(affRec.totalEarnings || '0')).toFixed(2),
-              pendingBalance: (parseFloat(affiliateCommission) + parseFloat(affRec.pendingBalance || '0')).toFixed(2),
-            },
-          })
-        }
-      }
-
-      // Provider credit (net amount after both commissions)
-      ledgerEntries.push({
-        type: 'PROVIDER_CREDIT',
-        bookingId: booking.id,
-        paymentId: payment.id,
-        userId: providerUserId,
-        amount: providerNet,
-        description: 'Provider credit (pending until service completion)',
-      })
-
-      await db.ledgerEntry.createMany({ data: ledgerEntries })
-    }
-
-    // Notifications — notify both patient and provider
+    // Notify patient + provider that an UNPAID booking awaits checkout.
     const patientUser = await db.user.findUnique({ where: { id: session.id }, select: { name: true } })
     const patientName = patientUser?.name || 'Patient'
     await notify({
       userId: session.id,
       type: 'booking_created',
-      title: 'Booking confirmed!',
-      body: `Your ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with ${providerName} has been confirmed.`,
+      title: 'Booking created',
+      body: `Your ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with ${providerName} is reserved. Complete payment to confirm it.`,
       link: 'bookings',
       meta: { bookingId: booking.id, amount: patientCharge },
     })
     await notify({
       userId: providerUserId,
       type: 'booking_created',
-      title: 'New booking received',
-      body: `${patientName} booked a ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with you.`,
+      title: 'New booking request',
+      body: `${patientName} booked a ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with you — awaiting payment.`,
       link: 'appointments',
       meta: { bookingId: booking.id, amount: toDec(amount) },
     })
 
-    // Send confirmation emails — patient sees the discounted amount they paid;
-    // provider sees the full booking amount (their revenue is unaffected by promos).
-    const { sendEmail, bookingConfirmationEmail } = await import('@/lib/email')
-    const bookingDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(booking.startDate))
-    const patientEmailTemplate = bookingConfirmationEmail(patientName, providerName, bookingDate, patientCharge, body.visitType)
-    await sendEmail({ to: session.email, subject: patientEmailTemplate.subject, html: patientEmailTemplate.html })
-
-    const providerUser = await db.user.findUnique({ where: { id: providerUserId }, select: { email: true } })
-    if (providerUser) {
-      const providerEmailTemplate = bookingConfirmationEmail(providerName, patientName, bookingDate, toDec(amount), body.visitType)
-      await sendEmail({ to: providerUser.email, subject: providerEmailTemplate.subject, html: providerEmailTemplate.html })
-    }
-
-    return json({ booking, payment }, 201)
+    return json({ booking, checkoutUrl: `/checkout/${booking.id}` }, 201)
   } catch (e) { return handleError(e) }
+}
+
+// Prefix a note while preserving any existing notes text.
+function prependNote(existing: string | null | undefined, marker: string): string {
+  return existing ? `${marker}\n${existing}` : marker
 }

@@ -409,6 +409,8 @@ model Payment {
   bookingId      String        @unique
   booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   stripeChargeId String?
+  stripeSessionId        String? // Stripe Checkout Session id (cs_...)
+  stripePaymentIntentId  String? // PaymentIntent behind the Checkout Session (pi_...)
   amount         String        @default("0")
   currency       String        @default("USD")
   status         PaymentStatus @default(PENDING)

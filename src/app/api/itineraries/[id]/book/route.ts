@@ -85,27 +85,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const totalAmountCents = Math.round(totalPrice * 100)
     const totalAmountDollars = totalPrice.toFixed(2)
 
-    // === Step 1: Process payment (mock or Stripe) ===
-    const { createCharge, isStripeConfigured } = await import('@/lib/stripe')
-    let stripeChargeId = `ch_mock_itin_${itinerary.id.slice(-8)}`
-    let paymentStatus = 'SUCCEEDED'
-
-    if (isStripeConfigured()) {
-      const charge = await createCharge(
-        totalAmountCents / 100,
-        'usd',
-        `Wishubest itinerary booking - ${itinerary.items.length} services`,
-        { itineraryId: itinerary.id, patientId: session.id }
-      )
-      if (charge) {
-        stripeChargeId = charge.id
-        paymentStatus = charge.status === 'succeeded' ? 'SUCCEEDED' : 'PENDING'
-      } else {
-        paymentStatus = 'FAILED'
-      }
-    } else if (process.env.NODE_ENV === 'production') {
-      return error(503, 'Payments are temporarily unavailable. Please contact support.')
+    // === Step 1: Payments must be commercially live — no mocks exist anymore ===
+    const { arePaymentsEnabled, createCheckoutSession } = await import('@/lib/stripe')
+    const paymentsLive = await arePaymentsEnabled()
+    if (!paymentsLive) {
+      return error(503, 'Online payments are not yet available. Please contact support.')
     }
+
+    // Create ONE Stripe Checkout Session for the whole itinerary.
+    const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+    const cs = await createCheckoutSession({
+      bookingId: itinerary.id, // metadata carries the itinerary id
+      amount: totalPrice,
+      description: `Wishubest itinerary — ${itinerary.items.length} services`,
+      customerEmail: session.email,
+      successUrl: `${origin}/api/checkout/confirm?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${origin}/checkout/cancelled?bookingId=${itinerary.id}`,
+      metadata: { itineraryId: itinerary.id, patientId: session.id },
+    })
+    if (!cs) return error(503, 'Payment provider unavailable. Please contact support.')
+    let stripeSessionId = cs.id
+    let paymentStatus = 'PENDING'
 
     // === Step 2: Determine affiliate attribution (applied to first booking) ===
     let affiliateUserId: string | null = null
@@ -207,7 +207,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const payment = await tx.payment.create({
           data: {
             bookingId: created[0].id,
-            stripeChargeId,
+            stripeSessionId,
             amount: toDec(totalAmountDollars),
             currency: 'USD',
             status: paymentStatus as any,
@@ -325,11 +325,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         totalAmount: totalAmountDollars,
       }, 201)
     } catch (txError: any) {
-      // Transaction failed — refund the payment if it was real Stripe
-      if (isStripeConfigured() && !stripeChargeId.startsWith('ch_mock_')) {
-        const { refundPayment } = await import('@/lib/stripe')
-        await refundPayment(stripeChargeId, totalAmountCents / 100).catch(() => {})
-      }
+      // Transaction failed — nothing was charged yet (the Checkout Session is
+      // simply abandoned and expires after 30 min), so no refund is needed.
 
       // Check for specific Prisma unique constraint violation (slot already booked)
       if (txError?.code === 'P2002') {

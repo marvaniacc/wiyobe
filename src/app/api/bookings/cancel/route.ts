@@ -65,9 +65,9 @@ export async function POST(req: Request) {
     // after Stripe confirms it, otherwise a failed refund leaves phantom state.
     let stripeRefunded = false
     if (parseFloat(refundAmount) > 0 && payment?.stripeChargeId) {
-      if (payment.stripeChargeId.startsWith('ch_mock_')) {
-        stripeRefunded = true // mock charges "refund" trivially
-      } else {
+      // stripeChargeId now always holds a real PaymentIntent id (pi_...) set at
+      // payment finalization — refunds go through the gateway unconditionally.
+      {
         const { refundPayment } = await import('@/lib/stripe')
         const refund = await refundPayment(payment.stripeChargeId, parseFloat(refundAmount))
         if (refund) {

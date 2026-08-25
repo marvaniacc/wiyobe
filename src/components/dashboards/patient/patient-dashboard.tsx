@@ -1139,7 +1139,7 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
       bodyEndDate = end.toISOString()
     }
 
-    apiPost('/api/bookings', {
+    apiPost<{ booking: { id: string }; checkoutUrl?: string }>('/api/bookings', {
       providerType: provider.providerType,
       providerId: provider.id,
       slotId: hotel ? undefined : slotId || undefined,
@@ -1149,10 +1149,12 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
       notes: notes.trim() || undefined,
       promoCode: promoResult?.valid ? promoResult.code : undefined,
     })
-      .then(() => {
+      .then((res) => {
         toast.success(t('booking.bookingCreated'))
         handleClose(false)
         onBooked()
+        // Route to the dedicated checkout page to complete payment.
+        if (res?.checkoutUrl) window.location.href = res.checkoutUrl
       })
       .catch((e: any) => toast.error(e.message || t('booking.paymentFailed')))
       .finally(() => setSubmitting(false))
@@ -2748,6 +2750,17 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
                 {t('patient.pendingApproval')}
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* Unpaid booking — complete payment to confirm */}
+          {booking.status === 'PENDING' && !(booking as any).payment?.stripeChargeId && (
+            <Button
+              className="w-full gap-2 rounded-full"
+              onClick={() => { window.location.href = `/checkout/${booking.id}` }}
+            >
+              <Icon name="credit_card" size={18} fill />
+              Complete payment &amp; confirm
+            </Button>
           )}
 
           {/* Timeline */}

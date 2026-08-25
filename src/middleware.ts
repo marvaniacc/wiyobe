@@ -14,6 +14,7 @@ const EXCLUDED_PATHS = [
   '/sitemap.xml',
   '/favicon.ico',
   '/uploads',
+  '/checkout', // Stripe return pages — must render at the exact success/cancel URLs
 ]
 
 function isExcluded(pathname: string): boolean {
