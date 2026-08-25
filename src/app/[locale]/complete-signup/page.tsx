@@ -32,7 +32,7 @@ export default async function CompleteSignupPage({ params }: { params: Promise<{
         <span>Wishubest</span>
       </Link>
 
-      <GoogleRoleForm locale={locale} />
+      <div className="w-full max-w-4xl px-0 sm:px-2"><GoogleRoleForm locale={locale} /></div>
     </div>
   )
 }
