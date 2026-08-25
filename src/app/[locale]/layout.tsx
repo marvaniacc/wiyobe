@@ -59,6 +59,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
  */
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params
+  const { headers } = await import('next/headers')
+  const isAuthPage = (await headers()).get('x-auth-page') === '1'
 
   // Validate locale — return 404 if not supported
   if (!SUPPORTED_LOCALES.includes(locale as any)) {
@@ -67,6 +69,16 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   const isRTL = RTL_LOCALES.includes(locale)
   const dir = isRTL ? 'rtl' : 'ltr'
+
+  // Auth pages (login / signup / forgot-password) render chromeless —
+  // they bring their own centered layout and must fit the viewport.
+  if (isAuthPage) {
+    return (
+      <div dir={dir} className="flex min-h-screen flex-col bg-background">
+        <main className="flex flex-1 flex-col">{children}</main>
+      </div>
+    )
+  }
 
   return (
     <div dir={dir} className="flex min-h-screen flex-col bg-background">

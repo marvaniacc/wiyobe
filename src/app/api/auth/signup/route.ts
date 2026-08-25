@@ -3,6 +3,7 @@ import { hashPassword, setSessionCookie } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
 import crypto from 'crypto'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,32 +38,6 @@ const signupSchema = z.object({
   cfToken: z.string().optional(),
 })
 
-/**
- * Verify Cloudflare Turnstile token. Skips verification if no secret key
- * is configured (dev mode). Returns true on success, false on failure.
- */
-async function verifyTurnstileToken(token: string | undefined): Promise<boolean> {
-  const secret = process.env.CF_TURNSTILE_SECRET_KEY
-  // Dev mode: no secret configured — allow without verification
-  if (!secret) return true
-  // Production hard requirement: a missing/empty token must fail closed,
-  // otherwise bots bypass the challenge by simply omitting cfToken.
-  if (!token) return false
-  try {
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        secret,
-        response: token,
-      }),
-    })
-    const data = await res.json()
-    return data.success === true
-  } catch {
-    return false
-  }
-}
 
 export async function POST(req: Request) {
   try {

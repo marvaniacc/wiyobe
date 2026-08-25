@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 import { z } from 'zod'
 import crypto from 'crypto'
 
@@ -13,6 +14,8 @@ const RESEND_COOLDOWN_SEC = 45
 const schema = z.object({
   email: z.string().email(),
   purpose: z.enum(['signup', 'signin', 'reset']),
+  // Anti-bot token — required for signup (account creation happens after verify)
+  cfToken: z.string().optional(),
   // For signup OTP, we stash the full signup payload to use after verification
   signupData: z.object({
     role: z.enum(['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR', 'AFFILIATE']),
@@ -42,11 +45,14 @@ export async function POST(req: Request) {
       return error(429, `Too many code requests. Please try again in ${Math.ceil(wait / 60)} minute${Math.ceil(wait / 60) === 1 ? '' : 's'}.`)
     }
 
-    // For signup: ensure email isn't already taken
+    // For signup: ensure email isn't already taken + enforce Turnstile
+    // (account creation moved to the OTP flow, so the anti-bot check moved too)
     if (body.purpose === 'signup') {
       const existing = await db.user.findUnique({ where: { email: body.email } })
       if (existing) return error(409, 'An account with this email already exists.')
       if (!body.signupData) return error(400, 'signupData required for signup OTP')
+      const turnstileOk = await verifyTurnstileToken(body.cfToken)
+      if (!turnstileOk) return error(403, 'Security verification failed. Please try again.')
     }
 
     // For signin/reset: ensure user exists

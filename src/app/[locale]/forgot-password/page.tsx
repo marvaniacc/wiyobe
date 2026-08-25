@@ -9,21 +9,18 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params
   const loc = locale as Locale
   return {
-    title: translate(loc, 'auth.signup', 'Sign Up') + ' — Wishubest',
+    title: translate(loc, 'auth.resetPassword', 'Reset your password') + ' — Wishubest',
     robots: { index: false, follow: false },
   }
 }
 
 /**
- * /{locale}/signup — locale-aware signup page.
- *
- * Renders the AuthForm with type='signup' and the current locale.
- * Role is a dropdown INSIDE the form.
+ * /{locale}/forgot-password — password recovery via 6-digit email code.
+ * Uses the same OTP backend as signup (purpose='reset').
  */
-export default async function SignupPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function ForgotPasswordPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const loc = locale as Locale
-  const t = (k: string, f: string) => translate(loc, k, f)
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-br from-background to-surface-secondary px-4 py-8">
@@ -32,7 +29,7 @@ export default async function SignupPage({ params }: { params: Promise<{ locale:
         <span>Wishubest</span>
       </Link>
 
-      <AuthForm type="signup" role="patient" locale={locale} />
+      <AuthForm type="forgot" locale={locale} />
     </div>
   )
 }
