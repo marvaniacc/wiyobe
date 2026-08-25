@@ -126,7 +126,7 @@ export async function POST(req: Request) {
     }
 
     // The public-facing path (relative to public/)
-    const filePath = `/uploads/${uniqueName}`
+    const filePath = `/api/media/file/${uniqueName}`
 
     // Create the DB record
     const asset = await db.mediaAsset.create({

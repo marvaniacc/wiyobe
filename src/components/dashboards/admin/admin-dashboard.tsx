@@ -13,6 +13,9 @@ import { toast } from 'sonner'
 import { formatCurrency, formatDate, formatDateTime, relativeTime } from '@/lib/money'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
@@ -5916,6 +5919,11 @@ function MediaLibrarySection() {
   const [assets, setAssets] = React.useState<any[]>([])
   const [loading, setLoading] = React.useState(true)
   const [uploading, setUploading] = React.useState(false)
+  const [uploadProgress, setUploadProgress] = React.useState<{ done: number; total: number } | null>(null)
+  const [search, setSearch] = React.useState('')
+  const [typeFilter, setTypeFilter] = React.useState<'all' | 'images' | 'documents'>('all')
+  const [detail, setDetail] = React.useState<any | null>(null)
+  const [confirmDelete, setConfirmDelete] = React.useState<any | null>(null)
   const fileRef = React.useRef<HTMLInputElement>(null)
 
   const fetchMedia = React.useCallback(async () => {
@@ -5933,31 +5941,53 @@ function MediaLibrarySection() {
 
   React.useEffect(() => { fetchMedia() }, [fetchMedia])
 
-  async function handleUpload(file: File) {
+  async function uploadOne(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch('/api/media', { method: 'POST', body: formData })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || `Upload failed for ${file.name}`)
+  }
+
+  async function handleUpload(files: FileList | null) {
+    if (!files || files.length === 0) return
     setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/media', { method: 'POST', body: formData })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-      toast.success('File uploaded')
-      fetchMedia()
-    } catch (e: any) {
-      toast.error(e.message || 'Upload failed')
-    } finally {
-      setUploading(false)
+    setUploadProgress({ done: 0, total: files.length })
+    let failed = 0
+    for (let i = 0; i < files.length; i++) {
+      try {
+        await uploadOne(files[i])
+      } catch (e: any) {
+        failed++
+        toast.error(e.message || 'Upload failed')
+      }
+      setUploadProgress({ done: i + 1, total: files.length })
     }
+    setUploading(false)
+    setUploadProgress(null)
+    if (failed === 0) toast.success(files.length === 1 ? 'File uploaded' : `${files.length} files uploaded`)
+    fetchMedia()
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   async function handleDelete(id: string) {
     try {
       await apiDelete(`/api/media/${id}`)
       toast.success('File deleted')
-      setAssets(assets.filter((a) => a.id !== id))
+      setAssets((prev) => prev.filter((a) => a.id !== id))
+      setDetail(null)
+      setConfirmDelete(null)
     } catch (e: any) {
       toast.error(e.message || 'Delete failed')
     }
+  }
+
+  function copyLink(asset: any) {
+    const url = `${window.location.origin}${asset.filePath}`
+    navigator.clipboard.writeText(url).then(
+      () => toast.success('Link copied to clipboard'),
+      () => toast.error('Could not copy link')
+    )
   }
 
   function formatSize(bytes: number) {
@@ -5966,20 +5996,33 @@ function MediaLibrarySection() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
+  const isImage = (m: string) => m?.startsWith('image/')
+  const filtered = assets.filter((a) => {
+    if (search && !a.fileName?.toLowerCase().includes(search.toLowerCase())) return false
+    if (typeFilter === 'images' && !isImage(a.mimeType)) return false
+    if (typeFilter === 'documents' && isImage(a.mimeType)) return false
+    return true
+  })
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Media Library"
-        description="Upload, browse, and delete media files"
+        description="Upload, browse, copy links, and manage media files"
         icon="perm_media"
         action={
-          <Button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="gap-1.5"
-          >
-            {uploading ? <Icon name="progress_activity" size={18} className="animate-spin" /> : <Icon name="upload" size={18} />}
-            Upload
+          <Button onClick={() => fileRef.current?.click()} disabled={uploading} className="gap-1.5">
+            {uploading ? (
+              <>
+                <Icon name="progress_activity" size={18} className="animate-spin" />
+                {uploadProgress ? `${uploadProgress.done}/${uploadProgress.total}` : ''}
+              </>
+            ) : (
+              <>
+                <Icon name="upload" size={18} />
+                Upload
+              </>
+            )}
           </Button>
         }
       />
@@ -5987,54 +6030,162 @@ function MediaLibrarySection() {
         ref={fileRef}
         type="file"
         className="hidden"
-        accept="image/*,video/*,.pdf,.svg"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) handleUpload(file)
-          if (fileRef.current) fileRef.current.value = ''
-        }}
+        multiple
+        accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+        onChange={(e) => handleUpload(e.target.files)}
       />
+
+      {/* Toolbar: search + type filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-xs">
+          <Icon name="search" size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search files…" className="h-9 ps-9" />
+        </div>
+        <div className="flex items-center gap-1 rounded-full border border-divider bg-surface p-1">
+          {(['all', 'images', 'documents'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setTypeFilter(f)}
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors',
+                typeFilter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <span className="ms-auto text-xs text-muted-foreground">{filtered.length} of {assets.length} files</span>
+      </div>
 
       {loading ? (
         <LoadingCard lines={4} />
-      ) : assets.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
             <Icon name="image_not_supported" size={32} className="text-muted-foreground/50" />
-            <p className="text-sm font-medium text-foreground">No media files yet</p>
-            <p className="text-xs text-muted-foreground">Click "Upload" to add your first file.</p>
+            <p className="text-sm font-medium text-foreground">{assets.length === 0 ? 'No media files yet' : 'No files match your search'}</p>
+            <p className="text-xs text-muted-foreground">{assets.length === 0 ? 'Click "Upload" to add your first file.' : 'Try a different search or filter.'}</p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {assets.map((asset) => (
-            <div key={asset.id} className="group relative overflow-hidden rounded-[14px] border border-divider bg-surface">
-              <div className="aspect-square overflow-hidden bg-surface-secondary">
-                {asset.mimeType?.startsWith('image/') ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={asset.filePath} alt={asset.fileName} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <Icon name="description" size={32} className="text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-              <div className="p-2">
-                <p className="truncate text-xs font-medium text-foreground" title={asset.fileName}>{asset.fileName}</p>
-                <p className="text-[10px] text-muted-foreground">{formatSize(asset.fileSize)}</p>
-              </div>
-              {/* Hover delete button */}
-              <button
-                onClick={() => handleDelete(asset.id)}
-                className="absolute end-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-error group-hover:opacity-100"
-                title="Delete"
-              >
-                <Icon name="delete" size={14} />
+          {filtered.map((asset) => (
+            <div key={asset.id} className="group relative overflow-hidden rounded-[14px] border border-divider bg-surface transition-shadow hover:shadow-md">
+              <button className="block w-full text-start" onClick={() => setDetail(asset)} title="View details">
+                <div className="aspect-square overflow-hidden bg-surface-secondary">
+                  {isImage(asset.mimeType) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={asset.filePath} alt={asset.fileName} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Icon name="description" size={32} className="text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-2">
+                  <p className="truncate text-xs font-medium text-foreground" title={asset.fileName}>{asset.fileName}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {formatSize(asset.fileSize)} · {new Date(asset.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
               </button>
+              {/* Quick copy link on hover */}
+              <button
+                onClick={() => copyLink(asset)}
+                className="absolute start-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
+                title="Copy link"
+              >
+                <Icon name="content_copy" size={14} />
+              </button>
+              {/* Actions menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="absolute end-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-black/80 group-hover:opacity-100" title="Actions">
+                    <Icon name="more_vert" size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => copyLink(asset)}>
+                    <Icon name="content_copy" size={16} /> Copy link
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.open(asset.filePath, '_blank')}>
+                    <Icon name="open_in_new" size={16} /> Open in new tab
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDetail(asset)}>
+                    <Icon name="info" size={16} /> Details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-error" onClick={() => setConfirmDelete(asset)}>
+                    <Icon name="delete" size={16} /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ))}
         </div>
       )}
+
+      {/* Detail dialog */}
+      <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="truncate pe-6">{detail?.fileName}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-[14px] border border-divider bg-surface-secondary">
+                {isImage(detail.mimeType) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={detail.filePath} alt={detail.fileName} className="max-h-72 w-full object-contain" />
+                ) : (
+                  <div className="flex h-40 items-center justify-center">
+                    <Icon name="description" size={48} className="text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2 rounded-[14px] border border-divider p-3 text-sm">
+                <div className="flex justify-between gap-4"><span className="text-muted-foreground">Type</span><span className="truncate font-medium">{detail.mimeType}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-muted-foreground">Size</span><span className="font-medium">{formatSize(detail.fileSize)}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-muted-foreground">Uploaded</span><span className="font-medium">{new Date(detail.createdAt).toLocaleString()}</span></div>
+                {detail.uploader?.name && (
+                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">By</span><span className="truncate font-medium">{detail.uploader.name}</span></div>
+                )}
+                <div className="flex items-center justify-between gap-4">
+                  <span className="shrink-0 text-muted-foreground">Link</span>
+                  <code className="min-w-0 flex-1 truncate rounded-[8px] bg-surface-secondary px-2 py-1 text-xs">{`${typeof window !== 'undefined' ? window.location.origin : ''}${detail.filePath}`}</code>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button className="flex-1 gap-1.5" onClick={() => copyLink(detail)}>
+                  <Icon name="content_copy" size={16} /> Copy link
+                </Button>
+                <Button variant="outline" className="gap-1.5" onClick={() => window.open(detail.filePath, '_blank')}>
+                  <Icon name="open_in_new" size={16} /> Open
+                </Button>
+                <Button variant="outline" className="gap-1.5 text-error hover:bg-error/5" onClick={() => setConfirmDelete(detail)}>
+                  <Icon name="delete" size={16} />
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete file?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            "{confirmDelete?.fileName}" will be moved to the recycle bin. Links using this file will stop working.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleDelete(confirmDelete.id)}>Delete</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
