@@ -6,7 +6,6 @@ import { StarRating } from '@/components/shared/star-rating'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
 import { BookNowButton } from '@/components/shared/book-now-button'
 import { useT } from '@/hooks/use-t'
 import { useApi } from '@/hooks/use-api'
@@ -136,53 +135,78 @@ export function PublicProfilePage() {
 
             <Card className="gap-0 overflow-hidden">
               <CardContent className="p-0">
-                <div className="h-24 bg-primary/10" />
+                <div className="h-28 bg-gradient-to-r from-primary/15 via-primary/10 to-transparent" />
                 <div className="px-6 pb-6">
-                  <div className="-mt-12 flex items-end gap-4">
-                    <div className="flex size-24 shrink-0 items-center justify-center rounded-[20px] border-4 border-surface bg-primary/10 text-3xl font-bold text-primary shadow-sm">
-                      {(profile.name || '?').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 pb-2">
-                      <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-bold text-foreground">{profile.name}</h1>
-                        {profile.verified && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                            <Icon name="verified" size={14} fill />
-                            {t('common.verified')}
+                  <div className="-mt-12 flex flex-wrap items-end justify-between gap-4">
+                    {/* Identity */}
+                    <div className="flex items-end gap-4">
+                      <div className="flex size-24 shrink-0 items-center justify-center rounded-[20px] border-4 border-surface bg-primary/10 text-3xl font-bold text-primary shadow-sm">
+                        {(profile.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="pb-1">
+                        <div className="flex items-center gap-2">
+                          <h1 className="text-2xl font-bold text-foreground">{profile.name}</h1>
+                          {profile.verified && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                              <Icon name="verified" size={14} fill />
+                              {t('common.verified')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+                            <Icon name={TYPE_ICON[profile.type] || 'person'} size={14} fill />
+                            {t(TYPE_LABEL_KEY[profile.type] || 'role.patient')}
                           </span>
-                        )}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <Icon name={TYPE_ICON[profile.type] || 'person'} size={16} fill />
-                          {t(TYPE_LABEL_KEY[profile.type] || 'role.patient')}
-                        </span>
-                        <span>·</span>
-                        <span className="inline-flex items-center gap-1">
-                          <Icon name="location_on" size={16} />
-                          {profile.address}
-                        </span>
+                          {profile.address && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+                              <Icon name="location_on" size={14} />
+                              {profile.address}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <StarRating rating={profile.rating || 0} size={18} showValue />
-                      <span className="text-sm text-muted-foreground">({profile.reviewCount} {t('common.reviews')})</span>
-                    </div>
-                    <Separator orientation="vertical" className="h-8" />
-                    <div className="flex items-center gap-2">
-                      <Icon name="payments" size={18} className="text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">{t('common.from')}</span>
-                      <span className="text-lg font-semibold text-foreground">{formatCurrency(profile.consultationFee, 'USD', locale)}</span>
+                    {/* Stats */}
+                    <div className="flex items-stretch gap-3 pb-1">
+                      <div className="rounded-[14px] border border-divider bg-surface px-4 py-3 text-center">
+                        <StarRating rating={profile.rating || 0} size={16} showValue />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {profile.reviewCount} {t('common.reviews')}
+                        </p>
+                      </div>
+                      <div className="rounded-[14px] border border-divider bg-surface px-4 py-3 text-center">
+                        <p className="text-xs text-muted-foreground">{t('common.from')}</p>
+                        <p className="text-lg font-bold text-foreground">{formatCurrency(profile.consultationFee, 'USD', locale)}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="space-y-6 lg:col-span-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)_300px]">
+              {/* LEFT sidebar — provider details (sticky, own column: never overlaps) */}
+              <div className="order-3 space-y-6 lg:order-none">
+                <div className="lg:sticky lg:top-20">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">{t('provider.profileSection')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {profile.specialty && <InfoRow icon="badge" label={t('common.specialty')} value={profile.specialty} />}
+                      {profile.subSpecialties && <InfoRow icon="category" label={t('provider.subSpecialties')} value={profile.subSpecialties} />}
+                      {profile.languages && <InfoRow icon="language" label={t('common.languages')} value={profile.languages} />}
+                      {profile.yearsExperience > 0 && <InfoRow icon="work_history" label={t('common.experience', 'Experience')} value={`${profile.yearsExperience} ${t('common.years')}`} />}
+                      {profile.education && <InfoRow icon="school" label={t('provider.education')} value={profile.education} />}
+                      {profile.certifications && <InfoRow icon="workspace_premium" label={t('provider.certifications')} value={profile.certifications} />}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* CENTER — content */}
+              <div className="order-1 space-y-6 lg:order-none">
                 {profile.bio && (
                   <Card>
                     <CardHeader>
@@ -273,8 +297,10 @@ export function PublicProfilePage() {
                 </Card>
               </div>
 
-              <div className="space-y-6">
-                <Card className="sticky top-20 gap-0">
+              {/* RIGHT sidebar — booking (alone in its column, sticky) */}
+              <div className="order-2 lg:order-none">
+                <div className="lg:sticky lg:top-20">
+                <Card className="gap-0">
                   <CardContent className="space-y-4 p-5">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('common.from')}</p>
@@ -296,20 +322,7 @@ export function PublicProfilePage() {
                     <p className="text-center text-xs text-muted-foreground">{t('landing.feature.secure.desc')}</p>
                   </CardContent>
                 </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">{t('provider.profileSection')}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {profile.specialty && <InfoRow icon="badge" label={t('common.specialty')} value={profile.specialty} />}
-                    {profile.subSpecialties && <InfoRow icon="category" label={t('provider.subSpecialties')} value={profile.subSpecialties} />}
-                    {profile.languages && <InfoRow icon="language" label={t('common.languages')} value={profile.languages} />}
-                    {profile.yearsExperience > 0 && <InfoRow icon="work_history" label={t('common.experience')} value={`${profile.yearsExperience} ${t('common.years')}`} />}
-                    {profile.education && <InfoRow icon="school" label={t('provider.education')} value={profile.education} />}
-                    {profile.certifications && <InfoRow icon="workspace_premium" label={t('provider.certifications')} value={profile.certifications} />}
-                  </CardContent>
-                </Card>
+                </div>
               </div>
             </div>
           </div>

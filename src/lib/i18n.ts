@@ -19,7 +19,7 @@ export function isRTL(locale: Locale): boolean {
 type Dict = Record<string, string>
 
 const en: Dict = {
-  'brand.name': 'MedTravel',
+  'brand.name': 'Wishubest',
   'brand.tagline': 'Global Medical Tourism Marketplace',
   'nav.home': 'Home',
   'common.search': 'Search',
@@ -1233,7 +1233,7 @@ const en: Dict = {
 }
 
 const tr: Dict = {
-  'brand.name': 'MedTravel',
+  'brand.name': 'Wishubest',
   'brand.tagline': 'Küresel Medikal Turizm Pazarı',
   'nav.home': 'Ana sayfa',
   'common.search': 'Ara',
@@ -2327,7 +2327,7 @@ const tr: Dict = {
 }
 
 const fa: Dict = {
-  'brand.name': 'مدتراول',
+  'brand.name': 'ویشوبست',
   'brand.tagline': 'بازار جهانی توریسم پزشکی',
   'nav.home': 'خانه',
   'common.search': 'جستجو',
@@ -3416,7 +3416,7 @@ const fa: Dict = {
 }
 
 const ar: Dict = {
-  'brand.name': 'ميدترافيل',
+  'brand.name': 'ويشوبست',
   'brand.tagline': 'سوق السياحة الطبية العالمية',
   'nav.home': 'الرئيسية',
   'common.search': 'بحث',
