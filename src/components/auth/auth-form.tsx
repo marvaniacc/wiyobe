@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Icon } from '@/components/shared/icon'
+import { GoogleIcon } from '@/components/shared/google-icon'
 import { OtpInput } from '@/components/auth/otp-input'
 import { toast } from 'sonner'
 import { translate, type Locale } from '@/lib/i18n'
@@ -149,12 +150,38 @@ export function AuthForm({
     renderTurnstile()
   }, [renderTurnstile])
 
+  // Google OAuth availability (server-provided client id)
+  const [googleReady, setGoogleReady] = useState(false)
+  useEffect(() => {
+    if (isForgot) return
+    fetch('/api/auth/google', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setGoogleReady(!!d?.hasGoogle && !!d?.clientId))
+      .catch(() => {})
+  }, [isForgot])
+
+  function handleGoogleSignIn() {
+    const params = new URLSearchParams({ role: selectedRole.toUpperCase() })
+    if (redirectPath) params.set('redirect', redirectPath)
+    window.location.href = `/api/auth/google/start?${params.toString()}`
+  }
+
   // Resend cooldown ticker
   useEffect(() => {
     if (resendIn <= 0) return
     const timer = setInterval(() => setResendIn((s) => s - 1), 1000)
     return () => clearInterval(timer)
   }, [resendIn])
+
+  // Surface OAuth errors passed back via ?error= (e.g. from the Google callback)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const oauthError = params.get('error')
+    if (oauthError) {
+      import('sonner').then(({ toast }) => toast.error(oauthError))
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   // Session check on mount
   useEffect(() => {
@@ -494,6 +521,20 @@ export function AuthForm({
                 )}
                 {submitting ? t('auth.pleaseWait', 'Please wait…') : ctaLabel}
               </Button>
+
+              {googleReady && (
+                <>
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="h-px flex-1 bg-divider" />
+                    <span className="text-xs text-muted-foreground">{t('auth.orContinueWith', 'or continue with')}</span>
+                    <div className="h-px flex-1 bg-divider" />
+                  </div>
+                  <Button type="button" variant="outline" className="h-11 w-full gap-2" onClick={handleGoogleSignIn}>
+                    <GoogleIcon size={18} />
+                    {t('auth.googleSignIn', 'Continue with Google')}
+                  </Button>
+                </>
+              )}
             </form>
           </CardContent>
         </Card>
@@ -548,6 +589,20 @@ export function AuthForm({
                   </SelectContent>
                 </Select>
               </div>
+
+              {googleReady && (
+                <>
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="h-px flex-1 bg-divider" />
+                    <span className="text-xs text-muted-foreground">{t('auth.orContinueWith', 'or continue with')}</span>
+                    <div className="h-px flex-1 bg-divider" />
+                  </div>
+                  <Button type="button" variant="outline" className="h-11 w-full gap-2" onClick={handleGoogleSignIn}>
+                    <GoogleIcon size={18} />
+                    {t('auth.googleSignUp', 'Sign up with Google')}
+                  </Button>
+                </>
+              )}
 
               {TURNSTILE_SITE_KEY && (
                 <div className="space-y-1.5">

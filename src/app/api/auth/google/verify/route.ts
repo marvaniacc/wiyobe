@@ -1,26 +1,16 @@
-import { db } from '@/lib/db'
-import { setSessionCookie } from '@/lib/auth'
+import { resolveGoogleUser, type GoogleUserInfo } from '@/lib/google-auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
 const schema = z.object({
-  // Google ID token (from GIS) OR demo email when no Google credentials configured
+  // Google ID token (from GIS) OR demo email when explicitly enabled in dev
   idToken: z.string().optional(),
   demoEmail: z.string().email().optional(),
   demoName: z.string().optional(),
   role: z.enum(['PATIENT', 'DOCTOR', 'HOSPITAL', 'HOTEL', 'TRANSLATOR']).default('PATIENT'),
 })
-
-interface GoogleUserInfo {
-  sub: string
-  email: string
-  email_verified?: boolean
-  name?: string
-  picture?: string | null
-  locale?: string
-}
 
 async function verifyGoogleIdToken(idToken: string): Promise<GoogleUserInfo | null> {
   // Verify the ID token using Google's tokeninfo endpoint
@@ -47,6 +37,13 @@ async function verifyGoogleIdToken(idToken: string): Promise<GoogleUserInfo | nu
   }
 }
 
+/**
+ * POST /api/auth/google/verify
+ *
+ * GIS (Google Identity Services) idToken sign-in. The redirect-based flow
+ * lives at /api/auth/google/start → /api/auth/callback/google; both share
+ * the account resolution logic in lib/google-auth.ts.
+ */
 export async function POST(req: Request) {
   try {
     const body = await parseBody(req, schema)
@@ -92,95 +89,21 @@ export async function POST(req: Request) {
     // failing paths return early). This satisfies the type-checker.
     if (!googleInfo) return error(500, 'Authentication state error')
 
-    const googleId = googleInfo.sub
-    const email = googleInfo.email.toLowerCase()
-
-    // Check if a user with this Google ID already exists
-    let user = await db.user.findUnique({ where: { googleId } })
-
-    if (user) {
-      // Existing Google user — log them in
-      if (user.status === 'SUSPENDED') return error(403, 'Your account has been suspended.')
-      if (user.status === 'PENDING') return error(403, 'Your account is pending admin approval.')
-      await setSessionCookie(user.id, user.role)
-      return json({
-        user: { id: user.id, email: user.email, role: user.role, name: user.name, status: user.status, preferredLanguage: user.preferredLanguage },
-        isNewUser: false,
-        demo: isDemo,
-      })
-    }
-
-    // Check if a user with this email exists (link accounts)
-    user = await db.user.findUnique({ where: { email } })
-    if (user) {
-      // Link the Google ID to the existing account
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          googleId,
-          authProvider: user.authProvider === 'password' ? 'google' : user.authProvider,
-          emailVerified: user.emailVerified ?? new Date(),
-          ...(googleInfo.picture && !user.avatarUrl ? { avatarUrl: googleInfo.picture } : {}),
-        },
-      })
-      if (user.status === 'SUSPENDED') return error(403, 'Your account has been suspended.')
-      if (user.status === 'PENDING') return error(403, 'Your account is pending admin approval.')
-      await setSessionCookie(user.id, user.role)
-      return json({
-        user: { id: user.id, email: user.email, role: user.role, name: user.name, status: user.status, preferredLanguage: user.preferredLanguage },
-        isNewUser: false,
-        demo: isDemo,
-      })
-    }
-
-    // New user — create account via Google. Patients are active immediately; providers pending.
-    const role = body.role
-    const status = role === 'PATIENT' ? 'ACTIVE' : 'PENDING'
-
-    user = await db.user.create({
-      data: {
-        email,
-        googleId,
-        authProvider: 'google',
-        emailVerified: new Date(),
-        role,
-        status: status as any,
-        name: googleInfo.name || email.split('@')[0],
-        avatarUrl: googleInfo.picture || null,
-        preferredLanguage: googleInfo.locale?.startsWith('tr') ? 'tr' : googleInfo.locale?.startsWith('fa') ? 'fa' : googleInfo.locale?.startsWith('ar') ? 'ar' : 'en',
-      },
-    })
-
-    // Create role-specific profile
-    if (role === 'PATIENT') {
-      await db.patient.create({ data: { userId: user.id } })
-    } else if (role === 'DOCTOR') {
-      await db.doctor.create({
-        data: { userId: user.id, specialty: 'General', subSpecialties: '', bio: '', city: '', country: '', yearsExperience: 0, consultationFee: '0', onlineFee: '0', languages: user.preferredLanguage, education: '', certifications: '', verified: false },
-      })
-    } else if (role === 'HOSPITAL') {
-      await db.hospital.create({
-        data: { userId: user.id, name: user.name || 'New Hospital', description: '', address: '', city: '', country: '', departments: '', accreditations: '', beds: 0, baseFee: '0', languages: user.preferredLanguage, verified: false },
-      })
-    } else if (role === 'HOTEL') {
-      await db.hotel.create({
-        data: { userId: user.id, name: user.name || 'New Hotel', description: '', address: '', city: '', country: '', starRating: 3, amenities: '', roomTypes: '', pricePerNight: '0', languages: user.preferredLanguage, verified: false },
-      })
-    } else if (role === 'TRANSLATOR') {
-      await db.translator.create({
-        data: { userId: user.id, languages: user.preferredLanguage, specialization: 'general', bio: '', city: '', country: '', hourlyRate: '0', dailyRate: '0', yearsExperience: 0, verified: false },
-      })
-    }
-
-    if (status === 'ACTIVE') {
-      await setSessionCookie(user.id, user.role)
-    }
+    const result = await resolveGoogleUser(googleInfo, body.role)
+    if (!result.ok) return error(result.status, result.message)
 
     return json({
-      user: { id: user.id, email: user.email, role: user.role, name: user.name, status: user.status, preferredLanguage: user.preferredLanguage },
-      isNewUser: true,
-      needsApproval: status === 'PENDING',
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        role: result.user.role,
+        name: result.user.name,
+        status: result.user.status,
+        preferredLanguage: result.user.preferredLanguage,
+      },
+      isNewUser: result.isNewUser,
+      needsApproval: result.needsApproval,
       demo: isDemo,
-    }, 201)
+    }, result.isNewUser ? 201 : 200)
   } catch (e) { return handleError(e) }
 }
