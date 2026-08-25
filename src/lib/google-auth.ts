@@ -54,8 +54,10 @@ export async function resolveGoogleUser(googleInfo: GoogleUserInfo, role: string
     return { ok: true, user, isNewUser: false, needsApproval: false }
   }
 
-  // New user — patients are active immediately; providers pending admin approval
-  const status = role === 'PATIENT' ? 'ACTIVE' : 'PENDING'
+  // New user — ACTIVE immediately (same as email/OTP signup): providers
+  // enter the dashboard right away and are locked to the KYC + Profile
+  // sections (dashboard kycStatus !== APPROVED lock) until admin-approved.
+  const status = 'ACTIVE'
   user = await db.user.create({
     data: {
       email,
@@ -102,7 +104,7 @@ export async function resolveGoogleUser(googleInfo: GoogleUserInfo, role: string
     await setSessionCookie(user.id, user.role)
   }
 
-  return { ok: true, user, isNewUser: true, needsApproval: status === 'PENDING' }
+  return { ok: true, user, isNewUser: true, needsApproval: false }
 }
 
 /** Public config for the login UI. */
