@@ -281,9 +281,18 @@ export function PublicProfilePage() {
                       <p className="text-3xl font-bold text-foreground">{formatCurrency(profile.consultationFee, 'USD', locale)}</p>
                     </div>
                     <BookNowButton locale={locale} providerId={providerId} providerType={providerType} variant="public-profile" />
-                    <Button size="lg" variant="outline" className="w-full gap-2" onClick={() => router.push(`/${locale}`)}>
-                      {t('common.signin')}
-                    </Button>
+                    {/* Sign in CTA only for guests — logged-in users book directly
+                        (previously this was always rendered, even for patients). */}
+                    {!session && (
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => router.push(`/${locale}/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
+                      >
+                        {t('common.signin')}
+                      </Button>
+                    )}
                     <p className="text-center text-xs text-muted-foreground">{t('landing.feature.secure.desc')}</p>
                   </CardContent>
                 </Card>
