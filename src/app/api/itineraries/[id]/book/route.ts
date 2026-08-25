@@ -94,7 +94,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const charge = await createCharge(
         totalAmountCents / 100,
         'usd',
-        `MedTravel itinerary booking - ${itinerary.items.length} services`,
+        `Wishubest itinerary booking - ${itinerary.items.length} services`,
         { itineraryId: itinerary.id, patientId: session.id }
       )
       if (charge) {

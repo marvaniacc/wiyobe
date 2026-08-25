@@ -30,7 +30,7 @@ export function generateICal(event: ICalEvent): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//MedTravel//Medical Tourism Platform//EN',
+    'PRODID:-//Wishubest//Medical Tourism Platform//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',

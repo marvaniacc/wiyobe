@@ -104,7 +104,7 @@ export const useApp = create<AppState>()(
       clearCompare: () => set({ compareIds: [] }),
     }),
     {
-      name: 'medtravel-app',
+      name: 'wishubest-app',
       partialize: (s) => ({ locale: s.locale, theme: s.theme, compareIds: s.compareIds, lastSection: s.lastSection, activeNavGroup: s.activeNavGroup }),
     }
   )

@@ -131,7 +131,13 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL(`/en/login?error=${encodeURIComponent(result.message)}`, origin))
   }
 
-  const res = NextResponse.redirect(new URL(redirect, origin))
+  // Signed up with Google but an account already existed → welcome them back
+  // explicitly instead of a silent sign-in.
+  const target = new URL(redirect, origin)
+  if (mode === 'signup' && !result.isNewUser) {
+    target.searchParams.set('notice', 'Welcome back! An account already existed for this Google account, so we signed you in.')
+  }
+  const res = NextResponse.redirect(target)
   res.cookies.delete('g_state')
   return res
 }

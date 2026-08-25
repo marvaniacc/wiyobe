@@ -15,7 +15,7 @@ export async function POST() {
     if (count > 0) return json({ ok: true, alreadySeeded: true })
 
     const samples = [
-      { type: 'system', title: 'Welcome to MedTravel!', body: 'Your account is ready. Start exploring providers and book your first appointment.', link: 'browse' },
+      { type: 'system', title: 'Welcome to Wishubest!', body: 'Your account is ready. Start exploring providers and book your first appointment.', link: 'browse' },
       { type: 'booking_created', title: 'Booking confirmed', body: 'Your appointment has been confirmed. Check your bookings for details.', link: 'bookings' },
       { type: 'review_received', title: 'New review', body: 'A patient left you a 5-star review. Great work!', link: 'reviews' },
     ]

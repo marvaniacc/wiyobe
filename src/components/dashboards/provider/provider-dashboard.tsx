@@ -679,10 +679,10 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
     const startTime = new Date(booking.startDate)
     const endTime = booking.endDate ? new Date(booking.endDate) : new Date(startTime.getTime() + 60 * 60 * 1000)
     const visitType = booking.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'
-    downloadICal(`medtravel-booking-${booking.id.slice(-8)}`, {
+    downloadICal(`wishubest-booking-${booking.id.slice(-8)}`, {
       uid: booking.id,
       title: `${visitType} with ${booking.patient?.name || 'Patient'}`,
-      description: `MedTravel booking\nPatient: ${booking.patient?.name || '—'}\nVisit type: ${visitType}\nBooking ID: ${booking.id}`,
+      description: `Wishubest booking\nPatient: ${booking.patient?.name || '—'}\nVisit type: ${visitType}\nBooking ID: ${booking.id}`,
       location: booking.videoSessionUrl || booking.doctor?.city || '',
       startTime,
       endTime,

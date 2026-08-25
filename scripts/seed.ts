@@ -25,7 +25,7 @@ async function main() {
 
   await db.setting.upsert({ where: { key: 'payoutScheduleDays' }, update: {}, create: { key: 'payoutScheduleDays', value: '7' } })
   await db.setting.upsert({ where: { key: 'defaultCurrency' }, update: {}, create: { key: 'defaultCurrency', value: 'USD' } })
-  await db.setting.upsert({ where: { key: 'platformName' }, update: {}, create: { key: 'platformName', value: 'MedTravel' } })
+  await db.setting.upsert({ where: { key: 'platformName' }, update: {}, create: { key: 'platformName', value: 'Wishubest' } })
 
   await db.user.upsert({
     where: { email: 'admin@wishubest.com' },

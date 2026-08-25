@@ -31,7 +31,7 @@ export function isVideoConfigured(): boolean {
 
 export async function createVideoSession(bookingId: string, patientName: string, providerName: string): Promise<VideoSession> {
   const provider = getVideoProvider()
-  const roomName = `medtravel-${bookingId.slice(-8)}`
+  const roomName = `wishubest-${bookingId.slice(-8)}`
 
   switch (provider) {
     case 'daily':
@@ -168,7 +168,7 @@ async function createZoomMeeting(roomName: string, patientName: string, provider
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        topic: `MedTravel: ${providerName} & ${patientName}`,
+        topic: `Wishubest: ${providerName} & ${patientName}`,
         type: 2, // Scheduled meeting
         start_time: new Date().toISOString(),
         duration: 60,

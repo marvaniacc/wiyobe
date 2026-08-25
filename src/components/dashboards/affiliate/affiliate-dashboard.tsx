@@ -118,7 +118,7 @@ function MaterialsSection() {
     {
       title: 'Social media post',
       icon: 'share',
-      content: `🏥 Looking for affordable, world-class medical care abroad?\n\nMedTravel connects you with verified doctors, hospitals, and translators across Turkey, Iran, and beyond. Compare prices, read reviews, and book online!\n\n👉 Start here: ${referralLink}`,
+      content: `🏥 Looking for affordable, world-class medical care abroad?\n\nWishubest connects you with verified doctors, hospitals, and translators across Turkey, Iran, and beyond. Compare prices, read reviews, and book online!\n\n👉 Start here: ${referralLink}`,
     },
     {
       title: 'WhatsApp message',
@@ -128,12 +128,12 @@ function MaterialsSection() {
     {
       title: 'Email template',
       icon: 'mail',
-      content: `Subject: Trusted Medical Care Abroad — MedTravel\n\nHi [Name],\n\nI wanted to share a platform I've been using called MedTravel. It connects patients with verified doctors, hospitals, and translators for medical tourism.\n\nYou can compare prices, read reviews, and book appointments online. Here's my referral link:\n${referralLink}\n\nBest regards,`,
+      content: `Subject: Trusted Medical Care Abroad — Wishubest\n\nHi [Name],\n\nI wanted to share a platform I've been using called Wishubest. It connects patients with verified doctors, hospitals, and translators for medical tourism.\n\nYou can compare prices, read reviews, and book appointments online. Here's my referral link:\n${referralLink}\n\nBest regards,`,
     },
     {
       title: 'Blog/website embed',
       icon: 'code',
-      content: `<a href="${referralLink}" target="_blank" rel="noopener">MedTravel — Global Medical Tourism Marketplace</a>`,
+      content: `<a href="${referralLink}" target="_blank" rel="noopener">Wishubest — Global Medical Tourism Marketplace</a>`,
     },
   ]
 
@@ -174,7 +174,7 @@ function MaterialsSection() {
                 onClick={() => {
                   const a = document.createElement('a')
                   a.href = qrCodeUrl
-                  a.download = `medtravel-qr-${referralCode}.png`
+                  a.download = `wishubest-qr-${referralCode}.png`
                   a.target = '_blank'
                   a.click()
                 }}
@@ -227,7 +227,7 @@ function MaterialsSection() {
                 <Icon name="monitor_heart" size={36} fill />
               </div>
               <div className="flex-1">
-                <p className="text-lg font-bold">MedTravel</p>
+                <p className="text-lg font-bold">Wishubest</p>
                 <p className="text-sm text-primary-foreground/80">World-class healthcare, anywhere in the world. Compare verified providers and book online.</p>
               </div>
               {referralLink && (
@@ -326,7 +326,7 @@ function OverviewSection() {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground">Share:</span>
                 <a
-                  href={`https://wa.me/?text=${encodeURIComponent(`Find trusted medical care abroad with MedTravel! ${referralLink}`)}`}
+                  href={`https://wa.me/?text=${encodeURIComponent(`Find trusted medical care abroad with Wishubest! ${referralLink}`)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex size-8 items-center justify-center rounded-full bg-[#25D366]/10 text-[#25D366] transition-all hover:scale-110"
                   title="WhatsApp"
@@ -334,7 +334,7 @@ function OverviewSection() {
                   <Icon name="chat" size={16} fill />
                 </a>
                 <a
-                  href={`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent('Find trusted medical care abroad with MedTravel!')}`}
+                  href={`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent('Find trusted medical care abroad with Wishubest!')}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex size-8 items-center justify-center rounded-full bg-[#0088cc]/10 text-[#0088cc] transition-all hover:scale-110"
                   title="Telegram"
@@ -342,7 +342,7 @@ function OverviewSection() {
                   <Icon name="send" size={16} fill />
                 </a>
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('Find trusted medical care abroad with MedTravel!')}&url=${encodeURIComponent(referralLink)}`}
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('Find trusted medical care abroad with Wishubest!')}&url=${encodeURIComponent(referralLink)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex size-8 items-center justify-center rounded-full bg-black/5 text-foreground transition-all hover:scale-110"
                   title="X (Twitter)"
@@ -358,7 +358,7 @@ function OverviewSection() {
                   <Icon name="public" size={16} fill />
                 </a>
                 <a
-                  href={`mailto:?subject=${encodeURIComponent('MedTravel - Medical Tourism')}&body=${encodeURIComponent(`Find trusted medical care abroad with MedTravel! ${referralLink}`)}`}
+                  href={`mailto:?subject=${encodeURIComponent('Wishubest - Medical Tourism')}&body=${encodeURIComponent(`Find trusted medical care abroad with Wishubest! ${referralLink}`)}`}
                   className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary transition-all hover:scale-110"
                   title="Email"
                 >

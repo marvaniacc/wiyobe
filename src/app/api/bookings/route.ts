@@ -316,7 +316,7 @@ export async function POST(req: Request) {
       const charge = await createCharge(
         parseFloat(patientCharge),
         'usd',
-        `MedTravel booking - ${providerName} - ${body.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`,
+        `Wishubest booking - ${providerName} - ${body.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`,
         { bookingId: booking.id, patientId: session.id, providerType: pt }
       )
       if (charge) {

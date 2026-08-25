@@ -52,7 +52,7 @@ async function main() {
   // Settings
   await db.setting.upsert({ where: { key: 'payoutScheduleDays' }, update: {}, create: { key: 'payoutScheduleDays', value: '7' } })
   await db.setting.upsert({ where: { key: 'defaultCurrency' }, update: {}, create: { key: 'defaultCurrency', value: 'USD' } })
-  await db.setting.upsert({ where: { key: 'platformName' }, update: {}, create: { key: 'platformName', value: 'MedTravel' } })
+  await db.setting.upsert({ where: { key: 'platformName' }, update: {}, create: { key: 'platformName', value: 'Wishubest' } })
 
   // === 2. Affiliate Setup ===
   console.log('\n━━━ 2. Affiliate Setup ━━━')

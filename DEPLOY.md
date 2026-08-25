@@ -1,4 +1,4 @@
-# MedTravel — Production Deployment Guide
+# Wishubest — Production Deployment Guide
 
 ## Quick Deploy to Vercel (Recommended)
 
@@ -6,7 +6,7 @@
 Create a `.env` file (or set in Vercel dashboard) with:
 
 ```env
-DATABASE_URL=postgresql://user:password@host:5432/medtravel
+DATABASE_URL=postgresql://user:password@host:5432/wishubest
 AUTH_SECRET=<generate with: openssl rand -hex 32>
 STRIPE_SECRET_KEY=sk_live_your_live_key
 GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com

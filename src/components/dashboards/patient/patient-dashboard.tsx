@@ -2675,14 +2675,14 @@ function handleAddToCalendar(booking: any) {
   const visitType = booking.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'
   const location = booking.videoSessionUrl || (booking.doctor?.city || booking.hospital?.city || '') || 'TBD'
 
-  downloadICal(`medtravel-booking-${booking.id.slice(-8)}`, {
+  downloadICal(`wishubest-booking-${booking.id.slice(-8)}`, {
     uid: booking.id,
     title: `${visitType} with ${providerName}`,
-    description: `MedTravel booking\nProvider: ${providerName}\nVisit type: ${visitType}\nBooking ID: ${booking.id}\n${booking.notes ? 'Notes: ' + booking.notes : ''}`,
+    description: `Wishubest booking\nProvider: ${providerName}\nVisit type: ${visitType}\nBooking ID: ${booking.id}\n${booking.notes ? 'Notes: ' + booking.notes : ''}`,
     location,
     startTime,
     endTime,
-    organizer: { name: 'MedTravel', email: 'noreply@wishubest.com' },
+    organizer: { name: 'Wishubest', email: 'noreply@wishubest.com' },
   })
   toast.success('Calendar event downloaded')
 }

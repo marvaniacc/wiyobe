@@ -129,6 +129,18 @@ export function DefaultLanding() {
     }
   }, [session, sessionLoading, view.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Surface notices passed via ?notice= (e.g. Google welcome-back)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const notice = params.get('notice')
+    if (notice) {
+      import('sonner').then(({ toast }) => toast.info(notice))
+      params.delete('notice')
+      const remaining = params.toString()
+      window.history.replaceState({}, '', remaining ? `${window.location.pathname}?${remaining}` : window.location.pathname)
+    }
+  }, [])
+
   // Browser back button support
   useEffect(() => {
     if (view.name === 'dashboard') {
