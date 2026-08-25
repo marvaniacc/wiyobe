@@ -160,8 +160,8 @@ export function AuthForm({
       .catch(() => {})
   }, [isForgot])
 
-  function handleGoogleSignIn() {
-    const params = new URLSearchParams({ role: selectedRole.toUpperCase() })
+  function handleGoogleSignIn(mode: 'login' | 'signup') {
+    const params = new URLSearchParams({ role: selectedRole.toUpperCase(), mode })
     if (redirectPath) params.set('redirect', redirectPath)
     window.location.href = `/api/auth/google/start?${params.toString()}`
   }
@@ -173,12 +173,13 @@ export function AuthForm({
     return () => clearInterval(timer)
   }, [resendIn])
 
-  // Surface OAuth errors passed back via ?error= (e.g. from the Google callback)
+  // Surface OAuth errors/notices passed back via ?error= / ?notice=
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const oauthError = params.get('error')
-    if (oauthError) {
-      import('sonner').then(({ toast }) => toast.error(oauthError))
+    const notice = params.get('notice')
+    if (oauthError || notice) {
+      import('sonner').then(({ toast }) => (oauthError ? toast.error(oauthError) : toast.info(notice!)))
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
@@ -529,7 +530,7 @@ export function AuthForm({
                     <span className="text-xs text-muted-foreground">{t('auth.orContinueWith', 'or continue with')}</span>
                     <div className="h-px flex-1 bg-divider" />
                   </div>
-                  <Button type="button" variant="outline" className="h-11 w-full gap-2" onClick={handleGoogleSignIn}>
+                  <Button type="button" variant="outline" className="h-11 w-full gap-2" onClick={() => handleGoogleSignIn('login')}>
                     <GoogleIcon size={18} />
                     {t('auth.googleSignIn', 'Continue with Google')}
                   </Button>
@@ -597,7 +598,7 @@ export function AuthForm({
                     <span className="text-xs text-muted-foreground">{t('auth.orContinueWith', 'or continue with')}</span>
                     <div className="h-px flex-1 bg-divider" />
                   </div>
-                  <Button type="button" variant="outline" className="h-11 w-full gap-2" onClick={handleGoogleSignIn}>
+                  <Button type="button" variant="outline" className="h-11 w-full gap-2" onClick={() => handleGoogleSignIn('signup')}>
                     <GoogleIcon size={18} />
                     {t('auth.googleSignUp', 'Sign up with Google')}
                   </Button>

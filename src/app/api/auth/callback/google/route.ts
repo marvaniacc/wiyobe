@@ -43,10 +43,12 @@ export async function GET(req: Request) {
 
   let role = 'PATIENT'
   let redirect = '/dashboard'
+  let mode = 'login'
   try {
     const payload = JSON.parse(Buffer.from(state.split('.')[1], 'base64url').toString('utf8'))
     if (typeof payload.role === 'string') role = payload.role
     if (typeof payload.redirect === 'string' && payload.redirect.startsWith('/')) redirect = payload.redirect
+    if (payload.mode === 'signup') mode = 'signup'
   } catch {
     return fail('Invalid Google sign-in state')
   }
@@ -104,10 +106,21 @@ export async function GET(req: Request) {
       picture: claims.picture || null,
       locale: claims.locale,
     },
-    role
+    role,
+    mode === 'signup'
   )
 
   if (!result.ok) {
+    // Sign-in intent with no existing account → send to signup so the role
+    // is chosen explicitly (never silently create a PATIENT account).
+    if (result.message.startsWith('NO_ACCOUNT:')) {
+      const email = result.message.slice('NO_ACCOUNT:'.length)
+      const locale = redirect.split('/')[1]
+      const loc = ['en', 'tr', 'fa', 'ar', 'ru'].includes(locale as any) ? locale : 'en'
+      return NextResponse.redirect(
+        new URL(`/${loc}/signup?notice=${encodeURIComponent(`No account exists for ${email} yet. Choose your role to sign up.`)}`, origin)
+      )
+    }
     return NextResponse.redirect(new URL(`/en/login?error=${encodeURIComponent(result.message)}`, origin))
   }
 

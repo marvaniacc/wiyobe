@@ -23,7 +23,7 @@ export type GoogleAuthResult =
   | { ok: true; user: any; isNewUser: boolean; needsApproval: boolean }
   | { ok: false; status: number; message: string }
 
-export async function resolveGoogleUser(googleInfo: GoogleUserInfo, role: string): Promise<GoogleAuthResult> {
+export async function resolveGoogleUser(googleInfo: GoogleUserInfo, role: string, createIfMissing = true): Promise<GoogleAuthResult> {
   const googleId = googleInfo.sub
   const email = googleInfo.email.toLowerCase()
 
@@ -52,6 +52,12 @@ export async function resolveGoogleUser(googleInfo: GoogleUserInfo, role: string
     })
     await setSessionCookie(user.id, user.role)
     return { ok: true, user, isNewUser: false, needsApproval: false }
+  }
+
+  // Sign-in intent: never silently create accounts — the UI redirects the
+  // user to the signup page where the role is chosen explicitly.
+  if (!createIfMissing) {
+    return { ok: false, status: 404, message: `NO_ACCOUNT:${email}` }
   }
 
   // New user — ACTIVE immediately (same as email/OTP signup): providers
