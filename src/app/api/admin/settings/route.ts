@@ -14,12 +14,47 @@ export const dynamic = 'force-dynamic'
  */
 function isSiteSettingKey(key: string): boolean {
   const exactKeys = new Set([
-    'siteName', 'tagline', 'logoUrl',
+    'siteName', 'tagline', 'logoUrl', 'faviconUrl',
     'defaultSeoTitle', 'defaultSeoDescription',
+    // Appearance (hex colors enforced separately)
+    'bgColorLight', 'primaryColor', 'accentColor',
+    // Contact & locale
+    'supportEmail', 'contactPhone', 'defaultLocale',
+    // SEO / operations toggles
+    'allowSearchIndexing', 'maintenanceMode',
+    // Booking rules
+    'minBookingLeadHours', 'maxBookingDaysAhead',
+    // Payments
+    'paymentsEnabled', 'paymentsActivatedAt', 'paymentsActivatedBy',
   ])
   if (exactKeys.has(key)) return true
   if (key.startsWith('headerConfig') || key.startsWith('footerConfig')) return true
   return false
+}
+
+// Validation applied to SiteSetting values before persistence.
+// Returns an error message, or null when valid.
+function validateSettingValue(key: string, value: string): string | null {
+  const hexKeys = new Set(['bgColorLight', 'primaryColor', 'accentColor'])
+  if (hexKeys.has(key)) {
+    if (!/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) {
+      return `${key}: must be a hex color like #1A73E8`
+    }
+    return null
+  }
+  if (key === 'defaultLocale' && value && !['en', 'tr', 'fa', 'ar', 'ru'].includes(value)) {
+    return 'defaultLocale: must be one of en, tr, fa, ar, ru'
+  }
+  if ((key === 'allowSearchIndexing' || key === 'maintenanceMode' || key === 'paymentsEnabled') && !['true', 'false'].includes(value)) {
+    return `${key}: must be "true" or "false"`
+  }
+  if (key === 'supportEmail' && value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+    return 'supportEmail: invalid email address'
+  }
+  if ((key === 'minBookingLeadHours' || key === 'maxBookingDaysAhead') && value && !/^\d{1,5}$/.test(value)) {
+    return `${key}: must be a non-negative whole number`
+  }
+  return null
 }
 
 /**
@@ -66,6 +101,8 @@ export async function PUT(req: Request) {
     const { settings } = await parseBody(req, updateSchema)
 
     for (const [key, value] of Object.entries(settings)) {
+      const err = isSiteSettingKey(key) ? validateSettingValue(key, value) : null
+      if (err) return error(400, err)
       if (isSiteSettingKey(key)) {
         await db.siteSetting.upsert({
           where: { key },
@@ -101,6 +138,8 @@ export async function PATCH(req: Request) {
     const body = await parseBody(req, patchSchema)
 
     for (const [key, value] of Object.entries(body)) {
+      const err = isSiteSettingKey(key) ? validateSettingValue(key, value) : null
+      if (err) return error(400, err)
       if (isSiteSettingKey(key)) {
         await db.siteSetting.upsert({
           where: { key },

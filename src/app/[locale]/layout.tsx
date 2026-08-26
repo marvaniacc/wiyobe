@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { PublicHeader } from '@/components/shared/public-header'
 import { PublicFooter } from '@/components/shared/public-footer'
 import { CookieConsentBanner } from '@/components/shared/cookie-consent-banner'
+import { getSiteSettings, normalizeHex } from '@/lib/site-settings'
 
 const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
 const RTL_LOCALES = ['fa', 'ar']
@@ -16,7 +17,7 @@ type LocaleLayoutProps = {
 /**
  * Fetch site settings as a key-value map for use in metadata.
  */
-async function getSiteSettings(): Promise<Record<string, string>> {
+async function getSiteSettingsMap(): Promise<Record<string, string>> {
   try {
     const settings = await db.siteSetting.findMany()
     const map: Record<string, string> = {}
@@ -34,11 +35,15 @@ async function getSiteSettings(): Promise<Record<string, string>> {
  */
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
-  const settings = await getSiteSettings()
+  const settings = await getSiteSettingsMap()
 
   const siteName = settings.siteName || 'Wishubest'
   const defaultSeoTitle = settings.defaultSeoTitle || `${siteName} — Global Medical Tourism Marketplace`
   const defaultSeoDescription = settings.defaultSeoDescription || 'Compare and book verified doctors, hospitals, accommodations and translators worldwide.'
+
+  const robots = settings.allowSearchIndexing === 'false'
+    ? { index: false as const, follow: false as const }
+    : undefined
 
   return {
     title: {
@@ -46,6 +51,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       template: `%s — ${siteName}`,
     },
     description: defaultSeoDescription,
+    ...(robots ? { robots } : {}),
   }
 }
 
@@ -70,11 +76,43 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   const isRTL = RTL_LOCALES.includes(locale)
   const dir = isRTL ? 'rtl' : 'ltr'
 
+  // Admin-configurable appearance — injected as CSS variable overrides so the
+  // whole design system (background, primary, accent) follows without a rebuild.
+  const s = await getSiteSettings()
+  const bg = normalizeHex(s.bgColorLight)
+  const primary = normalizeHex(s.primaryColor)
+  const accent = normalizeHex(s.accentColor)
+  const styleOverrides = (bg || primary || accent)
+    ? `:root{${bg ? `--background:${bg};` : ''}${primary ? `--primary:${primary};--ring:${primary};--sidebar-primary:${primary};` : ''}${accent ? `--accent:${accent};` : ''}}`
+    : undefined
+
+  // Maintenance mode — non-admin visitors see a holding page.
+  if (s.maintenanceMode === 'true') {
+    let isAdmin = false
+    try {
+      const { getSession } = await import('@/lib/auth')
+      const session = await getSession()
+      isAdmin = session?.role === 'ADMIN'
+    } catch { /* treat as visitor */ }
+    if (!isAdmin) {
+      return (
+        <div dir={dir} className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background p-6 text-center">
+          <span className="material-symbols-outlined text-primary" style={{ fontSize: 44 }} aria-hidden>engineering</span>
+          <h1 className="text-xl font-semibold">{s.siteName}</h1>
+          <p className="max-w-md text-sm text-muted-foreground">
+            We&apos;re performing scheduled maintenance. Please check back shortly.
+          </p>
+        </div>
+      )
+    }
+  }
+
   // Auth pages (login / signup / forgot-password) render chromeless —
   // they bring their own centered layout and must fit the viewport.
   if (isAuthPage) {
     return (
       <div dir={dir} className="flex min-h-screen flex-col bg-background">
+        {styleOverrides ? <style dangerouslySetInnerHTML={{ __html: styleOverrides }} /> : null}
         <main className="flex flex-1 flex-col">{children}</main>
       </div>
     )
@@ -82,6 +120,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   return (
     <div dir={dir} className="flex min-h-screen flex-col bg-background">
+      {styleOverrides ? <style dangerouslySetInnerHTML={{ __html: styleOverrides }} /> : null}
       <PublicHeader locale={locale} />
       <main className="flex-1">{children}</main>
       <PublicFooter locale={locale} />

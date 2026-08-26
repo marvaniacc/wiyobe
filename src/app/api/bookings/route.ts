@@ -79,6 +79,24 @@ export async function POST(req: Request) {
     const body = await parseBody(req, createSchema)
     const pt = body.providerType as ProviderType
 
+    // Admin-configurable booking guardrails (SiteSetting)
+    const { getSetting } = await import('@/lib/site-settings')
+    const [leadHoursStr, maxDaysStr] = await Promise.all([
+      getSetting('minBookingLeadHours'),
+      getSetting('maxBookingDaysAhead'),
+    ])
+    const startMs = Date.parse(body.startDate)
+    if (Number.isFinite(startMs)) {
+      const leadHours = Math.max(0, parseInt(leadHoursStr || '2', 10) || 0)
+      if (startMs < Date.now() + leadHours * 3600_000) {
+        return error(422, `Bookings must be at least ${leadHours} hour${leadHours === 1 ? '' : 's'} in advance.`)
+      }
+      const maxDays = parseInt(maxDaysStr || '180', 10)
+      if (maxDays > 0 && startMs > Date.now() + maxDays * 86_400_000) {
+        return error(422, `Bookings can be made at most ${maxDays} days ahead.`)
+      }
+    }
+
     // resolve provider + price
     let providerUserId: string | null = null
     let amount = '0'

@@ -5246,24 +5246,38 @@ function AdminSettingsSection() {
     }
   }
 
-  // Site identity settings
+  // ── Field definitions (all keys are consumed by the app — see src/lib/site-settings.ts) ──
+
+  // Site identity
   const siteFields = [
-    { key: 'siteName', label: 'Site Name', placeholder: 'Wishubest', type: 'text' },
-    { key: 'tagline', label: 'Tagline', placeholder: 'Global Medical Tourism Marketplace', type: 'text' },
-    { key: 'logoUrl', label: 'Logo URL', placeholder: 'https://…/logo.svg', type: 'text' },
+    { key: 'siteName', label: 'Site Name', placeholder: 'Wishubest', type: 'text', hint: 'Shown in header, footer, emails, page titles.' },
+    { key: 'tagline', label: 'Tagline', placeholder: 'Global Medical Tourism Marketplace', type: 'text', hint: 'Used as fallback footer description and SEO suffix.' },
+  ]
+
+  // Appearance (colors must be #RGB / #RRGGBB hex)
+  const colorFields = [
+    { key: 'bgColorLight', label: 'Global background', hint: 'Page background across the whole site (light mode).' },
+    { key: 'primaryColor', label: 'Primary color', hint: 'Buttons, links, focus rings, brand accents.' },
+    { key: 'accentColor', label: 'Accent tint', hint: 'Soft highlight backgrounds behind primary elements.' },
+  ]
+
+  // Contact & locale
+  const contactFields = [
+    { key: 'supportEmail', label: 'Support email', placeholder: 'support@wishubest.com', type: 'text', hint: 'Displayed for patient inquiries; also suggested for email replies.' },
+    { key: 'contactPhone', label: 'Contact phone', placeholder: '+1 …', type: 'text', hint: 'Optional public phone number.' },
+    { key: 'defaultLocale', label: 'Default language', placeholder: 'en', type: 'text', hint: 'One of: en, tr, fa, ar, ru. Visitors without a preference see this.' },
+  ]
+
+  // Booking rules
+  const bookingFields = [
+    { key: 'minBookingLeadHours', label: 'Minimum booking lead time (hours)', type: 'number', hint: 'Patients cannot book slots starting sooner than this many hours from now.' },
+    { key: 'maxBookingDaysAhead', label: 'Maximum days ahead', type: 'number', hint: 'How far in the future patients may book.' },
   ]
 
   // Default SEO settings
   const seoFields = [
-    { key: 'defaultSeoTitle', label: 'Default SEO Title', placeholder: 'Wishubest — Medical Tourism', type: 'text' },
-    { key: 'defaultSeoDescription', label: 'Default SEO Description', placeholder: 'Compare and book verified doctors…', type: 'textarea' },
-  ]
-
-  // Legacy platform settings
-  const platformFields = [
-    { key: 'platformName', label: t('admin.platformName'), type: 'text' },
-    { key: 'defaultCurrency', label: t('admin.defaultCurrency'), type: 'text' },
-    { key: 'payoutScheduleDays', label: t('admin.payoutScheduleDays'), type: 'number' },
+    { key: 'defaultSeoTitle', label: 'Default SEO Title', placeholder: 'Wishubest — Medical Tourism', type: 'text', hint: '' },
+    { key: 'defaultSeoDescription', label: 'Default SEO Description', placeholder: 'Compare and book verified doctors…', type: 'textarea', hint: '' },
   ]
 
   return (
@@ -5286,9 +5300,12 @@ function AdminSettingsSection() {
               <CardDescription>Configure the site name, tagline, and logo shown across the platform.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {siteFields.map(({ key, label, placeholder, type }) => (
-                <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-center">
-                  <Label className="text-sm font-medium">{label}</Label>
+              {siteFields.map(({ key, label, placeholder, type, hint }) => (
+                <div key={key} className="grid gap-1 sm:grid-cols-3 sm:items-center">
+                  <div>
+                    <Label className="text-sm font-medium">{label}</Label>
+                    {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+                  </div>
                   <Input
                     type={type}
                     placeholder={placeholder}
@@ -5298,14 +5315,34 @@ function AdminSettingsSection() {
                   />
                 </div>
               ))}
-              {/* Logo preview */}
-              {values.logoUrl && (
-                <div className="flex items-center gap-2 rounded-[10px] border border-divider p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={values.logoUrl} alt="Logo preview" className="h-8 w-auto" />
-                  <span className="text-xs text-muted-foreground">Logo preview</span>
+              <div className="grid gap-1 sm:grid-cols-3 sm:items-start">
+                <div>
+                  <Label className="text-sm font-medium">Logo URL</Label>
+                  <p className="text-xs text-muted-foreground">Upload via Media and paste the /api/media/file/… link. Leave empty to use the default brand icon.</p>
                 </div>
-              )}
+                <div className="space-y-2 sm:col-span-2">
+                  <Input
+                    placeholder="/api/media/file/your-logo.webp or https://…"
+                    value={values.logoUrl || ''}
+                    onChange={(e) => setValues((v) => ({ ...v, logoUrl: e.target.value }))}
+                  />
+                  <div className="flex items-center gap-2 rounded-[10px] border border-divider bg-surface-secondary/40 p-2">
+                    {values.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={values.logoUrl}
+                        alt="Logo preview"
+                        className="h-8 w-auto max-w-[140px] object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.25' }}
+                        onLoad={(e) => { (e.target as HTMLImageElement).style.opacity = '1' }}
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }}>monitor_heart</span>
+                    )}
+                    <span className="text-xs text-muted-foreground">Header & footer preview</span>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -5340,6 +5377,173 @@ function AdminSettingsSection() {
                       className="sm:col-span-2"
                     />
                   )}
+                </div>
+              ))}
+
+              {/* Search indexing */}
+              <div className="flex items-center justify-between gap-3 rounded-[12px] border border-divider p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Allow search engine indexing</p>
+                  <p className="text-xs text-muted-foreground">
+                    Off = robots.txt blocks all crawlers and pages emit noindex. Use while in private beta.
+                  </p>
+                </div>
+                <Switch
+                  checked={values.allowSearchIndexing !== 'false'}
+                  onCheckedChange={async (checked) => {
+                    const newVal = checked ? 'true' : 'false'
+                    setValues((v) => ({ ...v, allowSearchIndexing: newVal }))
+                    try {
+                      await apiPatch('/api/admin/settings', { allowSearchIndexing: newVal })
+                      toast.success(`Search indexing ${checked ? 'allowed' : 'blocked'}`)
+                    } catch (e: any) {
+                      toast.error(e.message || 'Failed to update')
+                      setValues((v) => ({ ...v, allowSearchIndexing: checked ? 'false' : 'true' }))
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Maintenance mode */}
+              <div className="flex items-center justify-between gap-3 rounded-[12px] border border-divider p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Maintenance mode</p>
+                  <p className="text-xs text-muted-foreground">
+                    Visitors see a holding page; admins keep full access. Bookings and checkout are paused.
+                  </p>
+                </div>
+                <Switch
+                  checked={values.maintenanceMode === 'true'}
+                  onCheckedChange={async (checked) => {
+                    const newVal = checked ? 'true' : 'false'
+                    setValues((v) => ({ ...v, maintenanceMode: newVal }))
+                    try {
+                      await apiPatch('/api/admin/settings', { maintenanceMode: newVal })
+                      toast.success(`Maintenance mode ${checked ? 'ON — site hidden from visitors' : 'off'}`)
+                    } catch (e: any) {
+                      toast.error(e.message || 'Failed to update')
+                      setValues((v) => ({ ...v, maintenanceMode: checked ? 'false' : 'true' }))
+                    }
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Appearance — global theme */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="palette" size={18} className="text-primary" />
+                Appearance
+              </CardTitle>
+              <CardDescription>Global theme colors applied across the entire platform instantly — no rebuild required. Must be hex colors (#RRGGBB).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {colorFields.map(({ key, label, hint }) => {
+                const val = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(values[key] || '') ? values[key] : '#FFFFFF'
+                return (
+                  <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-center">
+                    <div>
+                      <Label className="text-sm font-medium">{label}</Label>
+                      <p className="text-xs text-muted-foreground">{hint}</p>
+                    </div>
+                    <div className="flex items-center gap-2 sm:col-span-2">
+                      {/* Native color picker swatch */}
+                      <input
+                        type="color"
+                        aria-label={`${label} picker`}
+                        value={val}
+                        onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                        className="h-10 w-14 cursor-pointer rounded-lg border border-divider bg-surface p-1"
+                      />
+                      <Input
+                        placeholder="#F8F9FA"
+                        value={values[key] || ''}
+                        onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                        className="max-w-[140px] font-mono text-sm"
+                        maxLength={7}
+                      />
+                      <span
+                        className="size-10 shrink-0 rounded-lg border border-divider shadow-inner"
+                        style={{ backgroundColor: val }}
+                        aria-hidden
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Quick presets for the primary color */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-xs text-muted-foreground">Presets:</span>
+                {['#1A73E8', '#0B57D0', '#188038', '#9334E6', '#D93025', '#F9AB00', '#202124'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    title={c}
+                    onClick={() => setValues((v) => ({ ...v, primaryColor: c }))}
+                    className="size-6 rounded-full border border-divider transition-transform hover:scale-110"
+                    style={{ backgroundColor: c }}
+                    aria-label={`Use ${c} as primary`}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Colors save with the Save button below and apply site-wide on next page load.</p>
+            </CardContent>
+          </Card>
+
+          {/* Contact & Locale */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="contact_mail" size={18} className="text-primary" />
+                Contact &amp; Language
+              </CardTitle>
+              <CardDescription>Public contact details and the default language for new visitors.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {contactFields.map(({ key, label, placeholder, type, hint }) => (
+                <div key={key} className="grid gap-1 sm:grid-cols-3 sm:items-center">
+                  <div>
+                    <Label className="text-sm font-medium">{label}</Label>
+                    {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+                  </div>
+                  <Input
+                    type={type}
+                    placeholder={placeholder}
+                    value={values[key] || ''}
+                    onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                    className="sm:col-span-2"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Booking rules */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Icon name="event_available" size={18} className="text-primary" />
+                Booking Rules
+              </CardTitle>
+              <CardDescription>Guardrails applied when patients create bookings.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {bookingFields.map(({ key, label, type, hint }) => (
+                <div key={key} className="grid gap-1 sm:grid-cols-3 sm:items-center">
+                  <div>
+                    <Label className="text-sm font-medium">{label}</Label>
+                    <p className="text-xs text-muted-foreground">{hint}</p>
+                  </div>
+                  <Input
+                    type={type}
+                    min={0}
+                    value={values[key] || ''}
+                    onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value.replace(/[^0-9]/g, '') }))}
+                    className="sm:col-span-2 max-w-[160px]"
+                  />
                 </div>
               ))}
             </CardContent>
@@ -5455,29 +5659,6 @@ function AdminSettingsSection() {
 
           {/* Header Builder */}
           <HeaderBuilderCard values={values} setValues={setValues} />
-
-          {/* Platform Settings (legacy) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Icon name="tune" size={18} className="text-primary" />
-                {t('admin.generalSettings')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {platformFields.map(({ key, label, type }) => (
-                <div key={key} className="grid gap-2 sm:grid-cols-3 sm:items-center">
-                  <Label className="text-sm font-medium">{label}</Label>
-                  <Input
-                    type={type}
-                    value={values[key] || ''}
-                    onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                    className="sm:col-span-2"
-                  />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
 
           {/* Save button */}
           <div className="flex justify-end">
