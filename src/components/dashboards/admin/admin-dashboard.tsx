@@ -5265,7 +5265,7 @@ function AdminSettingsSection() {
   const contactFields = [
     { key: 'supportEmail', label: 'Support email', placeholder: 'support@wishubest.com', type: 'text', hint: 'Displayed for patient inquiries; also suggested for email replies.' },
     { key: 'contactPhone', label: 'Contact phone', placeholder: '+1 …', type: 'text', hint: 'Optional public phone number.' },
-    { key: 'defaultLocale', label: 'Default language', placeholder: 'en', type: 'text', hint: 'One of: en, tr, fa, ar, ru. Visitors without a preference see this.' },
+    { key: 'defaultLocale', label: 'Default language', placeholder: 'en', type: 'select', options: ['en', 'tr', 'fa', 'ar', 'ru'], hint: 'Visitors without a preference see this language.' },
   ]
 
   // Booking rules
@@ -5503,19 +5503,31 @@ function AdminSettingsSection() {
               <CardDescription>Public contact details and the default language for new visitors.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {contactFields.map(({ key, label, placeholder, type, hint }) => (
+              {contactFields.map(({ key, label, placeholder, type, hint, options }) => (
                 <div key={key} className="grid gap-1 sm:grid-cols-3 sm:items-center">
                   <div>
                     <Label className="text-sm font-medium">{label}</Label>
                     {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
                   </div>
-                  <Input
-                    type={type}
-                    placeholder={placeholder}
-                    value={values[key] || ''}
-                    onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                    className="sm:col-span-2"
-                  />
+                  {type === 'select' ? (
+                    <select
+                      value={values[key] || 'en'}
+                      onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                      className="sm:col-span-2 h-12 rounded-[14px] border border-input bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      {(options || []).map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      type={type}
+                      placeholder={placeholder}
+                      value={values[key] || ''}
+                      onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                      className="sm:col-span-2"
+                    />
+                  )}
                 </div>
               ))}
             </CardContent>

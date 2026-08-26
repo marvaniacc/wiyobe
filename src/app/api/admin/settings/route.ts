@@ -42,7 +42,7 @@ function validateSettingValue(key: string, value: string): string | null {
     }
     return null
   }
-  if (key === 'defaultLocale' && value && !['en', 'tr', 'fa', 'ar', 'ru'].includes(value)) {
+  if (key === 'defaultLocale' && value.trim() && !['en', 'tr', 'fa', 'ar', 'ru'].includes(value.trim().toLowerCase())) {
     return 'defaultLocale: must be one of en, tr, fa, ar, ru'
   }
   if ((key === 'allowSearchIndexing' || key === 'maintenanceMode' || key === 'paymentsEnabled') && !['true', 'false'].includes(value)) {
@@ -101,13 +101,14 @@ export async function PUT(req: Request) {
     const { settings } = await parseBody(req, updateSchema)
 
     for (const [key, value] of Object.entries(settings)) {
-      const err = isSiteSettingKey(key) ? validateSettingValue(key, value) : null
+      const normalized = key === 'defaultLocale' && value ? value.trim().toLowerCase() : value
+      const err = isSiteSettingKey(key) ? validateSettingValue(key, normalized) : null
       if (err) return error(400, err)
       if (isSiteSettingKey(key)) {
         await db.siteSetting.upsert({
           where: { key },
-          update: { value },
-          create: { key, value },
+          update: { value: normalized },
+          create: { key, value: normalized },
         })
       } else {
         await db.setting.upsert({
@@ -138,13 +139,14 @@ export async function PATCH(req: Request) {
     const body = await parseBody(req, patchSchema)
 
     for (const [key, value] of Object.entries(body)) {
-      const err = isSiteSettingKey(key) ? validateSettingValue(key, value) : null
+      const normalized = key === 'defaultLocale' && value ? value.trim().toLowerCase() : value
+      const err = isSiteSettingKey(key) ? validateSettingValue(key, normalized) : null
       if (err) return error(400, err)
       if (isSiteSettingKey(key)) {
         await db.siteSetting.upsert({
           where: { key },
-          update: { value },
-          create: { key, value },
+          update: { value: normalized },
+          create: { key, value: normalized },
         })
       } else {
         await db.setting.upsert({
