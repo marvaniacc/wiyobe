@@ -40,10 +40,13 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
 
   try {
     const fromRaw = process.env.EMAIL_FROM || 'noreply@wishubest.com'
-    const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Wishubest'
+    let appName = process.env.NEXT_PUBLIC_APP_NAME || 'Wishubest'
+    try {
+      // Admin-configured site name wins over env (DB read is best-effort).
+      const { getSetting } = await import('@/lib/site-settings')
+      appName = (await getSetting('siteName')) || appName
+    } catch { /* keep env/default */ }
     // EMAIL_FROM may be a bare address or a full "Name <addr>" — accept both.
-    // (Wrapping a full value again produces `"Name" <Name <addr>>` which
-    // providers like Resend reject with 550 Invalid from field.)
     const from = fromRaw.includes('<') ? fromRaw : `"${appName}" <${fromRaw}>`
 
     await t.sendMail({

@@ -39,6 +39,14 @@ export async function PublicHeader({ locale }: { locale: string }) {
   const session = await getSession()
   const isAuth = !!session
 
+  // Site identity — admin-configurable (SiteSetting: siteName / logoUrl)
+  const [siteNameRow, logoRow] = await Promise.all([
+    db.siteSetting.findUnique({ where: { key: 'siteName' } }),
+    db.siteSetting.findUnique({ where: { key: 'logoUrl' } }),
+  ])
+  const siteName = siteNameRow?.value || 'Wishubest'
+  const logoUrl = logoRow?.value || ''
+
   // Read dynamic header config from SiteSetting — per-locale with fallback
   // Try headerConfigGuest_{locale} first, fall back to headerConfigGuest (default)
   const baseKey = isAuth ? 'headerConfigLogged' : 'headerConfigGuest'
@@ -56,16 +64,21 @@ export async function PublicHeader({ locale }: { locale: string }) {
   const navLinks = config?.menuItems?.length ? config.menuItems : defaultLinks
   const ctaText = config?.ctaLabel || (isAuth ? undefined : 'Login / Sign Up')
   const ctaHref = config?.ctaLink || `/${locale}/login`
-  const logoText = 'Wishubest'
+  const logoText = siteName
 
   return (
     <header className="sticky top-0 z-40 border-b border-divider bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-        {/* Logo */}
+        {/* Logo — admin-configurable image, falling back to the brand icon */}
         <Link href={`/${locale}`} className="flex shrink-0 items-center gap-2 text-lg font-semibold text-foreground transition-colors hover:text-primary">
-          <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }} aria-hidden>
-            monitor_heart
-          </span>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={siteName} className="h-8 w-auto max-w-[140px] object-contain" />
+          ) : (
+            <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }} aria-hidden>
+              monitor_heart
+            </span>
+          )}
           <span className="hidden sm:inline">{logoText}</span>
         </Link>
 

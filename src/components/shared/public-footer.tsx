@@ -61,14 +61,19 @@ function getDefaultColumns(locale: string): Array<{ title: string; links: Footer
 }
 
 export async function PublicFooter({ locale }: { locale: string }) {
-  // Per-locale footer config with fallback: footerConfig_{locale} → footerConfig
-  const configRow = (await db.siteSetting.findUnique({ where: { key: `footerConfig_${locale}` } }))
-    ?? (await db.siteSetting.findUnique({ where: { key: 'footerConfig' } }))
+  // Site identity + per-locale footer config with fallback
+  const [siteNameRow, configRow] = await Promise.all([
+    db.siteSetting.findUnique({ where: { key: 'siteName' } }),
+    (async () =>
+      (await db.siteSetting.findUnique({ where: { key: `footerConfig_${locale}` } }))
+      ?? (await db.siteSetting.findUnique({ where: { key: 'footerConfig' } })))(),
+  ])
+  const siteName = siteNameRow?.value || 'Wishubest'
   const config = parseFooterConfig(configRow?.value)
   const defaultCols = getDefaultColumns(locale)
   const columns = config?.columns?.length ? config.columns : defaultCols
   const year = new Date().getFullYear()
-  const copyright = config?.copyright || `© ${year} Wishubest — ${ssrT(locale, 'footer.copyrightSuffix', 'Global Medical Tourism Marketplace')}`
+  const copyright = config?.copyright || `© ${year} ${siteName} — ${ssrT(locale, 'footer.copyrightSuffix', 'Global Medical Tourism Marketplace')}`
 
   return (
     <footer className="border-t border-divider bg-surface">
@@ -80,7 +85,7 @@ export async function PublicFooter({ locale }: { locale: string }) {
               <span className="material-symbols-outlined text-primary" style={{ fontSize: 24 }} aria-hidden>
                 monitor_heart
               </span>
-              <span>Wishubest</span>
+              <span>{siteName}</span>
             </Link>
             <p className="mt-2 text-sm text-muted-foreground">
               {ssrT(locale, 'footer.brandDesc', 'Global Medical Tourism Marketplace — Compare and book verified providers worldwide.')}
