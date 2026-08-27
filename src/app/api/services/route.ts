@@ -29,12 +29,18 @@ export async function GET() {
   } catch (e) { return handleError(e) }
 }
 
+// Migration Plan v3 (Option B): one Service = one purchasable modality.
+// New Services MUST declare modality. Values are the product-level
+// ServiceModality enum (CHAT | VIDEO | IN_PERSON).
+const SERVICE_MODALITY_VALUES = ['CHAT', 'VIDEO', 'IN_PERSON'] as const
+
 const createSchema = z.object({
   name: z.string().min(2),
   description: z.string(),
   price: z.string(),
   currency: z.string().default('USD'),
   durationMinutes: z.number().optional(),
+  modality: z.enum(SERVICE_MODALITY_VALUES),
 })
 
 export async function POST(req: Request) {
@@ -44,7 +50,7 @@ export async function POST(req: Request) {
     const body = await parseBody(req, createSchema)
     const u = await db.user.findUnique({ where: { id: session.id }, include: { doctor: true, hospital: true, hotel: true, translator: true } })
 
-    let data: any = { name: body.name, description: body.description, price: body.price, currency: body.currency, durationMinutes: body.durationMinutes }
+    let data: any = { name: body.name, description: body.description, price: body.price, currency: body.currency, durationMinutes: body.durationMinutes, modality: body.modality }
     if (u?.doctor) { data.providerType = 'DOCTOR'; data.doctorId = u.doctor.id }
     else if (u?.hospital) { data.providerType = 'HOSPITAL'; data.hospitalId = u.hospital.id }
     else if (u?.hotel) { data.providerType = 'HOTEL'; data.hotelId = u.hotel.id }
@@ -63,6 +69,9 @@ const updateSchema = z.object({
   price: z.string().optional(),
   durationMinutes: z.number().optional(),
   isActive: z.boolean().optional(),
+  // May be explicitly SET or CLEARED (null). Never silently assigned:
+  // undefined = leave unchanged; null = clear to legacy unclassified state.
+  modality: z.enum(SERVICE_MODALITY_VALUES).nullable().optional(),
 })
 
 export async function PATCH(req: Request) {
@@ -70,7 +79,13 @@ export async function PATCH(req: Request) {
     const session = await getSession()
     if (!session) return error(401, 'Unauthorized')
     const body = await parseBody(req, updateSchema)
-    const { id, ...rest } = body
+
+    // Only persist modality when the key was actually present in the payload.
+    const rest: Record<string, unknown> = { ...body }
+    delete (rest as any).id
+    if (!('modality' in body)) delete (rest as any).modality
+
+    const { id } = body
 
     // Ownership check: verify the service belongs to the authenticated provider
     const u = await db.user.findUnique({ where: { id: session.id }, include: { doctor: true, hospital: true, hotel: true, translator: true } })

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { error } from '@/lib/api'
+import { tryNormalizeVisitType } from '@/lib/modality'
 import type { ProviderType } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -99,7 +100,7 @@ type FeedBooking = {
   id: string
   startDate: Date
   endDate: Date | null
-  visitType: 'IN_PERSON' | 'ONLINE'
+  visitType: 'IN_PERSON' | 'ONLINE' | 'VIDEO' | 'CHAT'
   status: string
   patient: { name: string | null }
   service: { name: string | null } | null
@@ -132,12 +133,15 @@ function buildIcal(providerName: string, providerUserId: string, bookings: FeedB
     const dtEnd = formatIcalUtc(end)
 
     const patientName = b.patient.name || 'Patient'
-    const visitLabel = b.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'
-    const serviceName = b.service?.name || visitLabel
+    // Display label via canonical modality (legacy ONLINE == VIDEO).
+    const modalityLabel = tryNormalizeVisitType(b.visitType) === 'VIDEO'
+      ? 'Video consultation'
+      : b.visitType === 'CHAT' ? 'Chat consultation' : 'In-person visit'
+    const serviceName = b.service?.name || modalityLabel
 
     const summary = `Appointment with ${patientName}`
     // Description intentionally excludes medical notes/amounts/contact info.
-    const description = `${serviceName} — ${visitLabel} (Wishubest booking ${b.id.slice(-8).toUpperCase()})`
+    const description = `${serviceName} — ${modalityLabel} (Wishubest booking ${b.id.slice(-8).toUpperCase()})`
 
     lines.push(
       'BEGIN:VEVENT',

@@ -37,6 +37,19 @@ enum ProviderType {
 enum VisitType {
   IN_PERSON
   ONLINE
+  VIDEO
+  CHAT
+}
+
+/// Product-level purchasable modality for a Service (Option B: one Service =
+/// one purchasable modality-specific offering). Nullable for legacy Services
+/// created before modality classification existed — NULL means "unclassified
+/// legacy" and is interpreted permissively at booking time. New Services MUST
+/// declare it.
+enum ServiceModality {
+  CHAT
+  VIDEO
+  IN_PERSON
 }
 
 enum BookingStatus {
@@ -314,6 +327,10 @@ model Service {
   currency        String       @default("USD")
   durationMinutes Int?
   isActive        Boolean      @default(true)
+  /// One Service = one purchasable modality (Migration Plan v3, Option B).
+  /// Nullable ONLY as transitional state for pre-existing rows; new records
+  /// must always set this.
+  modality        ServiceModality?
   bookings        Booking[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt

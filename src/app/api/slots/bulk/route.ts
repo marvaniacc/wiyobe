@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
+import { VISIT_TYPE_ZOD_ENUM, normalizeVisitType } from '@/lib/modality'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,8 @@ const schema = z.object({
   daysOfWeek: z.array(z.number().int().min(0).max(6)), // 0=Sun ... 6=Sat
   startTime: z.string(), // HH:mm
   endTime: z.string(),   // HH:mm
-  visitType: z.enum(['IN_PERSON', 'ONLINE']).default('IN_PERSON'),
+  // Accepts legacy ONLINE; persisted normalized via central modality module.
+  visitType: z.enum(VISIT_TYPE_ZOD_ENUM).default('IN_PERSON'),
   slotDurationMinutes: z.number().int().min(15).max(480).default(60),
 })
 
@@ -21,6 +23,14 @@ export async function POST(req: Request) {
     const session = await getSession()
     if (!session) return error(401, 'Unauthorized')
     const body = await parseBody(req, schema)
+
+    // Normalize once through the central module: ONLINE -> VIDEO on write.
+    let visitType: 'VIDEO' | 'CHAT' | 'IN_PERSON'
+    try {
+      visitType = normalizeVisitType(body.visitType) as 'VIDEO' | 'CHAT' | 'IN_PERSON'
+    } catch {
+      return error(400, `Unknown visit type: ${body.visitType}`)
+    }
 
     const u = await db.user.findUnique({ where: { id: session.id }, include: { doctor: true, hospital: true, translator: true } })
     let providerField: any = {}
@@ -55,7 +65,7 @@ export async function POST(req: Request) {
             ...providerField,
             startTime: new Date(slotStart),
             endTime: new Date(slotEnd),
-            visitType: body.visitType,
+            visitType,
           })
           slotStart = slotEnd
         }

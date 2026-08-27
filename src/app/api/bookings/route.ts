@@ -5,6 +5,7 @@ import { resolveProviderUser } from '@/lib/ledger'
 import { notify } from '@/lib/notify'
 import { toDec, mulDec, subDec } from '@/lib/money'
 import { arePaymentsEnabled } from '@/lib/stripe'
+import { normalizeVisitType, ModalityError, slotFilterForModality } from '@/lib/modality'
 import { z } from 'zod'
 import type { ProviderType } from '@prisma/client'
 
@@ -63,7 +64,9 @@ const createSchema = z.object({
   providerId: z.string(),
   serviceId: z.string().optional(),
   slotId: z.string().optional(),
-  visitType: z.enum(['IN_PERSON', 'ONLINE']),
+  // Migration Plan v3: product modalities VIDEO/CHAT added; legacy ONLINE
+  // remains accepted (historical representation of VIDEO).
+  visitType: z.enum(['IN_PERSON', 'ONLINE', 'VIDEO', 'CHAT']),
   startDate: z.string().refine((v) => !isNaN(Date.parse(v)), { message: 'startDate must be a valid ISO datetime' }),
   endDate: z.string().refine((v) => !isNaN(Date.parse(v)), { message: 'endDate must be a valid ISO datetime' }).optional(),
   notes: z.string().optional(),
@@ -78,6 +81,24 @@ export async function POST(req: Request) {
 
     const body = await parseBody(req, createSchema)
     const pt = body.providerType as ProviderType
+
+    // Canonical modality for this booking request — central semantics module.
+    // Unknown values are rejected before ANY side effect. Legacy ONLINE
+    // normalizes to VIDEO (runtime compatibility, rows never rewritten).
+    let modality: ReturnType<typeof normalizeVisitType>
+    try {
+      modality = normalizeVisitType(body.visitType)
+    } catch (e) {
+      // Item 2 (v3 review): an unrecognized/invalid visitType is invalid
+      // INPUT -> HTTP 400 generic invalid-input, NOT 422. The zod enum in
+      // createSchema is the primary gate (unknown values already fail there
+      // with 400 'Validation error'); this catch is defense-in-depth so no
+      // code path can return 422 for an invalid value. 422 MODALITY_MISMATCH
+      // is RESERVED for a valid modality that conflicts with the configured
+      // modality of the service (or an explicitly supplied slot).
+      if (e instanceof ModalityError) return error(400, 'Invalid visitType', e.message)
+      throw e
+    }
 
     // Admin-configurable booking guardrails (SiteSetting)
     const { getSetting } = await import('@/lib/site-settings')
@@ -106,7 +127,12 @@ export async function POST(req: Request) {
       if (!d || !d.verified) return error(404, 'Doctor not found or not verified')
       providerUserId = d.userId
       providerName = d.user.name || 'Doctor'
-      amount = body.visitType === 'ONLINE' ? d.onlineFee : d.consultationFee
+      // Pricing semantics (audited): the existing app prices "non-physically-
+      // present" visits at onlineFee and in-person visits at consultationFee.
+      // Canonical modality keeps that meaning: VIDEO and CHAT use onlineFee,
+      // IN_PERSON uses consultationFee. When an explicitly classified Service
+      // is supplied below, its own price overrides this base amount.
+      amount = modality === 'IN_PERSON' ? d.consultationFee : d.onlineFee
     } else if (pt === 'HOSPITAL') {
       const h = await db.hospital.findUnique({ where: { id: body.providerId }, include: { user: true } })
       if (!h || !h.verified) return error(404, 'Hospital not found')
@@ -142,6 +168,42 @@ export async function POST(req: Request) {
       })
       if (!svc) return error(400, 'Selected service is not available for this provider')
       amount = svc.price
+
+      // Migration Plan v3 — Service × Slot modality compatibility:
+      // For an explicitly classified Service (modality != NULL), normalize()
+      // of both sides must match. Enforced BEFORE slot claim / promo reserve /
+      // video-room creation, so a failed validation consumes nothing.
+      //
+      // DELIBERATE — DO NOT "FIX" (item 3, v3 review): the `if (svc.modality)`
+      // guard intentionally makes a Service with modality = NULL skip ALL
+      // modality validation, including the slot-compatibility check below.
+      // Legacy services are never validated against a modality they don't
+      // have; classification happens later via a controlled workflow
+      // (Decision 4 — no batch inference on production).
+      if (svc.modality) {
+        if (modality !== svc.modality) {
+          // Item 1 (v3 review): top-level "error" is the exact literal
+          // "MODALITY_MISMATCH" — the human-readable explanation goes in the
+          // separate "details" field, never concatenated into "error".
+          return error(422, 'MODALITY_MISMATCH', `requested ${modality} but service modality is ${svc.modality}`)
+        }
+        // A booked slot must also agree with the classified service's modality
+        // when one is supplied. (Compatibility mapping handles legacy ONLINE.)
+        if (body.slotId) {
+          const slotRow = await db.slot.findUnique({ where: { id: body.slotId }, select: { visitType: true } })
+          if (slotRow && normalizeVisitType(slotRow.visitType) !== modality) {
+            return error(422, 'MODALITY_MISMATCH', `requested ${modality} but slot is ${normalizeVisitType(slotRow.visitType)}`)
+          }
+        }
+      }
+    } else if (body.slotId) {
+      // No explicit service: still prevent cross-modality slot consumption,
+      // e.g. claiming an IN_PERSON-only slot for a VIDEO request. Compare in
+      // canonical space so historical ONLINE slots satisfy VIDEO requests.
+      const slotRow = await db.slot.findUnique({ where: { id: body.slotId }, select: { visitType: true } })
+      if (slotRow && slotFilterForModality(normalizeVisitType(slotRow.visitType))[0] !== modality) {
+        return error(422, 'MODALITY_MISMATCH', `requested ${modality} but slot is ${normalizeVisitType(slotRow.visitType)}`)
+      }
     }
 
     // If slot provided, CLAIM it atomically — updateMany with isBooked:false
@@ -300,10 +362,13 @@ export async function POST(req: Request) {
       : '0'
     const providerNet = subDec(amount, basePlatformCut.toFixed(2)) // UNCHANGED — full net share
 
-    // Video session URL for online visits — uses configured video provider
+    // Video session URL for VIDEO visits — uses configured video provider.
+    // Fulfillment semantics: only the canonical VIDEO modality creates a room.
+    // CHAT and IN_PERSON never do. Legacy 'ONLINE' requests normalize to VIDEO
+    // above, so historical behavior is preserved exactly.
     // Generate with a temp ID (booking ID not yet created); the URL is room-based, not ID-dependent
     let videoSessionUrl: string | null = null
-    if (body.visitType === 'ONLINE') {
+    if (modality === 'VIDEO') {
       const { createVideoSession } = await import('@/lib/video')
       const tempId = `${session.id.slice(-4)}-${Date.now().toString(36)}`
       const videoSession = await createVideoSession(tempId, session.name || 'Patient', providerName)
@@ -320,7 +385,12 @@ export async function POST(req: Request) {
         translatorId: pt === 'TRANSLATOR' ? body.providerId : null,
         serviceId: body.serviceId || null,
         slotId: body.slotId || null,
-        visitType: body.visitType,
+        // Item 4 (v3 review): normalize ONLINE -> VIDEO on NEW booking
+        // writes, mirroring Slot writes, so new Booking rows also prefer
+        // VIDEO. HISTORICAL ROWS ARE NEVER REWRITTEN — this affects the
+        // value written for new inserts only. Clients sending ONLINE keep
+        // full compatibility (normalize treats ONLINE == VIDEO everywhere).
+        visitType: body.visitType === 'ONLINE' ? 'VIDEO' : body.visitType,
         status: 'PENDING',
         startDate: new Date(body.startDate),
         endDate: body.endDate ? new Date(body.endDate) : null,
@@ -374,7 +444,12 @@ export async function POST(req: Request) {
       userId: session.id,
       type: 'booking_created',
       title: 'Booking created',
-      body: `Your ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with ${providerName} is reserved. Complete payment to confirm it.`,
+      // Decision-2 compliance (found during the item-4 conflict check): use
+      // the canonical modality, not a raw ONLINE/IN_PERSON ternary. The prior
+      // WIP ternary mislabeled VIDEO/CHAT requests as "in-person visit".
+      // Legacy ONLINE clients now see "video consultation" (display-only,
+      // consistent with the calendar-feed label change already in this WIP).
+      body: `Your ${modality === 'IN_PERSON' ? 'in-person visit' : modality === 'CHAT' ? 'chat consultation' : 'video consultation'} with ${providerName} is reserved. Complete payment to confirm it.`,
       link: 'bookings',
       meta: { bookingId: booking.id, amount: patientCharge },
     })
@@ -382,7 +457,7 @@ export async function POST(req: Request) {
       userId: providerUserId,
       type: 'booking_created',
       title: 'New booking request',
-      body: `${patientName} booked a ${body.visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with you — awaiting payment.`,
+      body: `${patientName} booked a ${modality === 'IN_PERSON' ? 'in-person visit' : modality === 'CHAT' ? 'chat consultation' : 'video consultation'} with you — awaiting payment.`,
       link: 'appointments',
       meta: { bookingId: booking.id, amount: toDec(amount) },
     })

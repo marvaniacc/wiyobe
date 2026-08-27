@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
+import { VISIT_TYPE_ZOD_ENUM, normalizeVisitType } from '@/lib/modality'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +24,8 @@ export async function GET() {
 const createSchema = z.object({
   startTime: z.string(),
   endTime: z.string(),
-  visitType: z.enum(['IN_PERSON', 'ONLINE']).default('IN_PERSON'),
+  // Accepts legacy ONLINE (persisted as VIDEO per central modality mapping).
+  visitType: z.enum(VISIT_TYPE_ZOD_ENUM).default('IN_PERSON'),
 })
 
 export async function POST(req: Request) {
@@ -32,7 +34,16 @@ export async function POST(req: Request) {
     if (!session) return error(401, 'Unauthorized')
     const body = await parseBody(req, createSchema)
     const u = await db.user.findUnique({ where: { id: session.id }, include: { doctor: true, hospital: true, translator: true } })
-    const data: any = { startTime: new Date(body.startTime), endTime: new Date(body.endTime), visitType: body.visitType }
+    // Normalize once through the central module: ONLINE -> VIDEO on write.
+    // Historical rows are never rewritten; only new writes are canonicalized.
+    let visitType: 'VIDEO' | 'CHAT' | 'IN_PERSON'
+    try {
+      visitType = normalizeVisitType(body.visitType) as 'VIDEO' | 'CHAT' | 'IN_PERSON'
+    } catch {
+      return error(400, `Unknown visit type: ${body.visitType}`)
+    }
+    const data: any = { startTime: new Date(body.startTime), endTime: new Date(body.endTime), visitType }
+
     if (u?.doctor) data.doctorId = u.doctor.id
     else if (u?.hospital) data.hospitalId = u.hospital.id
     else if (u?.translator) data.translatorId = u.translator.id
