@@ -61,6 +61,9 @@ type Service = {
   durationMinutes: number | null
   isActive: boolean
   providerType: string
+  // Migration Plan v3 (Option B): product modality. NULL/absent = legacy
+  // unclassified service (kept permissive server-side until classified).
+  modality?: 'CHAT' | 'VIDEO' | 'IN_PERSON' | null
 }
 
 type Slot = {
@@ -1190,6 +1193,9 @@ function ServiceFormDialog({
   const [description, setDescription] = useState(service?.description || '')
   const [price, setPrice] = useState(service?.price || '')
   const [duration, setDuration] = useState(service?.durationMinutes ? String(service.durationMinutes) : '')
+  // Empty string = "untouched" (legacy services may have modality NULL).
+  // Only a deliberate user pick produces a non-empty value here.
+  const [modality, setModality] = useState<string>(service?.modality || '')
   const [busy, setBusy] = useState(false)
 
   // Reset form when dialog opens
@@ -1199,6 +1205,7 @@ function ServiceFormDialog({
       setDescription(service?.description || '')
       setPrice(service?.price || '')
       setDuration(service?.durationMinutes ? String(service.durationMinutes) : '')
+      setModality(service?.modality || '')
     }
   }, [open])
 
@@ -1206,6 +1213,12 @@ function ServiceFormDialog({
     e.preventDefault()
     if (!name.trim() || !price.trim()) {
       toast.error(t('common.error'))
+      return
+    }
+    // Migration Plan v3: modality is REQUIRED for new services (server 400s
+    // without it) — validate client-side first for a clear error message.
+    if (mode === 'add' && !modality) {
+      toast.error(t('provider.serviceModalityHelp'))
       return
     }
     setBusy(true)
@@ -1218,10 +1231,23 @@ function ServiceFormDialog({
       }
       if (duration.trim()) body.durationMinutes = parseInt(duration.trim(), 10)
 
+      // Modality handling — "no silent assignment" contract with PATCH:
+      //  - add: always sent (required, validated above).
+      //  - edit: included ONLY when the user actively changed the field
+      //    (non-empty AND different from the loaded value). An untouched
+      //    legacy NULL field stays out of the body entirely, so editing an
+      //    unrelated field (price, name...) can never clear or set modality
+      //    implicitly. The form deliberately offers no way to CLEAR modality
+      //    back to NULL — clearing is reserved for the future classification
+      //    workflow via the API.
       if (mode === 'add') {
+        body.modality = modality
         await apiPost('/api/services', body)
         toast.success(t('provider.serviceCreated'))
       } else if (service) {
+        if (modality && modality !== (service.modality || '')) {
+          body.modality = modality
+        }
         await apiPatch('/api/services', { id: service.id, ...body })
         toast.success(t('provider.serviceUpdated'))
       }
@@ -1244,6 +1270,35 @@ function ServiceFormDialog({
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="svc-name">{t('provider.serviceName')}</Label>
             <Input id="svc-name" value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="svc-modality">
+              {t('provider.serviceModality')}
+              {mode === 'add' && <span className="text-error"> *</span>}
+            </Label>
+            <Select
+              value={modality || undefined}
+              onValueChange={(v) => setModality(v === '__unset__' ? '' : v)}
+            >
+              <SelectTrigger id="svc-modality">
+                <SelectValue placeholder={t('provider.serviceModalityUnset')} />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Legacy services (modality NULL) show their current state as a
+                    disabled marker row; picking nothing keeps NULL untouched. */}
+                {mode === 'edit' && !service?.modality && (
+                  <SelectItem value="__unset__" disabled>
+                    {t('provider.serviceModalityUnset')}
+                  </SelectItem>
+                )}
+                <SelectItem value="VIDEO">{t('booking.video')}</SelectItem>
+                <SelectItem value="CHAT">{t('booking.chat')}</SelectItem>
+                <SelectItem value="IN_PERSON">{t('booking.inPerson')}</SelectItem>
+              </SelectContent>
+            </Select>
+            {(mode === 'add' || !service?.modality) && (
+              <p className="text-xs text-muted-foreground">{t('provider.serviceModalityHelp')}</p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="svc-desc">{t('provider.serviceDescription')}</Label>

@@ -49,7 +49,9 @@ import { TripTracker } from '@/components/dashboards/patient/trip-tracker'
  * ======================================================================= */
 
 type ProviderType = 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR'
-type VisitType = 'IN_PERSON' | 'ONLINE'
+// Migration Plan v3: full product modalities. Legacy ONLINE remains valid
+// (historical rows; runtime alias of VIDEO) — never rewritten.
+type VisitType = 'IN_PERSON' | 'ONLINE' | 'VIDEO' | 'CHAT'
 type BookingStatus = 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'REFUNDED'
 
 interface Provider {
@@ -210,6 +212,14 @@ function isHotel(p: Provider): boolean { return p.providerType === 'HOTEL' }
 
 function onlinePriceAvailable(p: Provider): boolean {
   return p.providerType === 'DOCTOR' && !!p.onlinePrice && parseFloat(p.onlinePrice) > 0
+}
+
+// Migration Plan v3: remote modalities (VIDEO/CHAT) are available exactly when
+// the online (remote) price is set — same availability signal as before,
+// extended to the new modality values. IN_PERSON is always available.
+function modalityAvailable(p: Provider, m: 'VIDEO' | 'CHAT' | 'IN_PERSON'): boolean {
+  if (m === 'IN_PERSON') return true
+  return onlinePriceAvailable(p)
 }
 
 // Group slots by date label (YYYY-MM-DD)
@@ -1056,13 +1066,18 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
   const [promoApplying, setPromoApplying] = useState(false)
 
   const hotel = provider ? isHotel(provider) : false
-  const showOnline = provider ? onlinePriceAvailable(provider) : false
+  // Remote modalities (VIDEO/CHAT) share the same availability signal the
+  // ONLINE option always had (doctor with an onlinePrice set).
+  const remoteAvailable = provider ? onlinePriceAvailable(provider) : false
 
-  // Fetch slots for non-hotel providers
+  // Fetch slots for non-hotel providers — FILTERED BY THE SELECTED MODALITY
+  // (server-side slotFilterForModality, added in the modality groundwork).
+  // This prevents claiming an incompatible slot (e.g. an IN_PERSON slot for a
+  // CHAT booking), which the booking API would now reject with 422.
   const slotsUrl = provider && !hotel
-    ? `/api/providers/slots?${slotIdParam(provider.providerType)}=${provider.id}`
+    ? `/api/providers/slots?${slotIdParam(provider.providerType)}=${provider.id}&visitType=${visitType}`
     : null
-  const { data: slotsData, loading: slotsLoading } = useApi<{ slots: Slot[] }>(slotsUrl, { deps: [provider?.id] })
+  const { data: slotsData, loading: slotsLoading } = useApi<{ slots: Slot[] }>(slotsUrl, { deps: [provider?.id, visitType] })
 
   if (!provider) return null
 
@@ -1070,7 +1085,9 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
   const grouped = groupSlotsByDate(slots)
 
   // Determine price + total
-  const unitPrice = visitType === 'ONLINE' && provider.onlinePrice ? provider.onlinePrice : provider.price
+  // Remote modalities (VIDEO/CHAT — and legacy ONLINE) use the online price;
+  // the booking API applies the same rule server-side.
+  const unitPrice = visitType !== 'IN_PERSON' && provider.onlinePrice ? provider.onlinePrice : provider.price
   const total = hotel ? mulDec(unitPrice, String(nights)) : unitPrice
 
   const canContinue = hotel
@@ -1179,37 +1196,58 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
             {!hotel && (
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t('booking.visitType')}</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => { setVisitType('IN_PERSON'); setSlotId(null) }}
                     className={cn(
-                      'flex items-center gap-2 rounded-xl border p-3 text-sm font-medium transition-colors',
+                      'flex flex-col items-center gap-2 rounded-xl border p-3 text-sm font-medium transition-colors',
                       visitType === 'IN_PERSON'
                         ? 'border-primary bg-primary/5 text-primary'
                         : 'border-divider bg-surface text-muted-foreground hover:bg-surface-secondary',
                     )}
                   >
                     <Icon name="person" size={18} fill />
-                    <span className="flex-1 text-start">{t('booking.inPerson')}</span>
+                    <span className="text-center text-xs leading-tight">{t('booking.inPerson')}</span>
                     <span className="text-xs font-normal text-muted-foreground tabular-nums">
                       {formatCurrency(provider.price, 'USD', locale)}
                     </span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => { if (showOnline) { setVisitType('ONLINE'); setSlotId(null) } }}
-                    disabled={!showOnline}
+                    title={!remoteAvailable ? t('booking.modalityUnavailable') : undefined}
+                    onClick={() => { if (remoteAvailable) { setVisitType('VIDEO'); setSlotId(null) } }}
+                    disabled={!remoteAvailable}
                     className={cn(
-                      'flex items-center gap-2 rounded-xl border p-3 text-sm font-medium transition-colors disabled:opacity-50',
-                      visitType === 'ONLINE'
+                      'flex flex-col items-center gap-2 rounded-xl border p-3 text-sm font-medium transition-colors disabled:opacity-50',
+                      visitType === 'VIDEO'
                         ? 'border-primary bg-primary/5 text-primary'
                         : 'border-divider bg-surface text-muted-foreground hover:bg-surface-secondary',
                     )}
                   >
                     <Icon name="videocam" size={18} fill />
-                    <span className="flex-1 text-start">{t('booking.online')}</span>
-                    {showOnline && (
+                    <span className="text-center text-xs leading-tight">{t('booking.video')}</span>
+                    {remoteAvailable && (
+                      <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                        {formatCurrency(provider.onlinePrice!, 'USD', locale)}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    title={!remoteAvailable ? t('booking.modalityUnavailable') : undefined}
+                    onClick={() => { if (remoteAvailable) { setVisitType('CHAT'); setSlotId(null) } }}
+                    disabled={!remoteAvailable}
+                    className={cn(
+                      'flex flex-col items-center gap-2 rounded-xl border p-3 text-sm font-medium transition-colors disabled:opacity-50',
+                      visitType === 'CHAT'
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-divider bg-surface text-muted-foreground hover:bg-surface-secondary',
+                    )}
+                  >
+                    <Icon name="chat" size={18} fill />
+                    <span className="text-center text-xs leading-tight">{t('booking.chat')}</span>
+                    {remoteAvailable && (
                       <span className="text-xs font-normal text-muted-foreground tabular-nums">
                         {formatCurrency(provider.onlinePrice!, 'USD', locale)}
                       </span>
@@ -1393,7 +1431,10 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{t('booking.visitType')}</span>
                   <span className="font-medium text-foreground">
-                    {visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}
+                    {visitType === 'VIDEO' ? t('booking.video')
+                      : visitType === 'CHAT' ? t('booking.chat')
+                      : visitType === 'ONLINE' ? t('booking.online')
+                      : t('booking.inPerson')}
                   </span>
                 </div>
               )}

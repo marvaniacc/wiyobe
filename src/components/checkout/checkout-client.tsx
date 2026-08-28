@@ -26,7 +26,8 @@ import { formatCurrency } from '@/lib/money'
 type CheckoutBooking = {
   id: string
   providerType: 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR'
-  visitType: 'IN_PERSON' | 'ONLINE'
+  // Migration Plan v3: full modality set (legacy ONLINE kept for historical rows)
+  visitType: 'IN_PERSON' | 'ONLINE' | 'VIDEO' | 'CHAT'
   startDate: string
   endDate?: string | null
   amount: string
@@ -118,7 +119,7 @@ export function CheckoutClient({ bookingId }: { bookingId: string }) {
             <div>
               <p className="font-medium">{providerName}</p>
               <p className="text-sm text-muted-foreground">
-                {booking.service?.name || `${booking.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}`}
+                {booking.service?.name || MODALITY_LABELS[booking.visitType]}
                 {booking.doctor?.specialty ? ` · ${booking.doctor.specialty}` : ''}
               </p>
             </div>
@@ -132,7 +133,7 @@ export function CheckoutClient({ bookingId }: { bookingId: string }) {
             {booking.endDate && (
               <Row label="Check-out" value={new Date(booking.endDate).toLocaleDateString(undefined, { dateStyle: 'medium' })} />
             )}
-            <Row label="Visit type" value={booking.visitType === 'ONLINE' ? 'Online' : 'In person'} />
+            <Row label="Visit type" value={MODALITY_LABELS[booking.visitType]} />
             <Row label="Booking reference" value={<code className="rounded bg-muted px-1.5 py-0.5 text-xs">{booking.id.slice(-8).toUpperCase()}</code>} />
           </div>
 
@@ -178,6 +179,15 @@ export function CheckoutClient({ bookingId }: { bookingId: string }) {
       </div>
     </div>
   )
+}
+
+// Canonical display labels per visitType. ONLINE is the historical alias of
+// VIDEO — legacy bookings keep their familiar "Online consultation" label.
+const MODALITY_LABELS: Record<string, string> = {
+  VIDEO: 'Video consultation',
+  CHAT: 'Chat consultation',
+  ONLINE: 'Online consultation',
+  IN_PERSON: 'In-person visit',
 }
 
 function Row({ label, value, accent }: { label: string; value: React.ReactNode; accent?: string }) {
