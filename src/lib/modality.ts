@@ -15,14 +15,14 @@
  * Do NOT add scattered `visitType === 'ONLINE' ? 'VIDEO' : ...` mappings
  * elsewhere. Import from this module instead.
  *
- * KNOWN GAP — DOCUMENTED TRANSITIONAL STATE (not a bug):
- * Service.modality validation (422 MODALITY_MISMATCH, bookings route L183-197)
- * is implemented and typechecked but NOT YET wired into the patient booking
- * flow — BookingDialog does not send serviceId, so patient-created bookings
- * never carry a Service and the svc.modality check cannot fire from the UI.
- * No current caller (patient/provider/admin UI, seeds, tests) sends
- * serviceId. Connecting Service selection to patient booking is a deliberate
- * future decision, tracked separately — do not "fix" this silently.
+ * KNOWN GAP — CLOSED (was: serviceId never sent from patient flow):
+ * BookingDialog now fetches the provider's Services, filters them through
+ * matchServicesForModality() (active + modality-matched only), auto-selects
+ * a single match, offers a sub-choice for multiple matches, and sends the
+ * selected serviceId to POST /api/bookings. Zero matches = legacy fallback
+ * (no serviceId, Doctor fee fields, NULL-modality permissive path intact
+ * per Decision 4). The 422 MODALITY_MISMATCH path is reachable from the UI
+ * in the no-service + incompatible-slot case.
  */
 
 export type CanonicalModality = 'VIDEO' | 'CHAT' | 'IN_PERSON'
@@ -83,4 +83,38 @@ export function slotFilterForModality(modality: CanonicalModality): string[] {
     case 'CHAT': return ['CHAT']
     case 'IN_PERSON': return ['IN_PERSON']
   }
+}
+
+/**
+ * Map a Service.modality value (ServiceModality: CHAT | VIDEO | IN_PERSON —
+ * never ONLINE) onto the canonical modality space. Identity for all current
+ * values; exists so UI/API code never compares ServiceModality to VisitType
+ * ad hoc and so a future ServiceModality member has exactly one place to map.
+ */
+export function canonicalizeServiceModality(
+  m: 'CHAT' | 'VIDEO' | 'IN_PERSON' | null | undefined,
+): CanonicalModality | null {
+  if (m === 'CHAT' || m === 'VIDEO' || m === 'IN_PERSON') return m
+  return null
+}
+
+/**
+ * Client-side matching of a doctor's classified Services against the
+ * modality a patient selected in the booking dialog. Implements the
+ * service-matching contract:
+ *   - inactive services NEVER match (an inactive Service must not be
+ *     auto-selected or offered as a sub-choice, independent of the
+ *     booking.create ownership/isActive re-check),
+ *   - unclassified (modality NULL — legacy) services NEVER match,
+ *   - matching is in canonical space (ServiceModality has no ONLINE).
+ * Zero matches = legacy fallback path (no serviceId sent).
+ */
+export function matchServicesForModality<T extends {
+  modality?: 'CHAT' | 'VIDEO' | 'IN_PERSON' | null
+  isActive?: boolean
+}>(services: readonly T[], modality: CanonicalModality): T[] {
+  return services.filter((s) =>
+    s.isActive === true &&
+    canonicalizeServiceModality(s.modality) === modality,
+  )
 }

@@ -142,7 +142,12 @@ async function main() {
   })
   console.log(`  AffiliateClick: ${affClick.id} (status: SIGNED_UP, referred: ${affClick.referredUserId === doctorUser.id ? 'YES' : 'NO'})`)
 
-  // Create a Service for this doctor
+  // Create a Service for this doctor.
+  // Migration Plan v3: the Service is CLASSIFIED (modality: 'VIDEO') so the
+  // patient booking flow auto-selects it for the VIDEO tile. BookingDialog
+  // matches Service.modality against the selected tile, and booking.create
+  // charges Service.price ($100 — equals the onlineFee here, so both booking
+  // cases below keep their expected $100 math).
   await db.service.deleteMany({ where: { doctorId: doctor.id } })
   const service = await db.service.create({
     data: {
@@ -153,10 +158,11 @@ async function main() {
       durationMinutes: 30,
       providerType: 'DOCTOR',
       doctorId: doctor.id,
+      modality: 'VIDEO',
       isActive: true,
     },
   })
-  console.log(`  Service: ${service.name} ($${service.price})`)
+  console.log(`  Service: ${service.name} ($${service.price}, modality: VIDEO)`)
 
   // Create Slots
   await db.slot.deleteMany({ where: { doctorId: doctor.id } })

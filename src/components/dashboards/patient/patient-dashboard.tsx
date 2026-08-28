@@ -13,7 +13,7 @@ import {
   formatCurrency, formatDate, formatDateTime, relativeTime, mulDec,
 } from '@/lib/money'
 import { LOCALES, LOCALE_META, type Locale } from '@/lib/i18n'
-import { tryNormalizeVisitType } from '@/lib/modality'
+import { tryNormalizeVisitType, matchServicesForModality } from '@/lib/modality'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,6 +86,18 @@ interface Slot {
   endTime: string
   visitType: VisitType
   isBooked: boolean
+}
+
+/** Classified Service shape needed for booking-time service selection. */
+interface ProviderService {
+  id: string
+  name: string
+  description?: string
+  price: string
+  currency?: string
+  durationMinutes?: number | null
+  modality: 'CHAT' | 'VIDEO' | 'IN_PERSON' | null
+  isActive: boolean
 }
 
 interface BookingProvider {
@@ -1076,11 +1088,37 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
   const [promoInput, setPromoInput] = useState('')
   const [promoResult, setPromoResult] = useState<{ valid: boolean; code: string; discountAmount: string; newTotal: string; message?: string; capped?: boolean } | null>(null)
   const [promoApplying, setPromoApplying] = useState(false)
+  // Classified-Service selection state (single = auto-selected, multi = sub-choice)
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
 
   const hotel = provider ? isHotel(provider) : false
   // Remote modalities (VIDEO/CHAT) share the same availability signal the
   // ONLINE option always had (doctor with an onlinePrice set).
   const remoteAvailable = provider ? onlinePriceAvailable(provider) : false
+
+  // Fetch the provider's Services so a classified Service (modality set) can
+  // be attached to the booking. Only active, modality-matched services ever
+  // enter the match set (matchServicesForModality) — inactive services can
+  // never be auto-selected or offered, independent of the booking.create
+  // re-check. Zero matches = legacy fallback (no serviceId sent).
+  const servicesUrl = provider && !hotel
+    ? `/api/providers/detail?id=${provider.id}&type=${provider.providerType}`
+    : null
+  const { data: servicesData } = useApi<{ provider: { services?: ProviderService[] } }>(servicesUrl, { deps: [provider?.id] })
+  const providerServices: ProviderService[] = (servicesData?.provider as any)?.services || []
+  const matchedServices = useMemo(
+    () => (hotel ? [] : matchServicesForModality(providerServices, tryNormalizeVisitType(visitType) || 'IN_PERSON')),
+    [hotel, providerServices, visitType],
+  )
+  // Auto-select when exactly one classified Service matches the modality;
+  // clear the selection whenever the modality changes or matches disappear.
+  useEffect(() => {
+    setSelectedServiceId((prev) => {
+      if (matchedServices.length === 1) return matchedServices[0].id
+      if (prev && matchedServices.some((s) => s.id === prev)) return prev
+      return null
+    })
+  }, [matchedServices])
 
   // Fetch slots for non-hotel providers — FILTERED BY THE SELECTED MODALITY
   // (server-side slotFilterForModality, added in the modality groundwork).
@@ -1097,10 +1135,29 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
   const grouped = groupSlotsByDate(slots)
 
   // Determine price + total
-  // Remote modalities (VIDEO/CHAT — and legacy ONLINE) use the online price;
-  // the booking API applies the same rule server-side.
-  const unitPrice = visitType !== 'IN_PERSON' && provider.onlinePrice ? provider.onlinePrice : provider.price
+  // With a classified Service selected, the tile/summary price comes from
+  // Service.price — the exact value the server charges (booking.create sets
+  // amount = svc.price). Without one, legacy Doctor fee fields apply
+  // (onlineFee for remote modalities, consultationFee for IN_PERSON) — the
+  // server applies the same rule, so displayed == charged in both paths.
+  const selectedService = matchedServices.find((s) => s.id === selectedServiceId) || null
+  const unitPrice = selectedService
+    ? selectedService.price
+    : visitType !== 'IN_PERSON' && provider.onlinePrice ? provider.onlinePrice : provider.price
   const total = hotel ? mulDec(unitPrice, String(nights)) : unitPrice
+
+  // Tile prices: the price each modality tile shows BEFORE selection. When a
+  // single active classified Service matches the selected modality, its
+  // price is authoritative (it is auto-selected and charged); otherwise the
+  // legacy Doctor fee field. Multi-match tiles keep the legacy price — the
+  // precise per-service price appears in the sub-choice list under the tiles.
+  const singleMatchPrice =
+    visitType === 'IN_PERSON' || visitType === 'VIDEO' || visitType === 'CHAT'
+      ? (matchedServices.length === 1 ? matchedServices[0].price : null)
+      : null
+  const inPersonServicePrice = visitType === 'IN_PERSON' ? singleMatchPrice : null
+  const videoServicePrice = visitType === 'VIDEO' ? singleMatchPrice : null
+  const chatServicePrice = visitType === 'CHAT' ? singleMatchPrice : null
 
   const canContinue = hotel
     ? !!startDate && nights > 0
@@ -1117,6 +1174,7 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
     setPromoInput('')
     setPromoResult(null)
     setPromoApplying(false)
+    setSelectedServiceId(null)
   }
 
   // The effective total the patient pays (with promo discount applied if valid).
@@ -1171,6 +1229,10 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
     apiPost<{ booking: { id: string }; checkoutUrl?: string }>('/api/bookings', {
       providerType: provider.providerType,
       providerId: provider.id,
+      // Classified Service selected in the dialog (auto-selected single match
+      // or patient sub-choice). Omitted entirely on the legacy fallback path
+      // (zero matching classified services) — server keeps Doctor-fee pricing.
+      serviceId: selectedService?.id || undefined,
       slotId: hotel ? undefined : slotId || undefined,
       visitType: hotel ? 'IN_PERSON' : visitType,
       startDate: bodyStartDate,
@@ -1222,7 +1284,7 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
                     <Icon name="person" size={18} fill />
                     <span className="text-center text-xs leading-tight">{t('booking.inPerson')}</span>
                     <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                      {formatCurrency(provider.price, 'USD', locale)}
+                      {formatCurrency(inPersonServicePrice ?? provider.price, 'USD', locale)}
                     </span>
                   </button>
                   <button
@@ -1241,7 +1303,7 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
                     <span className="text-center text-xs leading-tight">{t('booking.video')}</span>
                     {remoteAvailable && (
                       <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                        {formatCurrency(provider.onlinePrice!, 'USD', locale)}
+                        {formatCurrency(videoServicePrice ?? provider.onlinePrice!, 'USD', locale)}
                       </span>
                     )}
                   </button>
@@ -1261,11 +1323,40 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
                     <span className="text-center text-xs leading-tight">{t('booking.chat')}</span>
                     {remoteAvailable && (
                       <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                        {formatCurrency(provider.onlinePrice!, 'USD', locale)}
+                        {formatCurrency(chatServicePrice ?? provider.onlinePrice!, 'USD', locale)}
                       </span>
                     )}
                   </button>
                 </div>
+
+                {/* Multiple classified Services match this modality: sub-choice
+                    (name + price). Exactly-one is auto-selected silently; zero
+                    falls back to legacy pricing with no UI here. */}
+                {matchedServices.length > 1 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">{t('booking.selectService')}</Label>
+                    <div className="space-y-1.5">
+                      {matchedServices.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setSelectedServiceId(s.id)}
+                          className={cn(
+                            'flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors',
+                            selectedServiceId === s.id
+                              ? 'border-primary bg-primary/5 text-primary'
+                              : 'border-divider bg-surface text-foreground hover:bg-surface-secondary',
+                          )}
+                        >
+                          <span className="min-w-0 truncate text-start font-medium">{s.name}</span>
+                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                            {formatCurrency(s.price, s.currency || 'USD', locale)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1364,6 +1455,14 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
               </div>
               <Separator />
               <div className="space-y-2 text-sm">
+                {/* When a classified Service is selected, show its name — the
+                    same Service the server will price the booking against. */}
+                {selectedService && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{t('booking.selectedService')}</span>
+                    <span className="font-medium text-foreground">{selectedService.name}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{t('common.price')}</span>
                   <span className="font-medium text-foreground tabular-nums">
