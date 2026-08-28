@@ -14,6 +14,15 @@
  *
  * Do NOT add scattered `visitType === 'ONLINE' ? 'VIDEO' : ...` mappings
  * elsewhere. Import from this module instead.
+ *
+ * KNOWN GAP — DOCUMENTED TRANSITIONAL STATE (not a bug):
+ * Service.modality validation (422 MODALITY_MISMATCH, bookings route L183-197)
+ * is implemented and typechecked but NOT YET wired into the patient booking
+ * flow — BookingDialog does not send serviceId, so patient-created bookings
+ * never carry a Service and the svc.modality check cannot fire from the UI.
+ * No current caller (patient/provider/admin UI, seeds, tests) sends
+ * serviceId. Connecting Service selection to patient booking is a deliberate
+ * future decision, tracked separately — do not "fix" this silently.
  */
 
 export type CanonicalModality = 'VIDEO' | 'CHAT' | 'IN_PERSON'
