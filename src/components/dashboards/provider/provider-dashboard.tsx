@@ -8,6 +8,7 @@ import { StarRating } from '@/components/shared/star-rating'
 import { AvatarUpload } from '@/components/shared/avatar-upload'
 import { MessagesSection } from '@/components/chat/messages-section'
 import { downloadICal } from '@/lib/ical'
+import { tryNormalizeVisitType } from '@/lib/modality'
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -180,14 +181,18 @@ function StatusBadge({ status }: { status: string }) {
 
 function VisitTypePill({ visitType }: { visitType: string }) {
   const { t } = useT()
-  const isOnline = visitType === 'ONLINE'
+  // Canonical modality space: VIDEO + historical ONLINE -> online pill;
+  // CHAT -> chat pill; IN_PERSON -> in-person pill.
+  const m = tryNormalizeVisitType(visitType)
+  const isOnline = m === 'VIDEO'
+  const isChat = m === 'CHAT'
   return (
     <span className={cn(
       'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
-      isOnline ? 'bg-primary/10 text-primary' : 'bg-surface-secondary text-muted-foreground',
+      isOnline || isChat ? 'bg-primary/10 text-primary' : 'bg-surface-secondary text-muted-foreground',
     )}>
-      <Icon name={isOnline ? 'videocam' : 'location_on'} size={12} fill />
-      {isOnline ? t('common.onlineVisit') : t('common.inPersonVisit')}
+      <Icon name={isChat ? 'chat' : isOnline ? 'videocam' : 'location_on'} size={12} fill />
+      {isChat ? t('booking.chat') : isOnline ? t('common.onlineVisit') : t('common.inPersonVisit')}
     </span>
   )
 }
@@ -681,7 +686,9 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
   function handleAddToCalendar() {
     const startTime = new Date(booking.startDate)
     const endTime = booking.endDate ? new Date(booking.endDate) : new Date(startTime.getTime() + 60 * 60 * 1000)
-    const visitType = booking.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'
+    // Canonical iCal label (VIDEO + legacy ONLINE -> "Online consultation")
+    const m = tryNormalizeVisitType(booking.visitType)
+    const visitType = m === 'IN_PERSON' ? 'In-person visit' : m === 'CHAT' ? 'Chat consultation' : 'Online consultation'
     downloadICal(`wishubest-booking-${booking.id.slice(-8)}`, {
       uid: booking.id,
       title: `${visitType} with ${booking.patient?.name || 'Patient'}`,
@@ -695,7 +702,7 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
 
   const isConfirmed = booking.status === 'CONFIRMED'
   const isPending = booking.status === 'PENDING'
-  const isOnline = booking.visitType === 'ONLINE'
+  const isOnline = tryNormalizeVisitType(booking.visitType) === 'VIDEO'
 
   return (
     <TableRow>
@@ -1460,7 +1467,7 @@ function SlotChip({ slot, t, locale, onDeleted }: { slot: Slot; t: (k: string, f
           ? 'border-success/30 bg-success/5 text-success'
           : 'border-divider bg-surface text-foreground hover:border-error/30 hover:bg-error/5'
       }`}>
-        <Icon name={slot.visitType === 'ONLINE' ? 'videocam' : 'person'} size={14} />
+        <Icon name={(() => { const m = tryNormalizeVisitType(slot.visitType); return m === 'VIDEO' ? 'videocam' : m === 'CHAT' ? 'chat' : 'person' })()} size={14} />
         <span className="font-medium tabular-nums">{timeFmt.format(new Date(slot.startTime))}</span>
         {slot.isBooked ? (
           <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold text-success">{t('availability.booked')}</span>

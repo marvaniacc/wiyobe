@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError } from '@/lib/api'
+import { tryNormalizeVisitType } from '@/lib/modality'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,9 +61,10 @@ export async function GET() {
       })
     }
 
-    // Visit type breakdown
-    const inPersonCount = bookings.filter(b => b.visitType === 'IN_PERSON').length
-    const onlineCount = bookings.filter(b => b.visitType === 'ONLINE').length
+    // Visit type breakdown — in canonical modality space: VIDEO + historical
+    // ONLINE count together as "online/remote" (no row is rewritten).
+    const inPersonCount = bookings.filter(b => tryNormalizeVisitType(b.visitType) === 'IN_PERSON').length
+    const onlineCount = bookings.filter(b => tryNormalizeVisitType(b.visitType) === 'VIDEO').length
 
     // Status breakdown
     const statusBreakdown = {

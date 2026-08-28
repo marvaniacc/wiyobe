@@ -9,6 +9,7 @@ import { MediaPicker } from '@/components/shared/media-picker'
 import { TicketsSection } from '@/components/shared/tickets-section'
 import { useApp } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
+import { tryNormalizeVisitType } from '@/lib/modality'
 import { toast } from 'sonner'
 import { formatCurrency, formatDate, formatDateTime, relativeTime } from '@/lib/money'
 import { Button } from '@/components/ui/button'
@@ -5180,7 +5181,7 @@ function AdminBookingsSection() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('booking.visitType')}</span>
-                <span>{detail.visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}</span>
+                <span>{(() => { const m = tryNormalizeVisitType(detail.visitType); return m === 'VIDEO' ? t('booking.online') : m === 'CHAT' ? t('booking.chat') : t('booking.inPerson') })()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('booking.provider')}</span>

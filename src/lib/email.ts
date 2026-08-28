@@ -1,4 +1,15 @@
 import nodemailer from 'nodemailer'
+import { tryNormalizeVisitType } from '@/lib/modality'
+
+// Canonical modality label for emails (legacy ONLINE == VIDEO). English-only
+// by design: transactional emails are currently locale-independent.
+function modalityLabel(visitType: string): string {
+  const m = tryNormalizeVisitType(visitType)
+  if (m === 'VIDEO') return 'online consultation'   // historical ONLINE rows keep the familiar label
+  if (m === 'CHAT') return 'chat consultation'
+  if (m === 'IN_PERSON') return 'in-person visit'
+  return 'consultation'
+}
 
 let transporter: nodemailer.Transporter | null = null
 
@@ -108,11 +119,11 @@ export function bookingConfirmationEmail(patientName: string, providerName: stri
         <div style="background: #F8F9FA; border-radius: 16px; padding: 24px; border: 1px solid #DADCE0;">
           <h2 style="color: #202124; font-size: 18px; margin: 0 0 12px;">✅ Booking Confirmed!</h2>
           <p style="color: #5F6368; font-size: 14px;">Hi ${patientName},</p>
-          <p style="color: #5F6368; font-size: 14px;">Your ${visitType === 'ONLINE' ? 'online consultation' : 'in-person visit'} with <strong>${providerName}</strong> has been confirmed.</p>
+          <p style="color: #5F6368; font-size: 14px;">Your ${modalityLabel(visitType)} with <strong>${providerName}</strong> has been confirmed.</p>
           <table style="width: 100%; margin-top: 16px; font-size: 14px;">
             <tr><td style="color: #5F6368; padding: 8px 0;">Provider</td><td style="color: #202124; font-weight: 500;">${providerName}</td></tr>
             <tr><td style="color: #5F6368; padding: 8px 0;">Date</td><td style="color: #202124; font-weight: 500;">${date}</td></tr>
-            <tr><td style="color: #5F6368; padding: 8px 0;">Type</td><td style="color: #202124; font-weight: 500;">${visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'}</td></tr>
+            <tr><td style="color: #5F6368; padding: 8px 0;">Type</td><td style="color: #202124; font-weight: 500;">${modalityLabel(visitType).replace(/^\./, (c) => c.toUpperCase())}</td></tr>
             <tr><td style="color: #5F6368; padding: 8px 0;">Amount</td><td style="color: #202124; font-weight: 500;">$${amount}</td></tr>
           </table>
           <p style="color: #5F6368; font-size: 13px; margin-top: 16px;">You can view your booking details and manage your appointment in your Wishubest dashboard.</p>

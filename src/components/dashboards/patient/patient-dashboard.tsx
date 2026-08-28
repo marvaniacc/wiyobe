@@ -13,6 +13,7 @@ import {
   formatCurrency, formatDate, formatDateTime, relativeTime, mulDec,
 } from '@/lib/money'
 import { LOCALES, LOCALE_META, type Locale } from '@/lib/i18n'
+import { tryNormalizeVisitType } from '@/lib/modality'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -222,6 +223,17 @@ function modalityAvailable(p: Provider, m: 'VIDEO' | 'CHAT' | 'IN_PERSON'): bool
   return onlinePriceAvailable(p)
 }
 
+// Canonical display bits for stored visitType values (legacy ONLINE == VIDEO).
+function modalityIcon(v: string): string {
+  const m = tryNormalizeVisitType(v)
+  return m === 'VIDEO' ? 'videocam' : m === 'CHAT' ? 'chat' : 'person'
+}
+
+function modalityTKey(v: string): string {
+  const m = tryNormalizeVisitType(v)
+  return m === 'VIDEO' ? 'booking.online' : m === 'CHAT' ? 'booking.chat' : 'booking.inPerson'
+}
+
 // Group slots by date label (YYYY-MM-DD)
 function groupSlotsByDate(slots: Slot[]): { date: string; items: Slot[] }[] {
   const map = new Map<string, Slot[]>()
@@ -427,7 +439,7 @@ function OverviewSection() {
                           <div className="flex items-center gap-2">
                             <span className="truncate text-sm font-medium text-foreground">{name || '—'}</span>
                             <Icon
-                              name={b.visitType === 'ONLINE' ? 'videocam' : 'person'}
+                              name={modalityIcon(b.visitType)}
                               size={13}
                               className="text-muted-foreground"
                             />
@@ -1781,8 +1793,8 @@ function BookingsSection() {
                           </TableCell>
                           <TableCell>
                             <div className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                              <Icon name={b.visitType === 'ONLINE' ? 'videocam' : 'person'} size={14} />
-                              {b.visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}
+                              <Icon name={modalityIcon(b.visitType)} size={14} />
+                              {t(modalityTKey(b.visitType))}
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{formatDateTime(b.startDate, locale)}</TableCell>
@@ -1824,7 +1836,7 @@ function BookingsSection() {
                             </Badge>
                           </div>
                           <div className="mt-0.5 text-xs text-muted-foreground">
-                            {t(PROVIDER_TYPE_LABEL_KEY[b.providerType])} · {b.visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}
+                            {t(PROVIDER_TYPE_LABEL_KEY[b.providerType])} · {t(modalityTKey(b.visitType))}
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(b.startDate, locale)}</div>
                           <div className="mt-2 flex items-center justify-between gap-2">
@@ -1899,7 +1911,7 @@ function BookingActions({ booking, onCancel, onReview, onReschedule }: {
   if (booking.status === 'CONFIRMED') {
     return (
       <div className="flex items-center justify-end gap-1.5">
-        {booking.visitType === 'ONLINE' && booking.videoSessionUrl && (
+        {tryNormalizeVisitType(booking.visitType) === 'VIDEO' && booking.videoSessionUrl && (
           <Button asChild size="sm" variant="success">
             <a href={booking.videoSessionUrl} target="_blank" rel="noopener noreferrer">
               <Icon name="videocam" size={14} />
@@ -2687,7 +2699,7 @@ function RescheduleDialog({ booking, open, onOpenChange, onDone }: {
                             isSel ? 'border-primary bg-primary text-primary-foreground' : 'border-divider bg-surface text-foreground hover:border-primary/40'
                           )}
                         >
-                          <Icon name={s.visitType === 'ONLINE' ? 'videocam' : 'person'} size={12} />
+                          <Icon name={modalityIcon(s.visitType)} size={12} />
                           {time}
                         </button>
                       )
@@ -2715,7 +2727,9 @@ function handleAddToCalendar(booking: any) {
   const providerName = booking.doctor?.user?.name || booking.hospital?.name || booking.hotel?.name || booking.translator?.user?.name || 'Provider'
   const startTime = new Date(booking.startDate)
   const endTime = booking.endDate ? new Date(booking.endDate) : new Date(startTime.getTime() + 60 * 60 * 1000) // default 1 hour
-  const visitType = booking.visitType === 'ONLINE' ? 'Online consultation' : 'In-person visit'
+  const visitType = tryNormalizeVisitType(booking.visitType) === 'IN_PERSON' ? 'In-person visit'
+    : tryNormalizeVisitType(booking.visitType) === 'CHAT' ? 'Chat consultation'
+    : 'Online consultation' // VIDEO and legacy ONLINE both display as "Online consultation"
   const location = booking.videoSessionUrl || (booking.doctor?.city || booking.hospital?.city || '') || 'TBD'
 
   downloadICal(`wishubest-booking-${booking.id.slice(-8)}`, {
@@ -2767,7 +2781,7 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
             {t('booking.detailTitle')}
           </DialogTitle>
           <DialogDescription>
-            {providerName} · {booking.visitType === 'ONLINE' ? t('booking.online') : t('booking.inPerson')}
+            {providerName} · {t(modalityTKey(booking.visitType))}
           </DialogDescription>
         </DialogHeader>
 
@@ -2832,7 +2846,7 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
           </div>
 
           {/* Video link for online visits */}
-          {booking.visitType === 'ONLINE' && booking.videoSessionUrl && booking.status === 'CONFIRMED' && (
+          {tryNormalizeVisitType(booking.visitType) === 'VIDEO' && booking.videoSessionUrl && booking.status === 'CONFIRMED' && (
             <Button asChild variant="success" className="w-full gap-2">
               <a href={booking.videoSessionUrl} target="_blank" rel="noopener noreferrer">
                 <Icon name="videocam" size={18} />

@@ -3,6 +3,16 @@ import { getSession } from '@/lib/auth'
 import { error, handleError } from '@/lib/api'
 import { resolveProviderUser } from '@/lib/ledger'
 import { formatCurrency, formatDate } from '@/lib/money'
+import { tryNormalizeVisitType } from '@/lib/modality'
+
+// Canonical invoice label (legacy ONLINE == VIDEO).
+function modalityLabel(visitType: string): string {
+  const m = tryNormalizeVisitType(visitType)
+  if (m === 'VIDEO') return 'Online Consultation'
+  if (m === 'CHAT') return 'Chat Consultation'
+  if (m === 'IN_PERSON') return 'In-person Visit'
+  return 'Consultation'
+}
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib'
 
 export const dynamic = 'force-dynamic'
@@ -67,7 +77,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ bookingI
       booking.translator?.user?.phone ||
       'N/A'
 
-    const serviceName = booking.service?.name || (booking.visitType === 'ONLINE' ? 'Online Consultation' : 'In-person Visit')
+    const serviceName = booking.service?.name || modalityLabel(booking.visitType)
     const invoiceNumber = `INV-${booking.id.slice(-8).toUpperCase()}`
     const invoiceDate = new Date().toISOString().split('T')[0]
     const bookingDate = formatDate(booking.startDate, 'en')
@@ -171,7 +181,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ bookingI
     const detailLines: [string, string][] = [
       ['Booking ID', booking.id],
       ['Service', serviceName],
-      ['Visit Type', booking.visitType === 'ONLINE' ? 'Online Consultation' : 'In-person Visit'],
+      ['Visit Type', modalityLabel(booking.visitType)],
       ['Appointment Date', bookingDate],
       ['Booking Status', booking.status],
       ['Payment Status', paymentStatus],
