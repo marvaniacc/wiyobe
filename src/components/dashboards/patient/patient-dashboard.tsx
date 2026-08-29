@@ -1159,9 +1159,16 @@ function BookingDialog({ provider, open, onOpenChange, onBooked }: {
   const videoServicePrice = visitType === 'VIDEO' ? singleMatchPrice : null
   const chatServicePrice = visitType === 'CHAT' ? singleMatchPrice : null
 
+  // Multi-match requires an explicit service choice before continuing — the
+  // screen price (Service.price of the picked service) must always equal the
+  // charged price; skipping past an ambiguous list would silently fall back
+  // to a legacy fee the patient never saw displayed. Zero-match (legacy) and
+  // single-match (auto-select) paths are unaffected.
+  const serviceChoicePending = matchedServices.length > 1 && !selectedServiceId
+
   const canContinue = hotel
     ? !!startDate && nights > 0
-    : !!slotId
+    : !!slotId && !serviceChoicePending
 
   function reset() {
     setStep(1)

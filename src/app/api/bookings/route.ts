@@ -197,7 +197,26 @@ export async function POST(req: Request) {
         }
       }
     } else if (body.slotId) {
-      // No explicit service: still prevent cross-modality slot consumption,
+      // No explicit service — defense-in-depth for the UI's "multi-match
+      // requires an explicit choice" rule: when the provider has MORE THAN
+      // ONE active classified Service for the requested modality, refusing
+      // to guess which one the patient meant (a silent legacy-fee fallback
+      // could charge a price the patient never saw displayed). Exactly one
+      // match is fine here because the UI auto-selects it; zero matches is
+      // the legacy path (Decision 4) and stays permissive. Direct API calls
+      // cannot bypass the client-side disabled Continue button.
+      const ownershipColumn =
+        pt === 'DOCTOR' ? { doctorId: body.providerId }
+        : pt === 'HOSPITAL' ? { hospitalId: body.providerId }
+        : pt === 'HOTEL' ? { hotelId: body.providerId }
+        : { translatorId: body.providerId }
+      const classifiedCount = await db.service.count({
+        where: { providerType: pt, isActive: true, modality: modality, ...ownershipColumn },
+      })
+      if (classifiedCount > 1) {
+        return error(400, 'SERVICE_CHOICE_REQUIRED', `${classifiedCount} active ${modality} services exist for this provider — serviceId is required`)
+      }
+      // Still prevent cross-modality slot consumption,
       // e.g. claiming an IN_PERSON-only slot for a VIDEO request. Compare in
       // canonical space so historical ONLINE slots satisfy VIDEO requests.
       const slotRow = await db.slot.findUnique({ where: { id: body.slotId }, select: { visitType: true } })

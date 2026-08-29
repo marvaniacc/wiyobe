@@ -150,6 +150,11 @@ async function main() {
     data: { doctorId: doctorIds.d1, startTime: new Date(Date.now() + 7 * 86400_000), endTime: new Date(Date.now() + 7 * 86400_000 + 1800_000), visitType: 'VIDEO', isBooked: false },
   })
   const s5SlotId = s5Slot.id
+  // Dedicated slot for S6 — S2 books D2's main slot, so S6 gets its own.
+  const s6Slot = await db.slot.create({
+    data: { doctorId: doctorIds.d2, startTime: new Date(Date.now() + 7 * 86400_000), endTime: new Date(Date.now() + 7 * 86400_000 + 1800_000), visitType: 'VIDEO', isBooked: false },
+  })
+  const s6SlotId = s6Slot.id
 
   const patient = await login(`e2emodality-patient-${stamp}@test.local`, 'test1234')
 
@@ -225,6 +230,20 @@ async function main() {
     check('error == MODALITY_MISMATCH', r.json?.error === 'MODALITY_MISMATCH', `error=${r.json?.error}`)
     const slotAfter = await db.slot.findUnique({ where: { id: s5SlotId }, select: { isBooked: true } })
     check('slot NOT consumed on mismatch', slotAfter?.isBooked === false)
+  }
+
+  // =========================================================================
+  console.log('━━━ S6 (defense-in-depth): multi-match + NO serviceId via direct API → 400')
+  {
+    // D2 has TWO active VIDEO services. The UI disables Continue until the
+    // patient picks one; a direct API call with no serviceId must NOT
+    // silently fall back to the legacy fee — it gets a clear 400 instead.
+    // (Zero-match D3 stays permissive, and single-match D1 auto-selects.)
+    const r = await api(patient, 'POST', '/api/bookings', uiBody(doctorIds.d2, s6SlotId, 'VIDEO'))
+    check('HTTP 400 (not silent legacy fallback)', r.status === 400, `got ${r.status} ${JSON.stringify(r.json)}`)
+    check('error == SERVICE_CHOICE_REQUIRED', r.json?.error === 'SERVICE_CHOICE_REQUIRED', `error=${r.json?.error}`)
+    const slotAfter = await db.slot.findUnique({ where: { id: s6SlotId }, select: { isBooked: true } })
+    check('slot NOT consumed', slotAfter?.isBooked === false)
   }
 
   // =========================================================================
