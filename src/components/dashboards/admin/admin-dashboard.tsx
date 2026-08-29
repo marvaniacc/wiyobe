@@ -1902,6 +1902,230 @@ function ReportsSection() {
 }
 
 // ============================================================================
+// Section: Services — admin Service-modality classification workflow
+// (Migration Plan v3, Decision 4 follow-up: humans classify each Service;
+//  no batch inference. One-way: set only, never back to NULL.)
+// ============================================================================
+
+type AdminService = {
+  id: string
+  name: string
+  price: string
+  currency: string
+  isActive: boolean
+  providerType: 'DOCTOR' | 'HOSPITAL' | 'HOTEL' | 'TRANSLATOR'
+  modality: 'CHAT' | 'VIDEO' | 'IN_PERSON' | null
+  durationMinutes: number | null
+  doctor?: { user: { name: string | null } } | null
+  hospital?: { user: { name: string | null } } | null
+  hotel?: { user: { name: string | null } } | null
+  translator?: { user: { name: string | null } } | null
+}
+
+const SERVICE_MODALITY_OPTIONS = ['VIDEO', 'CHAT', 'IN_PERSON'] as const
+
+function serviceOwnerName(s: AdminService): string {
+  return s.doctor?.user?.name || s.hospital?.user?.name || s.hotel?.user?.name || s.translator?.user?.name || '—'
+}
+
+function ServicesSection() {
+  const { t } = useT()
+  const [modalityFilter, setModalityFilter] = React.useState('UNCLASSIFIED')
+  const [sortBy, setSortBy] = React.useState('createdAt')
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc')
+  const [classifying, setClassifying] = React.useState<AdminService | null>(null)
+
+  const listUrl = `/api/admin/services?modality=${modalityFilter}&sortBy=${sortBy}&sortDir=${sortDir}`
+  const { data, loading, error, refetch } = useApi<{ services: AdminService[] }>(listUrl, { deps: [modalityFilter, sortBy, sortDir] })
+
+  const services = data?.services || []
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">{t('admin.servicesTitle')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('admin.servicesDescription')}</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={modalityFilter} onValueChange={setModalityFilter}>
+          <SelectTrigger className="w-52">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="UNCLASSIFIED">{t('admin.servicesFilterUnclassified')}</SelectItem>
+            <SelectItem value="VIDEO">{t('booking.video')}</SelectItem>
+            <SelectItem value="CHAT">{t('booking.chat')}</SelectItem>
+            <SelectItem value="IN_PERSON">{t('booking.inPerson')}</SelectItem>
+            <SelectItem value="ALL">{t('admin.servicesFilterAll')}</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-sm text-muted-foreground">{services.length} {t('admin.servicesCount')}</span>
+      </div>
+
+      {loading ? (
+        <Card><CardContent className="p-5 space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={`svc-skel-${i}`} className="h-10 w-full" />)}</CardContent></Card>
+      ) : error ? (
+        <Alert>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="cursor-pointer" onClick={() => toggleSort('name')}>
+                    {t('provider.serviceName')}{sortBy === 'name' && (sortDir === 'asc' ? ' ↑' : ' ↓')}
+                  </TableHead>
+                  <TableHead>{t('admin.servicesDoctor')}</TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => toggleSort('modality')}>
+                    {t('provider.serviceModality')}{sortBy === 'modality' && (sortDir === 'asc' ? ' ↑' : ' ↓')}
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => toggleSort('price')}>
+                    {t('provider.servicePrice')}{sortBy === 'price' && (sortDir === 'asc' ? ' ↑' : ' ↓')}
+                  </TableHead>
+                  <TableHead>{t('admin.servicesActive')}</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {services.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      {t('admin.servicesEmpty')}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  services.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium text-foreground">{s.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{serviceOwnerName(s)}</TableCell>
+                      <TableCell>
+                        {s.modality ? (
+                          <Badge variant="secondary">{t(`booking.${s.modality === 'VIDEO' ? 'video' : s.modality === 'CHAT' ? 'chat' : 'inPerson'}`)}</Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-amber-500/40 text-amber-600">{t('admin.servicesUnclassified')}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{formatCurrency(s.price, s.currency, t('common.locale') || 'en')}</TableCell>
+                      <TableCell>
+                        <Badge variant={s.isActive ? 'secondary' : 'outline'}>{s.isActive ? t('admin.servicesActiveTrue') : t('admin.servicesActiveFalse')}</Badge>
+                      </TableCell>
+                      <TableCell className="text-end">
+                        <Button size="sm" variant={s.modality ? 'outline' : 'default'} onClick={() => setClassifying(s)}>
+                          <Icon name="category" size={14} />
+                          {s.modality ? t('admin.servicesReclassify') : t('admin.servicesClassify')}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <ClassifyServiceDialog
+        service={classifying}
+        open={!!classifying}
+        onOpenChange={(o) => { if (!o) setClassifying(null) }}
+        onSaved={() => { setClassifying(null); refetch() }}
+      />
+    </div>
+  )
+}
+
+/**
+ * Classification dialog — mirrors the provider ServiceFormDialog modality
+ * control (no silent assignment, no NULL option). Once saved with a real
+ * value the service is classified; the API offers no way back to NULL.
+ */
+function ClassifyServiceDialog({ service, open, onOpenChange, onSaved }: {
+  service: AdminService | null
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSaved: () => void
+}) {
+  const { t } = useT()
+  const [modality, setModality] = React.useState<string>(service?.modality || '')
+  const [busy, setBusy] = React.useState(false)
+
+  React.useEffect(() => {
+    if (open) setModality(service?.modality || '')
+  }, [open, service])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!service || !modality) return
+    setBusy(true)
+    try {
+      await apiPatch('/api/admin/services', { id: service.id, modality })
+      toast.success(t('admin.servicesClassified'))
+      onSaved()
+    } catch (err: any) {
+      toast.error(err.message || t('common.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!service) return null
+  const changed = modality && modality !== (service.modality || '')
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{service.modality ? t('admin.servicesReclassify') : t('admin.servicesClassify')}</DialogTitle>
+          <DialogDescription>{service.name} · {serviceOwnerName(service)}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cls-modality">{t('provider.serviceModality')}</Label>
+            <Select value={modality || undefined} onValueChange={(v) => setModality(v)}>
+              <SelectTrigger id="cls-modality">
+                <SelectValue placeholder={t('admin.servicesPickModality')} />
+              </SelectTrigger>
+              <SelectContent>
+                {service.modality && (
+                  <SelectItem value={service.modality} disabled>
+                    {t(`booking.${service.modality === 'VIDEO' ? 'video' : service.modality === 'CHAT' ? 'chat' : 'inPerson'}`)} ({t('admin.servicesCurrent')})
+                  </SelectItem>
+                )}
+                {SERVICE_MODALITY_OPTIONS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {t(`booking.${m === 'VIDEO' ? 'video' : m === 'CHAT' ? 'chat' : 'inPerson'}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{t('admin.servicesOneWayNote')}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>{t('common.cancel')}</Button>
+            <Button type="submit" disabled={busy || !changed} className="gap-1.5">
+              {busy ? <Icon name="progress_activity" size={14} className="animate-spin" /> : <Icon name="save" size={14} fill />}
+              {t('common.save')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================================
 // Section: Promo Codes — CRUD for promo code management
 // ============================================================================
 
@@ -4246,6 +4470,7 @@ export function AdminDashboard({ section }: { section: string }) {
     case 'bookings': return <AdminBookingsSection />
     case 'messages': return <MessagesSection />
     case 'providers': return <ProvidersSection />
+    case 'services': return <ServicesSection />
     case 'users': return <UsersSection />
     case 'moderation': return <ModerationSection />
     case 'commission': return <CommissionSection />

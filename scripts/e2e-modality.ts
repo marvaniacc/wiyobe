@@ -24,12 +24,18 @@
 
 import { db } from '../src/lib/db'
 import { hashPassword } from '../src/lib/auth'
+import { matchServicesForModality } from '../src/lib/modality'
 
 const BASE = process.argv[2] || 'http://localhost:3011'
 
 interface Ctx { cookie: string }
 
 let failures = 0
+// Extra fixture doctor ids created mid-run (S7) — swept in cleanup.
+const e2eExtraDoctors: string[] = []
+// Extra user ids created mid-run (S7 admin) — swept in cleanup.
+const cleanupUserIds: string[] = []
+function userIdsSafe(ids: string[]): string[] { return ids }
 function check(name: string, cond: boolean, detail?: string) {
   if (cond) {
     console.log(`  ✅ ${name}`)
@@ -247,6 +253,92 @@ async function main() {
   }
 
   // =========================================================================
+  console.log('━━━ S7: admin classification workflow → service becomes booking-eligible')
+  {
+    // D4 starts with an UNCLASSIFIED service (legacy). Admin classifies it to
+    // VIDEO via the new admin API, verifies it appears in the classified
+    // match-set (matchServicesForModality — the same call BookingDialog
+    // makes), then books through it: amount must equal Service.price.
+    const u = await db.user.upsert({
+      where: { email: `e2emodality-d4-${stamp}@test.local` },
+      update: {},
+      create: {
+        email: `e2emodality-d4-${stamp}@test.local`, passwordHash: hashPassword('test1234'),
+        role: 'DOCTOR', status: 'ACTIVE', name: 'E2E Doctor D4', preferredLanguage: 'en',
+      },
+    })
+    await db.doctor.deleteMany({ where: { userId: u.id } })
+    const d4 = await db.doctor.create({
+      data: {
+        userId: u.id, specialty: 'E2E', subSpecialties: '', bio: '', city: 'Test', country: 'Test',
+        yearsExperience: 1, consultationFee: '100', onlineFee: '80',
+        languages: 'en', education: '', certifications: '', verified: true, rating: 0, reviewCount: 0,
+      },
+    })
+    const svc4 = await db.service.create({
+      data: {
+        name: 'E2E Legacy Service', description: 'starts unclassified', price: '66.00', currency: 'USD',
+        providerType: 'DOCTOR', doctorId: d4.id, modality: null, isActive: true,
+      },
+    })
+    const slot4 = await db.slot.create({
+      data: { doctorId: d4.id, startTime: new Date(Date.now() + 5 * 86400_000), endTime: new Date(Date.now() + 5 * 86400_000 + 1800_000), visitType: 'VIDEO', isBooked: false },
+    })
+    doctorIds.d4 = d4.id
+    serviceIds.d4 = [svc4.id]
+    slotIds.d4 = slot4.id
+
+    // admin client
+    const adminUser = await db.user.upsert({
+      where: { email: `e2emodality-admin-${stamp}@test.local` },
+      update: {},
+      create: {
+        email: `e2emodality-admin-${stamp}@test.local`, passwordHash: hashPassword('test1234'),
+        role: 'ADMIN', status: 'ACTIVE', name: 'E2E Admin', preferredLanguage: 'en',
+      },
+    })
+    const admin = await login(`e2emodality-admin-${stamp}@test.local`, 'test1234')
+    const adminUserIds = userIdsSafe([adminUser.id])
+    cleanupUserIds.push(...adminUserIds)
+
+    // 1) unclassified service must NOT match VIDEO before classification
+    const before = matchServicesForModality([svc4], 'VIDEO')
+    check('unclassified service NOT in VIDEO match-set (pre-classify)', before.length === 0)
+
+    // 2) patient-as-admin must be rejected (role gate)
+    const asPatient = await api(patient, 'PATCH', '/api/admin/services', { id: svc4.id, modality: 'VIDEO' })
+    check('non-admin PATCH → 403', asPatient.status === 403, `got ${asPatient.status}`)
+
+    // 3) admin classifies to VIDEO
+    const cls = await api(admin, 'PATCH', '/api/admin/services', { id: svc4.id, modality: 'VIDEO' })
+    check('admin classify → 200', cls.status === 200, `got ${cls.status} ${JSON.stringify(cls.json)}`)
+    check('modality persisted', cls.json?.service?.modality === 'VIDEO', `modality=${cls.json?.service?.modality}`)
+
+    // 4) NULL-clear attempt must fail (zod enum rejects null → 400)
+    const clear = await api(admin, 'PATCH', '/api/admin/services', { id: svc4.id, modality: null })
+    check('NULL-clear attempt → 400 (one-way rule)', clear.status === 400, `got ${clear.status}`)
+
+    // 5) list filter picks it up as classified
+    const list = await api(admin, 'GET', '/api/admin/services?modality=VIDEO')
+    check('admin list (modality=VIDEO) contains the service', Array.isArray(list.json?.services) && list.json.services.some((s: any) => s.id === svc4.id))
+    const listUnc = await api(admin, 'GET', '/api/admin/services?modality=UNCLASSIFIED')
+    check('admin list (UNCLASSIFIED) excludes it', Array.isArray(listUnc.json?.services) && !listUnc.json.services.some((s: any) => s.id === svc4.id))
+
+    // 6) post-classification, matchServicesForModality (BookingDialog's call) matches it
+    const classified = await db.service.findUnique({ where: { id: svc4.id } })
+    const after = matchServicesForModality([classified!], 'VIDEO')
+    check('classified service NOW in VIDEO match-set', after.length === 1 && after[0].id === svc4.id)
+
+    // 7) and the booking flow accepts it with Service.price
+    const r = await api(patient, 'POST', '/api/bookings', uiBody(d4.id, slot4.id, 'VIDEO', svc4.id))
+    check('booking with newly classified service → 200/201', r.status === 200 || r.status === 201, `got ${r.status} ${JSON.stringify(r.json)}`)
+    check('amount == Service.price (66.00)', r.json?.booking?.amount === '66.00', `amount=${r.json?.booking?.amount}`)
+
+    // cleanup D4 fixtures (bookings already swept below via patientId)
+    e2eExtraDoctors.push(d4.id)
+  }
+
+  // =========================================================================
   // CLEANUP — remove everything this script created (bookings first, then
   // dependents, then fixtures). Never touches production data.
   // =========================================================================
@@ -266,9 +358,14 @@ async function main() {
     await db.service.deleteMany({ where: { doctorId: doctorIds[key] } })
     await db.doctor.deleteMany({ where: { id: doctorIds[key] } })
   }
-  await db.session.deleteMany({ where: { userId: { in: userIds } } })
+  for (const doctorId of e2eExtraDoctors) {
+    await db.slot.deleteMany({ where: { doctorId } })
+    await db.service.deleteMany({ where: { doctorId } })
+    await db.doctor.deleteMany({ where: { id: doctorId } })
+  }
+  await db.session.deleteMany({ where: { userId: { in: [...userIds, ...cleanupUserIds] } } })
   await db.patient.deleteMany({ where: { userId: userIds[0] } })
-  await db.user.deleteMany({ where: { id: { in: userIds } } })
+  await db.user.deleteMany({ where: { id: { in: [...userIds, ...cleanupUserIds] } } })
   console.log('  fixtures removed')
 
   // =========================================================================

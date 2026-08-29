@@ -132,6 +132,7 @@ const ADMIN_NAV_GROUPS: NavGroup[] = [
     groupKey: 'providers', labelKey: 'nav.providers', icon: 'verified',
     items: [
       { key: 'providers', labelKey: 'dash.providers', icon: 'verified' },
+      { key: 'services', labelKey: 'admin.services', icon: 'medical_services' },
       { key: 'kyc-review', labelKey: 'admin.kycReview', icon: 'fact_check' },
       { key: 'kyc-requirements', labelKey: 'admin.kycRequirements', icon: 'verified_user' },
     ],
