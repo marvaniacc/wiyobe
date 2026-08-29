@@ -182,11 +182,11 @@ export function CheckoutClient({ bookingId }: { bookingId: string }) {
 }
 
 // Canonical display labels per visitType. ONLINE is the historical alias of
-// VIDEO — legacy bookings keep their familiar "Online consultation" label.
+// VIDEO — legacy bookings share the Video Call label (single user-facing name).
 const MODALITY_LABELS: Record<string, string> = {
-  VIDEO: 'Video consultation',
-  CHAT: 'Chat consultation',
-  ONLINE: 'Online consultation',
+  VIDEO: 'Video Call',
+  CHAT: 'Online Chat',
+  ONLINE: 'Video Call',
   IN_PERSON: 'In-person visit',
 }
 

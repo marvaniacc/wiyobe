@@ -339,6 +339,69 @@ async function main() {
   }
 
   // =========================================================================
+  console.log('━━━ S8: CHAT service + CHAT slot → booking, NO video room, chat usable')
+  {
+    // Decision 5 end-to-end through the slot-creation surface: create a CHAT
+    // slot (the exact POST /api/slots body the doctor's AddSlotDialog sends
+    // with its new CHAT option), a CHAT-classified Service, then book the
+    // slot. The booking must get videoSessionUrl = null (no Jitsi/Whereby
+    // room) while the chat thread remains authorized for patient + doctor.
+    const u = await db.user.upsert({
+      where: { email: `e2emodality-d5-${stamp}@test.local` },
+      update: {},
+      create: {
+        email: `e2emodality-d5-${stamp}@test.local`, passwordHash: hashPassword('test1234'),
+        role: 'DOCTOR', status: 'ACTIVE', name: 'E2E Doctor D5', preferredLanguage: 'en',
+      },
+    })
+    await db.doctor.deleteMany({ where: { userId: u.id } })
+    const d5 = await db.doctor.create({
+      data: {
+        userId: u.id, specialty: 'E2E', subSpecialties: '', bio: '', city: 'Test', country: 'Test',
+        yearsExperience: 1, consultationFee: '100', onlineFee: '80',
+        languages: 'en', education: '', certifications: '', verified: true, rating: 0, reviewCount: 0,
+      },
+    })
+    const svc5 = await db.service.create({
+      data: {
+        name: 'E2E Chat Service', description: 'chat modality', price: '33.00', currency: 'USD',
+        providerType: 'DOCTOR', doctorId: d5.id, modality: 'CHAT', isActive: true,
+      },
+    })
+
+    // Create the CHAT slot through the API exactly as AddSlotDialog does.
+    const doctorClient = await login(`e2emodality-d5-${stamp}@test.local`, 'test1234')
+    const startAt = new Date(Date.now() + 5 * 86400_000)
+    const endAt = new Date(Date.now() + 5 * 86400_000 + 1800_000)
+    const slotRes = await api(doctorClient, 'POST', '/api/slots', {
+      startTime: startAt.toISOString(),
+      endTime: endAt.toISOString(),
+      visitType: 'CHAT', // the new option in the doctor slot-creation form
+    })
+    check('POST /api/slots with CHAT → 200/201', slotRes.status === 200 || slotRes.status === 201, `got ${slotRes.status} ${JSON.stringify(slotRes.json)}`)
+    const chatSlotId = slotRes.json?.slot?.id
+    check('slot persisted with visitType CHAT', !!chatSlotId && slotRes.json?.slot?.visitType === 'CHAT', `visitType=${slotRes.json?.slot?.visitType}`)
+
+    // Book it as the patient with the CHAT-classified service.
+    const r = await api(patient, 'POST', '/api/bookings', uiBody(d5.id, chatSlotId, 'CHAT', svc5.id))
+    check('CHAT booking → 200/201', r.status === 200 || r.status === 201, `got ${r.status} ${JSON.stringify(r.json)}`)
+    const booking = r.json?.booking
+    check('amount == Service.price (33.00)', booking?.amount === '33.00', `amount=${booking?.amount}`)
+    check('visitType persisted as CHAT', booking?.visitType === 'CHAT', `visitType=${booking?.visitType}`)
+    // Decision 5: only VIDEO (and historical ONLINE) get a video room.
+    check('videoSessionUrl is null (no room for CHAT)', booking?.videoSessionUrl === null || booking?.videoSessionUrl === undefined, `videoSessionUrl=${booking?.videoSessionUrl}`)
+
+    // Chat thread remains available for both parties (authorizeBookingChat is
+    // modality-independent) — messages POST must be accepted for the patient.
+    const msg = await api(patient, 'POST', '/api/chat', { bookingId: booking.id, message: 'Hello doctor — e2e chat check' })
+    check('chat message send (patient) → 200/201', msg.status === 200 || msg.status === 201, `got ${msg.status} ${JSON.stringify(msg.json).slice(0, 120)}`)
+    const thread = await api(patient, 'GET', `/api/chat?bookingId=${booking.id}`)
+    check('chat thread readable (patient) → 200', thread.status === 200, `got ${thread.status}`)
+
+    e2eExtraDoctors.push(d5.id)
+  }
+
+  // =========================================================================
   // CLEANUP — remove everything this script created (bookings first, then
   // dependents, then fixtures). Never touches production data.
   // =========================================================================

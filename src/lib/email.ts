@@ -5,8 +5,8 @@ import { tryNormalizeVisitType } from '@/lib/modality'
 // by design: transactional emails are currently locale-independent.
 function modalityLabel(visitType: string): string {
   const m = tryNormalizeVisitType(visitType)
-  if (m === 'VIDEO') return 'online consultation'   // historical ONLINE rows keep the familiar label
-  if (m === 'CHAT') return 'chat consultation'
+  if (m === 'VIDEO') return 'video call'   // historical ONLINE rows share the new label
+  if (m === 'CHAT') return 'online chat'
   if (m === 'IN_PERSON') return 'in-person visit'
   return 'consultation'
 }

@@ -71,7 +71,9 @@ type Slot = {
   id: string
   startTime: string
   endTime: string
-  visitType: 'IN_PERSON' | 'ONLINE'
+  // DB VisitType values (VIDEO/CHAT added by the modality pivot; legacy rows
+  // carry ONLINE). Display paths normalize via tryNormalizeVisitType.
+  visitType: 'IN_PERSON' | 'ONLINE' | 'VIDEO' | 'CHAT'
   isBooked: boolean
 }
 
@@ -79,7 +81,7 @@ type Booking = {
   id: string
   patient: Patient
   providerType: string
-  visitType: 'IN_PERSON' | 'ONLINE'
+  visitType: 'IN_PERSON' | 'ONLINE' | 'VIDEO' | 'CHAT'
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'REFUNDED'
   startDate: string
   endDate: string | null
@@ -686,9 +688,10 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
   function handleAddToCalendar() {
     const startTime = new Date(booking.startDate)
     const endTime = booking.endDate ? new Date(booking.endDate) : new Date(startTime.getTime() + 60 * 60 * 1000)
-    // Canonical iCal label (VIDEO + legacy ONLINE -> "Online consultation")
+    // Canonical iCal label (VIDEO + legacy ONLINE -> "Video Call";
+    // CHAT -> "Online Chat")
     const m = tryNormalizeVisitType(booking.visitType)
-    const visitType = m === 'IN_PERSON' ? 'In-person visit' : m === 'CHAT' ? 'Chat consultation' : 'Online consultation'
+    const visitType = m === 'IN_PERSON' ? 'In-person visit' : m === 'CHAT' ? 'Online Chat' : 'Video Call'
     downloadICal(`wishubest-booking-${booking.id.slice(-8)}`, {
       uid: booking.id,
       title: `${visitType} with ${booking.patient?.name || 'Patient'}`,
@@ -1508,7 +1511,10 @@ function RecurringSlotsDialog({ open, onOpenChange, onCreated }: { open: boolean
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
   const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]) // Mon-Fri by default
-  const [visitType, setVisitType] = useState<'IN_PERSON' | 'ONLINE'>('IN_PERSON')
+  // Canonical modality values: new slots are written as VIDEO (never the
+  // historical ONLINE alias) or CHAT — the slot APIs normalize + persist
+  // exactly what is sent here.
+  const [visitType, setVisitType] = useState<'IN_PERSON' | 'VIDEO' | 'CHAT'>('IN_PERSON')
   const [duration, setDuration] = useState(60)
   const [busy, setBusy] = useState(false)
 
@@ -1613,7 +1619,8 @@ function RecurringSlotsDialog({ open, onOpenChange, onCreated }: { open: boolean
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="IN_PERSON">{t('booking.inPerson')}</SelectItem>
-                  <SelectItem value="ONLINE">{t('booking.online')}</SelectItem>
+                  <SelectItem value="VIDEO">{t('booking.video')}</SelectItem>
+                  <SelectItem value="CHAT">{t('booking.chat')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1724,7 +1731,10 @@ function AddSlotDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpe
   const { t } = useT()
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
-  const [visitType, setVisitType] = useState<'IN_PERSON' | 'ONLINE'>('IN_PERSON')
+  // Canonical modality values: new slots are written as VIDEO (never the
+  // historical ONLINE alias) or CHAT — the slot API normalizes + persists
+  // exactly what is sent here.
+  const [visitType, setVisitType] = useState<'IN_PERSON' | 'VIDEO' | 'CHAT'>('IN_PERSON')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -1787,13 +1797,14 @@ function AddSlotDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpe
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>{t('provider.visitType')}</Label>
-            <Select value={visitType} onValueChange={(v) => setVisitType(v as 'IN_PERSON' | 'ONLINE')}>
+            <Select value={visitType} onValueChange={(v) => setVisitType(v as 'IN_PERSON' | 'VIDEO' | 'CHAT')}>
               <SelectTrigger className="h-12 w-full rounded-[14px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="IN_PERSON">{t('common.inPersonVisit')}</SelectItem>
-                <SelectItem value="ONLINE">{t('common.onlineVisit')}</SelectItem>
+                <SelectItem value="VIDEO">{t('booking.video')}</SelectItem>
+                <SelectItem value="CHAT">{t('booking.chat')}</SelectItem>
               </SelectContent>
             </Select>
           </div>

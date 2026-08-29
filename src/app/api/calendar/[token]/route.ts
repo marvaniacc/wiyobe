@@ -133,10 +133,11 @@ function buildIcal(providerName: string, providerUserId: string, bookings: FeedB
     const dtEnd = formatIcalUtc(end)
 
     const patientName = b.patient.name || 'Patient'
-    // Display label via canonical modality (legacy ONLINE == VIDEO).
+    // Display label via canonical modality (legacy ONLINE == VIDEO shares
+    // the Video Call label; CHAT renders as Online Chat).
     const modalityLabel = tryNormalizeVisitType(b.visitType) === 'VIDEO'
-      ? 'Video consultation'
-      : b.visitType === 'CHAT' ? 'Chat consultation' : 'In-person visit'
+      ? 'Video Call'
+      : b.visitType === 'CHAT' ? 'Online Chat' : 'In-person visit'
     const serviceName = b.service?.name || modalityLabel
 
     const summary = `Appointment with ${patientName}`

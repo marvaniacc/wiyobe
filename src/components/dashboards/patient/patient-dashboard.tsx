@@ -2834,8 +2834,8 @@ function handleAddToCalendar(booking: any) {
   const startTime = new Date(booking.startDate)
   const endTime = booking.endDate ? new Date(booking.endDate) : new Date(startTime.getTime() + 60 * 60 * 1000) // default 1 hour
   const visitType = tryNormalizeVisitType(booking.visitType) === 'IN_PERSON' ? 'In-person visit'
-    : tryNormalizeVisitType(booking.visitType) === 'CHAT' ? 'Chat consultation'
-    : 'Online consultation' // VIDEO and legacy ONLINE both display as "Online consultation"
+    : tryNormalizeVisitType(booking.visitType) === 'CHAT' ? 'Online Chat'
+    : 'Video Call' // VIDEO and legacy ONLINE both display as "Video Call"
   const location = booking.videoSessionUrl || (booking.doctor?.city || booking.hospital?.city || '') || 'TBD'
 
   downloadICal(`wishubest-booking-${booking.id.slice(-8)}`, {

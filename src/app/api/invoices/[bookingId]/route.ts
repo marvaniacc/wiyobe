@@ -8,8 +8,8 @@ import { tryNormalizeVisitType } from '@/lib/modality'
 // Canonical invoice label (legacy ONLINE == VIDEO).
 function modalityLabel(visitType: string): string {
   const m = tryNormalizeVisitType(visitType)
-  if (m === 'VIDEO') return 'Online Consultation'
-  if (m === 'CHAT') return 'Chat Consultation'
+  if (m === 'VIDEO') return 'Video Call'
+  if (m === 'CHAT') return 'Online Chat'
   if (m === 'IN_PERSON') return 'In-person Visit'
   return 'Consultation'
 }
