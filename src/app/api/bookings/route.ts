@@ -385,12 +385,15 @@ export async function POST(req: Request) {
     // Fulfillment semantics: only the canonical VIDEO modality creates a room.
     // CHAT and IN_PERSON never do. Legacy 'ONLINE' requests normalize to VIDEO
     // above, so historical behavior is preserved exactly.
-    // Generate with a temp ID (booking ID not yet created); the URL is room-based, not ID-dependent
+    // Room name: high-entropy CSPRNG (generateSecureRoomName) — NOT derived
+    // from the booking id (the old wishubest-<id8> pattern was guessable).
+    // The generated URL is stored on the Booking row (videoSessionUrl) and is
+    // only revealed to participants via GET /api/bookings/[id]/video/join.
     let videoSessionUrl: string | null = null
     if (modality === 'VIDEO') {
       const { createVideoSession } = await import('@/lib/video')
-      const tempId = `${session.id.slice(-4)}-${Date.now().toString(36)}`
-      const videoSession = await createVideoSession(tempId, session.name || 'Patient', providerName)
+      const { generateSecureRoomName } = await import('@/lib/video-token')
+      const videoSession = await createVideoSession(generateSecureRoomName(), session.name || 'Patient', providerName)
       videoSessionUrl = videoSession.url
     }
 

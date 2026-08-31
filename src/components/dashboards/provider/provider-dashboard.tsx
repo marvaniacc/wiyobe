@@ -807,7 +807,7 @@ function BookingRow({ booking, t, locale, onDone }: { booking: Booking; t: (k: s
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => window.open(booking.videoSessionUrl!, '_blank', 'noopener')}
+              onClick={() => window.open(`/api/bookings/${booking.id}/video/join?redirect=1`, '_blank', 'noopener')}
             >
               <Icon name="videocam" size={14} fill />
               <span className="hidden sm:inline">{t('common.joinVideo')}</span>

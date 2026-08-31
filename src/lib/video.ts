@@ -29,9 +29,12 @@ export function isVideoConfigured(): boolean {
   return false
 }
 
-export async function createVideoSession(bookingId: string, patientName: string, providerName: string): Promise<VideoSession> {
+export async function createVideoSession(roomName: string, patientName: string, providerName: string): Promise<VideoSession> {
+  // `roomName` is supplied by the caller and must come from
+  // generateSecureRoomName() (src/lib/video-token.ts) — high-entropy CSPRNG,
+  // NOT derived from booking ids. The legacy `wishubest-<id8>` pattern was
+  // guessable from booking ids and is retired for NEW bookings.
   const provider = getVideoProvider()
-  const roomName = `wishubest-${bookingId.slice(-8)}`
 
   switch (provider) {
     case 'daily':

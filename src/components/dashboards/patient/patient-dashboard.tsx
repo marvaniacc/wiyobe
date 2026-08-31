@@ -2019,7 +2019,7 @@ function BookingActions({ booking, onCancel, onReview, onReschedule }: {
       <div className="flex items-center justify-end gap-1.5">
         {tryNormalizeVisitType(booking.visitType) === 'VIDEO' && booking.videoSessionUrl && (
           <Button asChild size="sm" variant="success">
-            <a href={booking.videoSessionUrl} target="_blank" rel="noopener noreferrer">
+            <a href={`/api/bookings/${booking.id}/video/join?redirect=1`} target="_blank" rel="noopener noreferrer">
               <Icon name="videocam" size={14} />
               <span className="hidden sm:inline">{t('bookings.joinVideo')}</span>
             </a>
@@ -2954,7 +2954,7 @@ function BookingDetailDialog({ booking, open, onOpenChange, onOpenDispute }: {
           {/* Video link for online visits */}
           {tryNormalizeVisitType(booking.visitType) === 'VIDEO' && booking.videoSessionUrl && booking.status === 'CONFIRMED' && (
             <Button asChild variant="success" className="w-full gap-2">
-              <a href={booking.videoSessionUrl} target="_blank" rel="noopener noreferrer">
+              <a href={`/api/bookings/${booking.id}/video/join?redirect=1`} target="_blank" rel="noopener noreferrer">
                 <Icon name="videocam" size={18} />
                 {t('booking.videoJoin')}
               </a>
