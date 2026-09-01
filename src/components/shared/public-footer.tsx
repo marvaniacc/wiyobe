@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { ssrT } from '@/lib/ssr-i18n'
 import { CookiePreferencesButton } from '@/components/shared/cookie-preferences-button'
+import { SHOW_LEGACY_PROVIDER_TYPES, isLegacyListingPath } from '@/lib/feature-flags'
 
 /**
  * PublicFooter — unified public-site footer for SSR pages under /{locale}/...
@@ -71,7 +72,14 @@ export async function PublicFooter({ locale }: { locale: string }) {
   const siteName = siteNameRow?.value || 'Wishubest'
   const config = parseFooterConfig(configRow?.value)
   const defaultCols = getDefaultColumns(locale)
-  const columns = config?.columns?.length ? config.columns : defaultCols
+  const columns = (config?.columns?.length ? config.columns : defaultCols)
+    // Flag OFF: drop footer links to legacy provider-type listings — including
+    // links inside admin-configured footer columns.
+    .map((col) => ({
+      ...col,
+      links: col.links.filter((l) => SHOW_LEGACY_PROVIDER_TYPES || !isLegacyListingPath(l.link)),
+    }))
+    .filter((col) => col.links.length > 0)
   const year = new Date().getFullYear()
   const copyright = config?.copyright || `© ${year} ${siteName} — ${ssrT(locale, 'footer.copyrightSuffix', 'Global Medical Tourism Marketplace')}`
 

@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { LOCALES, LOCALE_META, type Locale } from '@/lib/i18n'
 import { ssrT } from '@/lib/ssr-i18n'
 import { PublicAuthArea } from '@/components/shared/public-auth-area'
+import { SHOW_LEGACY_PROVIDER_TYPES, isLegacyListingPath } from '@/lib/feature-flags'
 
 type NavLink = { label: string; link: string }
 type HeaderConfig = {
@@ -61,7 +62,10 @@ export async function PublicHeader({ locale }: { locale: string }) {
     { label: ssrT(locale, 'public.verifiedHospitals', 'Hospitals'), link: `/${locale}/hospitals` },
     { label: ssrT(locale, 'public.blogTitle', 'Blog'), link: `/${locale}/blog` },
   ]
-  const navLinks = config?.menuItems?.length ? config.menuItems : defaultLinks
+  const navLinks = (config?.menuItems?.length ? config.menuItems : defaultLinks)
+    // Flag OFF: hide legacy provider-type entries from the header nav —
+    // including any admin-configured menu item pointing at them.
+    .filter((l) => SHOW_LEGACY_PROVIDER_TYPES || !isLegacyListingPath(l.link))
   const ctaText = config?.ctaLabel || (isAuth ? undefined : 'Login / Sign Up')
   const ctaHref = config?.ctaLink || `/${locale}/login`
   const logoText = siteName

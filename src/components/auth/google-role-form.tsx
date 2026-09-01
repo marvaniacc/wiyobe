@@ -8,6 +8,7 @@ import { Icon } from '@/components/shared/icon'
 import { GoogleIcon } from '@/components/shared/google-icon'
 import { toast } from 'sonner'
 import { translate, type Locale } from '@/lib/i18n'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 import { cn } from '@/lib/utils'
 
 type Role = 'patient' | 'doctor' | 'hospital' | 'hotel' | 'translator' | 'affiliate'
@@ -15,9 +16,15 @@ type Role = 'patient' | 'doctor' | 'hospital' | 'hotel' | 'translator' | 'affili
 const ROLE_OPTIONS: { value: Role; labelKey: string; descKey: string; icon: string; descFallback: string }[] = [
   { value: 'patient', labelKey: 'role.patient', descKey: 'auth.roleDesc.patient', icon: 'personal_injury', descFallback: 'Book treatments and manage your care journey' },
   { value: 'doctor', labelKey: 'role.doctor', descKey: 'auth.roleDesc.doctor', icon: 'medical_services', descFallback: 'Offer consultations and medical services' },
-  { value: 'hospital', labelKey: 'role.hospital', descKey: 'auth.roleDesc.hospital', icon: 'local_hospital', descFallback: 'List your hospital or clinic' },
-  { value: 'hotel', labelKey: 'role.hotel', descKey: 'auth.roleDesc.hotel', icon: 'hotel', descFallback: 'Host patients and their families' },
-  { value: 'translator', labelKey: 'role.translator', descKey: 'auth.roleDesc.translator', icon: 'translate', descFallback: 'Provide medical translation services' },
+  // Flag OFF: legacy provider types are not selectable for NEW Google signups —
+  // existing Hospital/Hotel/Translator accounts are unaffected.
+  ...(SHOW_LEGACY_PROVIDER_TYPES
+    ? [
+        { value: 'hospital' as const, labelKey: 'role.hospital', descKey: 'auth.roleDesc.hospital', icon: 'local_hospital', descFallback: 'List your hospital or clinic' },
+        { value: 'hotel' as const, labelKey: 'role.hotel', descKey: 'auth.roleDesc.hotel', icon: 'hotel', descFallback: 'Host patients and their families' },
+        { value: 'translator' as const, labelKey: 'role.translator', descKey: 'auth.roleDesc.translator', icon: 'translate', descFallback: 'Provide medical translation services' },
+      ]
+    : []),
   { value: 'affiliate', labelKey: 'role.affiliate', descKey: 'auth.roleDesc.affiliate', icon: 'campaign', descFallback: 'Promote Wishubest and earn commissions' },
 ]
 

@@ -14,6 +14,7 @@ import {
 } from '@/lib/money'
 import { LOCALES, LOCALE_META, type Locale } from '@/lib/i18n'
 import { tryNormalizeVisitType, matchServicesForModality } from '@/lib/modality'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -673,9 +674,14 @@ function BrowseSection() {
   const typeTabs: { key: 'all' | ProviderType; label: string; icon: string }[] = [
     { key: 'all', label: t('browse.allTypes'), icon: 'apps' },
     { key: 'DOCTOR', label: t('role.doctor'), icon: 'medical_services' },
-    { key: 'HOSPITAL', label: t('role.hospital'), icon: 'local_hospital' },
-    { key: 'HOTEL', label: t('role.hotel'), icon: 'hotel' },
-    { key: 'TRANSLATOR', label: t('role.translator'), icon: 'translate' },
+    // Flag OFF: hide legacy provider types from the Browse filter tabs.
+    ...(SHOW_LEGACY_PROVIDER_TYPES
+      ? [
+          { key: 'HOSPITAL' as const, label: t('role.hospital'), icon: 'local_hospital' },
+          { key: 'HOTEL' as const, label: t('role.hotel'), icon: 'hotel' },
+          { key: 'TRANSLATOR' as const, label: t('role.translator'), icon: 'translate' },
+        ]
+      : []),
   ]
 
   function clearFilters() {

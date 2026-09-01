@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { TriageBot } from '@/components/shared/triage-bot'
 import { BlockNoteSSRRenderer } from '@/components/editor/blocknote-ssr-renderer'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,8 +59,10 @@ export default async function LocaleHomePage({
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Wishubest</h1>
           <p className="text-muted-foreground">
-            Global Medical Tourism Marketplace — Compare and book verified doctors,
-            hospitals, accommodations, and translators worldwide.
+            {/* Flag OFF: tagline without legacy provider-type references */}
+            {SHOW_LEGACY_PROVIDER_TYPES
+              ? 'Global Medical Tourism Marketplace — Compare and book verified doctors, hospitals, accommodations, and translators worldwide.'
+              : 'Cross-Border Doctor Marketplace — Compare and book verified doctors worldwide.'}
           </p>
         </div>
         <Link

@@ -13,6 +13,7 @@ import { GoogleIcon } from '@/components/shared/google-icon'
 import { OtpInput } from '@/components/auth/otp-input'
 import { toast } from 'sonner'
 import { translate, type Locale } from '@/lib/i18n'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 import { cn } from '@/lib/utils'
 
 declare global {
@@ -40,9 +41,16 @@ type AuthFormProps = {
 const ROLE_OPTIONS: { value: Role; labelKey: string; icon: string }[] = [
   { value: 'patient', labelKey: 'role.patient', icon: 'personal_injury' },
   { value: 'doctor', labelKey: 'role.doctor', icon: 'medical_services' },
-  { value: 'hospital', labelKey: 'role.hospital', icon: 'local_hospital' },
-  { value: 'hotel', labelKey: 'role.hotel', icon: 'hotel' },
-  { value: 'translator', labelKey: 'role.translator', icon: 'translate' },
+  // Flag OFF: legacy provider types are not selectable for NEW signups —
+  // existing Hospital/Hotel/Translator accounts are unaffected (login and
+  // dashboards are untouched).
+  ...(SHOW_LEGACY_PROVIDER_TYPES
+    ? [
+        { value: 'hospital' as const, labelKey: 'role.hospital', icon: 'local_hospital' },
+        { value: 'hotel' as const, labelKey: 'role.hotel', icon: 'hotel' },
+        { value: 'translator' as const, labelKey: 'role.translator', icon: 'translate' },
+      ]
+    : []),
   { value: 'affiliate', labelKey: 'role.affiliate', icon: 'campaign' },
 ]
 

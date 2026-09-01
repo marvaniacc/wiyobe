@@ -17,6 +17,7 @@ import { ProviderDashboard } from '@/components/dashboards/provider/provider-das
 import { AdminDashboard } from '@/components/dashboards/admin/admin-dashboard'
 import { AffiliateDashboard } from '@/components/dashboards/affiliate/affiliate-dashboard'
 import { NotificationBell } from '@/components/shell/notification-bell'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 import dynamic from 'next/dynamic'
 const PageEditorFullScreen = dynamic(() => import('@/components/admin/full-screen-editors').then(m => m.PageEditorFullScreen), { ssr: false })
 const BlogEditorFullScreen = dynamic(() => import('@/components/admin/full-screen-editors').then(m => m.BlogEditorFullScreen), { ssr: false })
@@ -30,7 +31,13 @@ const NAV: Record<string, NavItem[]> = {
     { key: 'compare', labelKey: 'dash.compare', icon: 'compare' },
     { key: 'favorites', labelKey: 'dash.favorites', icon: 'favorite' },
     { key: 'bookings', labelKey: 'dash.bookings', icon: 'event' },
-    { key: 'itineraries', labelKey: 'dash.itineraries', icon: 'luggage' },
+    // Itineraries: hidden from the sidebar when the legacy flag is OFF.
+    // The section itself stays reachable via direct deep-link (?section=
+    // itineraries) and remains exactly as-is (currently calls a nonexistent
+    // API endpoint) — only its navigation entry is gated.
+    ...(SHOW_LEGACY_PROVIDER_TYPES
+      ? [{ key: 'itineraries' as const, labelKey: 'dash.itineraries', icon: 'luggage' }]
+      : []),
     { key: 'messages', labelKey: 'dash.messages', icon: 'forum' },
     { key: 'documents', labelKey: 'dash.documents', icon: 'folder_shared' },
     { key: 'recycle-bin', labelKey: 'admin.recycleBin', icon: 'delete_sweep' },
