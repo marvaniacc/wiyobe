@@ -303,3 +303,6 @@ async function main() {
 
 main()
   .catch((e) => { console.error('FATAL', e); process.exit(1) })
+
+// Module marker: top-level await used by scripts run via `bun run`.
+export {}
