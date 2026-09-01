@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { authorizeBookingChat } from '@/lib/chat-auth'
-import { translateMessage, isSupportedLanguage, TranslationConfigError, TranslationError } from '@/lib/translation'
+import { translateMessage, isSupportedLanguage, TranslationConfigError, TranslationError, TRANSLATION_PROVIDER } from '@/lib/translation'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
     // Persist (best-effort — swallow unique-constraint race on concurrent requests)
     await db.messageTranslation.create({
-      data: { messageId, targetLanguage, translatedText, provider: 'zai-glm-4-flash' },
+      data: { messageId, targetLanguage, translatedText, provider: TRANSLATION_PROVIDER },
     }).catch(() => {})
 
     return json({ translatedText, cached: false })

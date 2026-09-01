@@ -1,18 +1,20 @@
-import ZAI from 'z-ai-web-dev-sdk'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import OpenAI from 'openai'
 
 /**
  * Dedicated medical-translation service.
  *
- * Uses the ZAI LLM (glm-4-flash) with a strict system prompt that instructs the
- * model to translate only — no summarizing, no medical advice, no commentary.
- * Medical terminology, dosages, names, numbers, dates, prices and units are
- * preserved verbatim.
+ * Uses the AvalAI gateway (OpenAI-compatible, https://api.avalai.ir/v1) with a
+ * strict system prompt that instructs the model to translate only — no
+ * summarizing, no medical advice, no commentary. Medical terminology, dosages,
+ * names, numbers, dates, prices and units are preserved verbatim.
  *
  * Config resolution:
- *   1. TRANSLATION_API_KEY / TRANSLATION_BASE_URL / TRANSLATION_TOKEN env vars
- *   2. Fallback to /etc/.z-ai-config (sandbox only)
+ *   1. TRANSLATION_API_KEY / TRANSLATION_BASE_URL / TRANSLATION_MODEL env vars
+ *      (TRANSLATION_BASE_URL defaults to the AvalAI endpoint)
+ *   2. AVALAI_API_KEY (primary AvalAI credential in .env)
+ *
+ * Model: AVALAI_TRANSLATION_MODEL (default gpt-4o-mini — winner of the
+ * 2026-08-31 bake-off vs gemini-2.5-flash on naturalness, cost and latency).
  *
  * The caller is responsible for caching (see MessageTranslation table).
  */
@@ -75,43 +77,6 @@ STRICT RULES:
 Translate the following message into ${targetLanguageName}:`
 }
 
-interface ZaiConfig {
-  baseUrl?: string
-  apiKey?: string
-  token?: string
-}
-
-function loadZaiConfig(): ZaiConfig {
-  // 1. Environment variables (production)
-  if (process.env.TRANSLATION_API_KEY) {
-    return {
-      apiKey: process.env.TRANSLATION_API_KEY,
-      baseUrl: process.env.TRANSLATION_BASE_URL,
-      token: process.env.TRANSLATION_TOKEN,
-    }
-  }
-
-  // 2. Fallback to /etc/.z-ai-config (sandbox only)
-  const candidates = [
-    '/etc/.z-ai-config',
-    join(process.cwd(), '.z-ai-config'),
-    join(process.env.HOME || '/', '.z-ai-config'),
-  ]
-  for (const p of candidates) {
-    try {
-      const raw = readFileSync(p, 'utf-8')
-      const cfg = JSON.parse(raw)
-      if (cfg.apiKey || cfg.token) {
-        return { apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, token: cfg.token }
-      }
-    } catch {
-      // file not found or invalid — try next
-    }
-  }
-
-  return {}
-}
-
 /**
  * Translate `messageText` into `targetLanguage` (a 2-letter code like "en", "tr", "fa").
  * Throws TranslationConfigError if the service is not configured, or TranslationError
@@ -124,26 +89,28 @@ export async function translateMessage(
   targetLanguage: string,
 ): Promise<string> {
   const targetLangName = getLanguageName(targetLanguage)
-  const cfg = loadZaiConfig()
 
-  if (!cfg.apiKey && !cfg.token) {
+  const apiKey = process.env.TRANSLATION_API_KEY || process.env.AVALAI_API_KEY
+  const baseURL = process.env.TRANSLATION_BASE_URL || 'https://api.avalai.ir/v1'
+  const model = process.env.AVALAI_TRANSLATION_MODEL || 'gpt-4o-mini'
+
+  if (!apiKey) {
     throw new TranslationConfigError(
-      'Translation service is not configured. Set TRANSLATION_API_KEY or place a .z-ai-config file.',
+      'Translation service is not configured. Set AVALAI_API_KEY in the environment.',
     )
   }
 
   try {
-    const zai = await ZAI.create()
-    const completion = await zai.chat.completions.create({
+    const client = new OpenAI({ apiKey, baseURL, timeout: 30_000, maxRetries: 1 })
+    const completion = await client.chat.completions.create({
       messages: [
         { role: 'system', content: buildTranslationSystemPrompt(targetLangName) },
         { role: 'user', content: messageText },
       ],
-      model: 'glm-4-flash',
+      model,
       temperature: 0.1,
-      maxTokens: 2000,
+      max_tokens: 2000,
       stream: false,
-      thinking: { type: 'disabled' },
     })
 
     const translated = (completion.choices?.[0]?.message?.content || '').trim()
@@ -156,3 +123,6 @@ export async function translateMessage(
     throw new TranslationError(`Translation call failed: ${e?.message || String(e)}`)
   }
 }
+
+/** Identifier stored in MessageTranslation.provider for rows created via AvalAI. */
+export const TRANSLATION_PROVIDER = 'avalai'

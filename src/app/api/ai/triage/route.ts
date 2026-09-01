@@ -1,4 +1,4 @@
-import ZAI from 'z-ai-web-dev-sdk'
+import OpenAI from 'openai'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
 import { z } from 'zod'
@@ -34,8 +34,9 @@ Rules:
  * medical triage system prompt, and returns the AI's recommendation
  * (specialty, reasoning, suggested countries).
  *
- * Uses z-ai-web-dev-sdk (server-side only) — no API key needed in .env
- * as the SDK is pre-configured in this environment.
+ * Uses the OpenAI-compatible AvalAI endpoint (server-side only); the key is
+ * read from AVALAI_API_KEY and the model from AVALAI_TRIAGE_MODEL
+ * (both set in .env).
  *
  * Authorization: any authenticated user (patients primarily).
  */
@@ -50,13 +51,21 @@ export async function POST(req: Request) {
 
     let aiResponse: string
     try {
-      const zai = await ZAI.create()
-      const completion = await zai.chat.completions.create({
+      const client = new OpenAI({
+        apiKey: process.env.AVALAI_API_KEY,
+        baseURL: process.env.AVALAI_BASE_URL || 'https://api.avalai.ir/v1',
+        timeout: 30_000,
+        maxRetries: 1,
+      })
+      const completion = await client.chat.completions.create({
         messages: [
-          { role: 'assistant', content: SYSTEM_PROMPT },
+          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `Patient symptoms: "${symptoms}"\n\nBased on these symptoms, suggest the appropriate medical specialty, your reasoning, and suggested countries for medical tourism. Respond in JSON format only.` },
         ],
-        thinking: { type: 'disabled' },
+        model: process.env.AVALAI_TRIAGE_MODEL || 'gpt-4o-mini',
+        temperature: 0.2,
+        max_tokens: 600,
+        stream: false,
       })
       aiResponse = completion.choices[0]?.message?.content || ''
     } catch (aiErr: any) {
