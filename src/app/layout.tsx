@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { SHOW_LEGACY_PROVIDER_TYPES } from "@/lib/feature-flags";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -14,10 +15,17 @@ const inter = Inter({
 // Preload Material Symbols font for icon rendering reliability
 const materialSymbolsUrl = "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block";
 
+// Flag OFF: root metadata description/keywords without legacy provider-type
+// references (the locale layout's metadata takes precedence on /{locale}
+// pages — this covers non-locale routes like /dashboard).
 export const metadata: Metadata = {
   title: "Wishubest — Global Medical Tourism Marketplace",
-  description: "Compare and book verified doctors, hospitals, accommodations and translators worldwide. Secure platform payments, multilingual support.",
-  keywords: ["medical tourism", "healthcare", "doctors", "hospitals", "telemedicine", "medical travel"],
+  description: SHOW_LEGACY_PROVIDER_TYPES
+    ? "Compare and book verified doctors, hospitals, accommodations and translators worldwide. Secure platform payments, multilingual support."
+    : "Compare and book verified doctors worldwide. Secure platform payments, multilingual support.",
+  keywords: SHOW_LEGACY_PROVIDER_TYPES
+    ? ["medical tourism", "healthcare", "doctors", "hospitals", "telemedicine", "medical travel"]
+    : ["medical tourism", "healthcare", "doctors", "telemedicine", "medical travel"],
   icons: { icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg" },
 };
 

@@ -5,6 +5,7 @@ import { PublicHeader } from '@/components/shared/public-header'
 import { PublicFooter } from '@/components/shared/public-footer'
 import { CookieConsentBanner } from '@/components/shared/cookie-consent-banner'
 import { getSiteSettings, normalizeHex } from '@/lib/site-settings'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 
 const SUPPORTED_LOCALES = ['en', 'tr', 'fa', 'ar', 'ru'] as const
 const RTL_LOCALES = ['fa', 'ar']
@@ -39,7 +40,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
   const siteName = settings.siteName || 'Wishubest'
   const defaultSeoTitle = settings.defaultSeoTitle || `${siteName} — Global Medical Tourism Marketplace`
-  const defaultSeoDescription = settings.defaultSeoDescription || 'Compare and book verified doctors, hospitals, accommodations and translators worldwide.'
+  // Flag OFF: default SEO description without legacy provider-type references
+  // (an admin-set defaultSeoDescription SiteSetting overrides both variants —
+  // that's admin DATA, out of scope).
+  const defaultSeoDescription = settings.defaultSeoDescription
+    || (SHOW_LEGACY_PROVIDER_TYPES
+      ? 'Compare and book verified doctors, hospitals, accommodations and translators worldwide.'
+      : 'Compare and book verified doctors worldwide.')
 
   const robots = settings.allowSearchIndexing === 'false'
     ? { index: false as const, follow: false as const }
