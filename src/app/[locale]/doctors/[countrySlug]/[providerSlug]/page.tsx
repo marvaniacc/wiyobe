@@ -9,6 +9,7 @@ import {
   getCountryName,
   getCountrySlug,
 } from '@/lib/countries'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -468,18 +469,22 @@ export default async function DoctorDetailPage({
                 >
                   All doctors
                 </Link>
-                <Link
-                  href={`/${locale}/hospitals/${detailCountrySlug}`}
-                  className="font-medium text-primary transition-colors hover:underline"
-                >
-                  Hospitals in {countryName}
-                </Link>
-                <Link
-                  href={`/${locale}/translators/${detailCountrySlug}`}
-                  className="font-medium text-primary transition-colors hover:underline"
-                >
-                  Translators in {countryName}
-                </Link>
+                {SHOW_LEGACY_PROVIDER_TYPES && (
+                  <Link
+                    href={`/${locale}/hospitals/${detailCountrySlug}`}
+                    className="font-medium text-primary transition-colors hover:underline"
+                  >
+                    Hospitals in {countryName}
+                  </Link>
+                )}
+                {SHOW_LEGACY_PROVIDER_TYPES && (
+                  <Link
+                    href={`/${locale}/translators/${detailCountrySlug}`}
+                    className="font-medium text-primary transition-colors hover:underline"
+                  >
+                    Translators in {countryName}
+                  </Link>
+                )}
               </div>
             </div>
           </aside>

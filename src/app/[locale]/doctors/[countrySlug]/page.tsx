@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { formatCurrency } from '@/lib/money'
 import { getCountryCode, getCountryFlag, getCountryName, getCountrySlug } from '@/lib/countries'
+import { SHOW_LEGACY_PROVIDER_TYPES } from '@/lib/feature-flags'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -115,9 +116,13 @@ export default async function DoctorsByCountryPage({
       <div className="border-b border-divider bg-surface">
         <div className="mx-auto flex max-w-5xl flex-wrap gap-2 px-4 py-3 sm:px-6">
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">Doctors</span>
-          <Link href={`/${locale}/hospitals/${countrySlug}`} className="rounded-full border border-divider px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">Hospitals</Link>
-          <Link href={`/${locale}/hotels/${countrySlug}`} className="rounded-full border border-divider px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">Hotels</Link>
-          <Link href={`/${locale}/translators/${countrySlug}`} className="rounded-full border border-divider px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">Translators</Link>
+          {SHOW_LEGACY_PROVIDER_TYPES && (
+            <>
+              <Link href={`/${locale}/hospitals/${countrySlug}`} className="rounded-full border border-divider px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">Hospitals</Link>
+              <Link href={`/${locale}/hotels/${countrySlug}`} className="rounded-full border border-divider px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">Hotels</Link>
+              <Link href={`/${locale}/translators/${countrySlug}`} className="rounded-full border border-divider px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">Translators</Link>
+            </>
+          )}
         </div>
       </div>
 
