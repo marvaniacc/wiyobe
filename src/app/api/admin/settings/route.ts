@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { json, error, handleError, parseBody } from '@/lib/api'
+import { SETTING_DEFAULTS } from '@/lib/site-settings'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -111,6 +112,10 @@ export async function PUT(req: Request) {
           create: { key, value: normalized },
         })
       } else {
+        // Never let known platform keys be written into the legacy Setting
+        // table: stale rows there re-enter the settings form via GET and can
+        // fail SiteSetting validation on save (e.g. defaultLocale='xx').
+        if (key in SETTING_DEFAULTS) continue
         await db.setting.upsert({
           where: { key },
           update: { value },
@@ -149,6 +154,10 @@ export async function PATCH(req: Request) {
           create: { key, value: normalized },
         })
       } else {
+        // Never let known platform keys be written into the legacy Setting
+        // table: stale rows there re-enter the settings form via GET and can
+        // fail SiteSetting validation on save (e.g. defaultLocale='xx').
+        if (key in SETTING_DEFAULTS) continue
         await db.setting.upsert({
           where: { key },
           update: { value },

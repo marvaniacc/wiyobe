@@ -132,7 +132,7 @@ export function ManageAccessDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-lg overflow-hidden p-0">
-        <DialogHeader className="border-b border-divider p-5">
+        <DialogHeader className="border-b border-divider p-6">
           <DialogTitle className="flex items-center gap-2">
             <Icon name="manage_accounts" size={20} className="text-primary" />
             {t('vault.manageAccess', 'Manage Access')}
@@ -143,7 +143,7 @@ export function ManageAccessDialog({
         </DialogHeader>
 
         {/* Search */}
-        <div className="px-5 pt-4">
+        <div className="px-6 pt-5">
           <div className="relative">
             <Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -156,7 +156,7 @@ export function ManageAccessDialog({
         </div>
 
         {/* Doctor list */}
-        <div className="max-h-[40vh] flex-1 overflow-y-auto px-5 py-3">
+        <div className="max-h-[40vh] flex-1 overflow-y-auto px-6 py-4">
           {loadingDoctors ? (
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -211,7 +211,7 @@ export function ManageAccessDialog({
         </div>
 
         {/* Footer */}
-        <DialogFooter className="border-t border-divider p-4">
+        <DialogFooter className="border-t border-divider p-6">
           <div className="flex w-full items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
               {t('vault.accessCount', `${selected.size} doctor(s) with access`)}

@@ -157,7 +157,7 @@ export function MediaPicker({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="shrink-0 border-b border-divider p-5">
+        <DialogHeader className="shrink-0 border-b border-divider p-6">
           <DialogTitle className="flex items-center gap-2">
             <Icon name="perm_media" size={20} className="text-primary" />
             {t('media.library', 'Media Library')}
@@ -166,7 +166,7 @@ export function MediaPicker({
         </DialogHeader>
 
         {/* Upload area */}
-        <div className="shrink-0 border-b border-divider p-4">
+        <div className="shrink-0 border-b border-divider p-6">
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
@@ -193,7 +193,7 @@ export function MediaPicker({
         </div>
 
         {/* Grid of assets — this section scrolls, footer stays fixed below */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="aspect-square rounded-[12px]" />)}
@@ -241,7 +241,7 @@ export function MediaPicker({
                     </button>
                   </div>
                   {/* File info */}
-                  <div className="p-2">
+                  <div className="p-3">
                     <p className="truncate text-[11px] font-medium text-foreground">{asset.fileName}</p>
                     <p className="text-[10px] text-muted-foreground">{formatFileSize(asset.fileSize)}</p>
                   </div>
@@ -252,7 +252,7 @@ export function MediaPicker({
         </div>
 
         {/* Footer — ALWAYS rendered, pinned to the bottom via shrink-0 */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-divider bg-surface p-4">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-divider bg-surface p-6">
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
             {selected ? <span className="font-mono text-foreground">{selected}</span> : t('media.noSelection', 'No file selected')}
           </p>
