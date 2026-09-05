@@ -80,6 +80,19 @@ const sendSchema = z.object({
   'Message or at least one attachment is required',
 )
 
+function decodeAndValidateAttachment(dataUrl: string, declaredType: string, declaredSize: number): boolean {
+  const match = /^data:([^;]+);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
+  if (!match || match[1] !== declaredType) return false
+
+  try {
+    // Never trust fileSize supplied by the browser: validate decoded bytes
+    // before persisting the data URL in the database.
+    return Buffer.from(match[2], 'base64').length === declaredSize
+  } catch {
+    return false
+  }
+}
+
 /**
  * POST /api/chat
  *
@@ -99,6 +112,9 @@ export async function POST(req: Request) {
       for (const a of attachments) {
         if (!ALLOWED_TYPES.has(a.fileType)) {
           return error(400, `Unsupported file type: ${a.fileType}`)
+        }
+        if (!decodeAndValidateAttachment(a.dataUrl, a.fileType, a.fileSize)) {
+          return error(400, `Invalid attachment: ${a.fileName}`)
         }
       }
     }

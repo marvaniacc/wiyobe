@@ -135,13 +135,6 @@ export function CookieConsentBanner({ locale }: { locale: string }) {
               .
             </p>
           </div>
-          <button
-            onClick={() => setVisible(false)}
-            aria-label="Dismiss"
-            className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-secondary hover:text-foreground"
-          >
-            <Icon name="close" size={16} />
-          </button>
         </div>
 
         {/* Preferences panel (collapsible) */}
