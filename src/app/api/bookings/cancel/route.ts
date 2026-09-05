@@ -41,10 +41,40 @@ export async function POST(req: Request) {
     if (booking.status === 'CANCELLED' || booking.status === 'REFUNDED') {
       return error(409, 'Booking already cancelled')
     }
-    // Only CONFIRMED bookings are cancellable. Cancelling COMPLETED/NO_SHOW
-    // bookings would refund delivered services; PENDING ones have no charge to reverse.
+    // A patient must be able to abandon an unpaid hold. Otherwise closing the
+    // checkout page leaves its slot blocked until a provider intervenes.
+    if (booking.status === 'PENDING') {
+      const cancelledAt = new Date()
+      const cancelled = await db.$transaction(async (tx) => {
+        const bumped = await tx.booking.updateMany({
+          where: { id: booking.id, status: 'PENDING' },
+          data: {
+            status: 'CANCELLED',
+            cancellationReason: body.reason || 'Cancelled before payment',
+            cancelledById: session.id,
+            cancelledAt,
+            refundAmount: toDec('0'),
+          },
+        })
+        if (bumped.count === 0) return false
+        if (booking.slotId) {
+          await tx.slot.update({ where: { id: booking.slotId }, data: { isBooked: false } })
+        }
+        if (booking.promoCodeId) {
+          await tx.promoCode.updateMany({
+            where: { id: booking.promoCodeId, usedCount: { gt: 0 } },
+            data: { usedCount: { decrement: 1 } },
+          })
+        }
+        return true
+      })
+      if (!cancelled) return error(409, 'Booking was already processed by someone else')
+      return json({ booking: { ...booking, status: 'CANCELLED' }, refundAmount: '0.00', feeRetained: '0.00', withinFreeWindow: true })
+    }
+
+    // Cancelling COMPLETED/NO_SHOW bookings would refund delivered services.
     if (booking.status !== 'CONFIRMED') {
-      return error(409, `Booking is ${booking.status}. Only CONFIRMED bookings can be cancelled.`)
+      return error(409, `Booking is ${booking.status}. Only pending or confirmed bookings can be cancelled.`)
     }
 
     // Cancellation fee logic: if within free window, full refund; else partial with fee retained
@@ -91,11 +121,8 @@ export async function POST(req: Request) {
       })
     }
 
-    // Release slot
-    if (booking.slotId) {
-      await db.slot.update({ where: { id: booking.slotId }, data: { isBooked: false } })
-    }
-
+    // Change state before releasing the slot. Releasing first could make a
+    // concurrently processed booking lose its slot even if this update loses.
     const bumped = await db.booking.updateMany({
       where: { id: booking.id, status: 'CONFIRMED' },
       data: {
@@ -107,6 +134,10 @@ export async function POST(req: Request) {
       },
     })
     if (bumped.count === 0) return error(409, 'Booking was already processed by someone else')
+
+    if (booking.slotId) {
+      await db.slot.update({ where: { id: booking.slotId }, data: { isBooked: false } })
+    }
 
 
     // Refund ledger entries

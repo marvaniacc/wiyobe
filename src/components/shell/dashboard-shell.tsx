@@ -261,9 +261,9 @@ export function DashboardShell() {
       {/* Sidebar — icon rail by default, expands on hover (desktop) */}
       <aside
         className={cn(
-          'group fixed inset-y-0 start-0 z-40 flex flex-col border-e border-divider bg-sidebar transition-[width] duration-200 ease-out',
-          'w-[68px] hover:w-[248px]',
-          mobileOpen && 'w-[248px]'
+          'group fixed inset-y-0 start-0 z-40 flex w-0 -translate-x-full overflow-hidden border-e border-divider bg-sidebar transition-[width,transform] duration-200 ease-out',
+          'lg:w-[68px] lg:translate-x-0 lg:overflow-visible lg:hover:w-[248px]',
+          mobileOpen && 'w-[248px] translate-x-0'
         )}
       >
         {/* Brand */}
@@ -377,7 +377,12 @@ export function DashboardShell() {
       <div className="flex min-w-0 flex-1 flex-col lg:ps-[68px]">
         {/* Topbar */}
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-divider bg-surface/80 px-4 backdrop-blur-md md:px-6">
-          <button className="lg:hidden" onClick={() => setMobileOpen((v) => !v)}>
+          <button
+            className="lg:hidden"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label={mobileOpen ? t('common.close') : t('common.menu', 'Open navigation menu')}
+            aria-expanded={mobileOpen}
+          >
             <Icon name="menu" size={24} />
           </button>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -484,8 +489,8 @@ export function DashboardShell() {
           <div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
             <span>© {new Date().getFullYear()} {t('brand.name')}. {t('footer.rights')}</span>
             <div className="flex gap-4">
-              <a href="#" className="transition-colors hover:text-foreground">{t('footer.privacy')}</a>
-              <a href="#" className="transition-colors hover:text-foreground">{t('footer.terms')}</a>
+              <a href={`/${locale}/privacy`} className="transition-colors hover:text-foreground">{t('footer.privacy')}</a>
+              <a href={`/${locale}/terms`} className="transition-colors hover:text-foreground">{t('footer.terms')}</a>
               <a href="#" className="transition-colors hover:text-foreground" onClick={(e) => { e.preventDefault(); goDashboard('tickets') }}>{t('footer.support')}</a>
             </div>
           </div>

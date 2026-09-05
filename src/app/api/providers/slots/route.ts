@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { json, error, handleError } from '@/lib/api'
 import { VISIT_TYPE_ZOD_ENUM, slotFilterForModality, normalizeVisitType } from '@/lib/modality'
+import { expirePaymentHolds } from '@/lib/payment-holds'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,9 @@ export const dynamic = 'force-dynamic'
 // No visitType param = all modalities (unchanged legacy behavior).
 export async function GET(req: Request) {
   try {
+    // Opportunistic cleanup keeps inventory accurate even if a scheduled job
+    // is delayed or unavailable.
+    await expirePaymentHolds()
     const { searchParams } = new URL(req.url)
     const doctorId = searchParams.get('doctorId')
     const hospitalId = searchParams.get('hospitalId')
