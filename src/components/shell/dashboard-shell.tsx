@@ -261,9 +261,15 @@ export function DashboardShell() {
       {/* Sidebar — icon rail by default, expands on hover (desktop) */}
       <aside
         className={cn(
+codex/-ux-n0jt0m
           'group fixed inset-y-0 start-0 z-40 flex w-0 -translate-x-full overflow-hidden border-e border-divider bg-sidebar transition-[width,transform] duration-200 ease-out',
           'lg:w-[68px] lg:translate-x-0 lg:overflow-visible lg:hover:w-[248px]',
           mobileOpen && 'w-[248px] translate-x-0'
+
+          'group fixed inset-y-0 start-0 z-40 flex w-[248px] -translate-x-full flex-col border-e border-divider bg-sidebar transition-[width,transform] duration-200 ease-out',
+          'lg:w-[68px] lg:translate-x-0 lg:hover:w-[248px]',
+          mobileOpen && 'translate-x-0'
+main
         )}
       >
         {/* Brand */}
