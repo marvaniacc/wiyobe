@@ -5,6 +5,7 @@ import { arePaymentsEnabled, createCheckoutSession } from '@/lib/stripe'
 import { toDec, subDec } from '@/lib/money'
 import { z } from 'zod'
 import type { ProviderType } from '@prisma/client'
+import { expirePaymentHolds } from '@/lib/payment-holds'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,7 @@ const schema = z.object({
  */
 export async function POST(req: Request) {
   try {
+    await expirePaymentHolds()
     const session = await getSession()
     if (!session) return error(401, 'Unauthorized')
     if (session.role !== 'PATIENT') return error(403, 'Only patients can pay for bookings')
