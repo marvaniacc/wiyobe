@@ -2043,6 +2043,21 @@ function BookingActions({ booking, onCancel, onReview, onReschedule }: {
     )
   }
 
+  if (booking.status === 'PENDING') {
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <Button size="sm" variant="outline" onClick={() => { window.location.href = `/checkout/${booking.id}` }}>
+          <Icon name="credit_card" size={14} />
+          <span className="hidden sm:inline">{t('booking.completePayment', 'Complete payment')}</span>
+        </Button>
+        <Button size="sm" variant="outline" onClick={onCancel}>
+          <Icon name="close" size={14} />
+          <span className="hidden sm:inline">{t('common.cancel')}</span>
+        </Button>
+      </div>
+    )
+  }
+
   if (booking.status === 'COMPLETED' && !booking.review) {
     return (
       <Button size="sm" variant="outline" onClick={onReview}>
@@ -2122,9 +2137,11 @@ function CancelBookingDialog({ booking, open, onOpenChange, onDone }: {
           <div className="space-y-3">
             <div className="rounded-xl bg-success/5 p-4 text-center">
               <Icon name="check_circle" size={32} fill className="mx-auto text-success" />
-              <p className="mt-2 text-sm font-medium text-foreground">{t('booking.refundIssued')}</p>
+              <p className="mt-2 text-sm font-medium text-foreground">
+                {booking.status === 'PENDING' ? t('bookings.cancelSuccess') : t('booking.refundIssued')}
+              </p>
             </div>
-            <div className="space-y-2 rounded-xl border border-divider p-3 text-sm">
+            {booking.status !== 'PENDING' && <div className="space-y-2 rounded-xl border border-divider p-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">{t('bookings.refundAmount')}</span>
                 <span className="font-semibold text-success tabular-nums">
@@ -2139,7 +2156,7 @@ function CancelBookingDialog({ booking, open, onOpenChange, onDone }: {
                   </span>
                 </div>
               )}
-            </div>
+            </div>}
             <DialogFooter>
               <Button className="w-full" onClick={() => { onOpenChange(false); onDone() }}>
                 {t('common.close')}
